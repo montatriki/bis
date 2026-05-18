@@ -1,0 +1,1326 @@
+
+STATEMENT OF WORK (SOW) — B.I.S ERP SYSTEM
+Business Intelligence Solution — Système de Gestion Intégré
+URL: http://41.226.17.73:3001/  |  API: http://41.226.17.73:3050/
+Admin Access: Email: sky@com | Login: admin | All modules enabled
+
+=========================================================
+NAVIGATION GÉNÉRALE
+=========================================================
+Après connexion, la barre de navigation supérieure affiche les modules :
+STOCK | ACHAT | CRM | VENTE | GESTION TOURNER | CHARGE | GRH | GMAO | GPAO | TRESORERIE | PARC ROULANT
+
+Barre de navigation gauche (sidebar) : icônes de raccourci vers les groupes de modules :
+  - Icône Boîte (gestion du stock)
+  - Icône Panier Vente (gestion des ventes)
+  - Icône Panier Achat (gestion des achats)
+  - Icône Graphique (trésorerie)
+  - Bas de page : [Masquer les modules] | [Configuration ⚙]
+
+=========================================================
+1. TABLEAU DE BORD (DASHBOARD)
+=========================================================
+Écran d'accueil après connexion. Affiche l'état global de l'entreprise.
+
+Widgets disponibles :
+A. Articles en stock minimum :
+   - Compteur : nombre d'articles sous le seuil d'alerte
+   - Bouton [CONSULTER] → redirige vers la liste filtrée du Stock
+
+B. Chèques et traites clients échus (Finances Entrantes) :
+   - Chèques : X documents / X TND
+   - Traites : X documents / X TND
+   - Bouton [CONSULTER] → détail des impayés clients
+
+C. Chèques et traites fournisseurs échus (Finances Sortantes) :
+   - Chèques : X documents / X TND
+   - Traites : X documents / X TND
+   - Bouton [CONSULTER] → règlements fournisseurs à honorer
+
+D. Analyses graphiques (Performance mensuelle) :
+   - Chiffre d'affaire vente mensuel global (graphique circulaire)
+   - Encaissement mensuel global
+   - Chiffre d'affaire charge mensuel global
+   - Chiffre d'affaire achat mensuel global
+
+=========================================================
+2. MODULE [STOCK] — GESTION DES INVENTAIRES (12 SECTIONS)
+=========================================================
+Navigation : Cliquer STOCK dans la barre supérieure.
+Sous-navigation : Produits | MATIERES | P.SEMI FINI | LES INVENTAIRES | Documents de stock |
+                  Mouvement de stock | Allocation stock | Transferts | Dépots | Rapports | LIST OFs | Paramétrages Stock
+
+——————————————————————————
+2.1 PRODUITS (Liste des produits finis)
+——————————————————————————
+Titre de page : "Liste des produits"
+Filtres de recherche : Désignation, Famille, S.Famille, Vendabe, Achetable, Archiver
+
+Colonnes du tableau principal :
+  Référence | Code à barre | Désignation (tri ↑↓) | Catalogue | Famille | S.Famille | En stock |
+  Pu achat.HT | T1.HT | T1.TTC | Dernière ACHAT (date, valeur achat, Nbr jours) |
+  Dernière VENTE (date, valeur vente, Nbr jours)
+
+Section inférieure — Distribution par dépôt :
+  Colonnes : Nom dépôt | Quantité | Mouvement d'article | Maj Stock
+  Dépôts listés : Dépôt principale, véhicules chauffeurs (ex: mokhtar 206TU7140, HICHEM 238TU1019, FOUED 243TU3251)
+
+Boutons d'action (haut droite) :
+  [⚙ Colonnes] [+ Ajouter] [✏ Modifier] [🗑 Supprimer] [≡ Tri] [↺ Actualiser] [🖨 Imprimer] [🔽 Filtrer] [Excel]
+
+Fiche article (formulaire de création/modification) :
+  Section Identification :
+    - Référence (obligatoire), Référence origine, Code à barre
+    - Unité de stockage & Unité d'entrée (ex: Litre, Pièce) + coefficient de conversion
+    - Désignation (français) + bouton traduction arabe [AR]
+    - Caractéristiques : champ texte libre pour spécifications techniques
+  Section Classification :
+    - Catalogue, Famille, Sous-famille, Marque, Sous-catégorie (+ création rapide [+])
+  Section Tarification :
+    - Bloc Achat : PU achat HT, Remise, Fodec achat, PU achat TTC, Taux TVA
+    - Bloc Tarif Vente : Prix unitaire HT, Prix unitaire TTC, Marge %, Fodec Vente, Remise, Taux TVA
+    - Indicateurs : pu Inv (Prix inventaire), dpa (Dernier Prix Achat), pmp (Prix Moyen Pondéré)
+    - Boutons : [MAJ] [PMP] [VENTE]
+  Section Statuts :
+    - Type d'article : [Produit fini] [P.semi-fini] [M.première]
+    - [Vendable] [Achetable] [Archiver]
+  Boutons de contrôle :
+    [💾 Enregistrer] [+ Nouveau] [✕ Fermer]
+
+——————————————————————————
+2.2 MATIERES (Liste des matières premières)
+——————————————————————————
+Mêmes colonnes que Produits (Référence, Code à barre, Désignation, Catalogue, Famille, S.Famille,
+En stock, Pu achat.HT, T1.HT, T1.TTC, Dernière ACHAT, Dernière VENTE)
+Section dépôts identique à Produits.
+Filtres : Désignation, Famille, S.Famille, Vendabe, Achetable, Archiver
+
+——————————————————————————
+2.3 P.SEMI FINI (Produits semi-finis)
+——————————————————————————
+Mêmes colonnes que Produits (Référence, Code à barre, Désignation, Catalogue, Famille, S.Famille,
+En stock, Pu achat.HT, T1.HT, T1.TTC, Dernière ACHAT, Dernière VENTE)
+Section dépôts identique à Produits.
+Filtres : Désignation, Famille, S.Famille, Vendabe, Achetable, Archiver
+
+——————————————————————————
+2.4 LES INVENTAIRES
+——————————————————————————
+Filtres de recherche :
+  - Période Du : [date picker]
+  - Période Au : [date picker]
+
+Colonnes du tableau :
+  Type | Référence | Libellé | Date | # | Libéllé
+
+Exemples de documents : INV220621 (INVENTAIRE), INV220622, INV220623, INV220624
+
+——————————————————————————
+2.5 DOCUMENTS DE STOCK
+——————————————————————————
+Filtres :
+  - Période Du : [date picker]
+  - Période Au : [date picker]
+
+Colonnes du tableau :
+  Type | Référence | Libellé | Date | # | Libéllé
+
+Affiche : "Pas de résultats" quand vide (0–0 sur 0)
+
+——————————————————————————
+2.6 MOUVEMENT DE STOCK
+——————————————————————————
+Filtres de recherche :
+  - Dépot : [sélection dépôt]
+  - Article : [recherche article]
+  - Fournisseur : [recherche fournisseur]
+  - Période Du : [date picker]
+  - Période Au : [date picker]
+  - Type de Mvt : [liste déroulante]
+
+Indicateurs affichés :
+  - Stock départ : [valeur]
+  - Entrer : [valeur]
+  - Sortie : [valeur]
+
+Boutons d'action :
+  [AFFICHER] [IMPRIMER] [EXCEL]
+
+Colonnes du tableau :
+  N° | Date | Document | Article | Tiers | Entrer | Sortie | PU HT | VALEUR HT | VALEUR TTC | Utilisateur
+
+——————————————————————————
+2.7 ALLOCATION STOCK
+——————————————————————————
+Mêmes filtres que Mouvement de stock (Dépot, Article, Fournisseur, Période Du, Période Au, Type de Mvt)
+Indicateurs : Stock départ | Entrer | Sortie
+
+Boutons d'action :
+  [+] [AFFICHER] [IMPRIMER] [EXCEL]
+
+Colonnes :
+  N° | Date | Document | Article | Tiers | Entrer | Sortie | PU HT | VALEUR HT | VALEUR TTC | Utilisateur
+
+——————————————————————————
+2.8 TRANSFERTS
+——————————————————————————
+Filtres :
+  - Document : [sélection type document]
+  - Commercial : [sélection commercial]
+
+Colonnes du tableau :
+  Trans. | Type | Référence | Code mission | Libellé | Date | Commercial | Code frs | Raison social |
+  Depot du | Depot au | Total Ht | Total TTC | Solde | reglé
+
+Section détail transfert (sous-tableau) :
+  Ref. | Code | Total.HT | Tva | Total.TTC | Timbre: 0.000
+  Nombre de lignes : 50
+
+Pagination : Rows per page selector
+
+——————————————————————————
+2.9 DEPOTS (Gestion des dépôts)
+——————————————————————————
+Bouton : [AJOUTER] — Créer un nouveau dépôt
+
+Formulaire de création dépôt :
+  - Matricule : [référence véhicule ou code dépôt]
+  - Dépot : [nom du dépôt]
+  - par défaut : [checkbox]
+  - fixe : [checkbox]
+
+Colonnes du tableau :
+  # | Libellé | Matricule | Type(fixe/mobile) | Actions
+
+Dépôts existants : Dépôt principale, Dépôts véhicules chauffeurs
+
+——————————————————————————
+2.10 RAPPORTS STOCK
+——————————————————————————
+Sous-sections de rapports :
+
+A. ETAT DU STOCK
+  Filtres ligne 1 :
+    - Dépot : [Tous ▼] (sélection dépôt)
+    - Filtrer par référence : [champ texte]
+    - Filtrer par famille : [liste déroulante]
+    - Filtrer par sous famille : [liste déroulante]
+    - Stock : [□ Positif] [□ Négatif] [□ = 0] [□ Tous]
+  Filtres ligne 2 :
+    - Groupement : [□ Familles] [□ Sous familles]
+    - Stock en valeur : [□ Dpa] [□ Pmp] [□ Prix vente]
+    - Type produit : (● Tous) (○ Fini) (○ Semi Fini) (○ Matière)
+  Boutons : [✓ RÉSULTAT] [🖨 Imprimer] [📊 EXCEL]
+  Rapport généré : "Etat du stock" avec date/heure d'impression en haut à droite
+  Colonnes : RÉF | DÉSIGNATION | QTE | Nombre de ligne : [total]
+
+B. ROTATION DE STOCK
+  Mêmes filtres que Etat du stock (Dépot, référence, famille, sous famille, Stock, Groupement, Stock en valeur, Type produit)
+  Boutons : [✓ RÉSULTAT] [🖨 Imprimer] [📊 EXCEL]
+  Colonnes : RÉF | DÉSIGNATION | QTE
+
+——————————————————————————
+2.11 LIST OFs (Ordres de Fabrication)
+——————————————————————————
+Filtres :
+  - Type : [Tous] [OF] [COM] [DEV] [DEM] [TIC] [BL] [BR] [FC] [AV]
+  - Client : [recherche client]
+  - N°Document : [recherche document]
+  - Utilisateur : [filtre utilisateur]
+
+Colonnes du tableau principal :
+  Trans. | Type | Référence | Libellé | Date | Raison social | Total Coût HT | Total Coût TTC |
+  Total HT | Total TTC | MF | Generé | Facturé | Comptabilisé | Utilisateur
+
+Sous-tableau détail OF :
+  N° | Ref.parent | REFRENCE | DESIGNATION | QTE | PU HT | En Stock | VALEUR HT | dpa | pmp |
+  Marge DPA | Marge PMP | VALEUR TTC
+
+Pied de tableau :
+  Ref. | Code | Total.HT | Tva | Total.TTC | TCL: [valeur] Timbre: 0.000
+  Nombre de lignes : 50
+
+——————————————————————————
+2.12 PARAMETRAGES STOCK
+——————————————————————————
+Menu PARAMETRAGE avec les sous-sections suivantes :
+  1. Codification des produits fini
+  2. Codification des produits semi-fini
+  3. Codification des matière produit
+  4. Méthode de mouvement de stock
+  5. Méthode de valorisation de stock
+  6. Famille
+  7. Sous famille
+  8. Catégorie
+  9. Marque
+  10. Emplacement de stock
+  11. Approvisionnement
+  12. Gestion des dépots
+
+=========================================================
+3. MODULE [ACHAT] — GESTION DES ACHATS (12 SECTIONS)
+=========================================================
+Navigation : Cliquer ACHAT dans la barre supérieure.
+Sous-navigation : Fournisseurs | Documents Frs | Demande de devis | Devis | B.Commande |
+                  Importation | B.Réçeption | B.Retour | Facture | Avoir | Rapport | Paramétrages achat
+
+——————————————————————————
+3.1 FOURNISSEURS (Liste des fournisseurs)
+——————————————————————————
+Liste des fournisseurs avec recherche et filtres.
+Boutons : [+ Ajouter] [✏ Modifier] [🗑 Supprimer] [Excel] [🖨 Imprimer]
+
+Fiche fournisseur (formulaire) :
+  Section Identité :
+    - Raison sociale (obligatoire), N° CIN, Date de naissance
+    - Adresse complète, Site web
+    - Statuts : [Exploi] [Charge] [Archiver]
+    - Bouton : [Catalogues fournisseur]
+  Section Identité Fiscale :
+    - Matricule TVA (Code / Clé / Catégorie / Établissement)
+    - Registre de Commerce (RC)
+  Section Contacts :
+    - Grille dynamique : Nom, Type, Coordonnées (plusieurs interlocuteurs)
+  Section Classement :
+    - Famille fournisseur & Sous-famille (+ création rapide [+])
+  Section Finance :
+    - Plafond crédit, Remise par défaut, Solde de départ
+
+——————————————————————————
+3.2 DOCUMENTS FRS (Documents fournisseurs)
+——————————————————————————
+Filtres :
+  - Document : [sélection type]
+  - Fournisseur : [recherche fournisseur]
+
+Colonnes du tableau :
+  Trans. | Type | Référence | N° Doc Frs | Libellé | Date | Code frs | Raison social |
+  Total Ht | Total TTC | Solde | reglé | Generé | Facturé | Comptabilisé | Utilisateur
+
+Sous-tableau totaux :
+  Ref. | Code | Total.HT | Tva | Total.TTC | Timbre: 0.000 | Nombre de lignes : 0
+
+——————————————————————————
+3.3 DEMANDE DE DEVIS
+——————————————————————————
+Formulaire de création document :
+  Champs entête :
+    - Fournisseur : [recherche fournisseur]
+    - N°DOC FOURNISSEUR : [numéro document fournisseur]
+    - Date : [date/heure, ex: 05/15/2026, 01:40 PM]
+    - N°DOC SYSTEME : [auto-généré]
+
+Onglets navigation :
+  [Entete document] [Autres détails] [Historique article] [Charges]
+
+Barre de saisie article :
+  - CODE A BARRE : [scan code barre]
+  - RÉFÉRENCE : [recherche référence]
+  - DÉSIGNATION : [recherche désignation]
+  - QTE : [quantité]
+  - PU HT : [prix unitaire HT]
+  - REMISE : [remise %]
+  - PU TTC : [0.000]
+  - VALEUR TTC : [0.000]
+  - M... : [marge]
+  - Prix Vente TTC : [prix vente]
+  Bouton [+] pour ajouter la ligne
+
+Colonnes tableau lignes document :
+  N° | REFRENCE | DESIGNATION | QTE | PU HT | REM... | PU TTC | VA... | VALEUR T... | N...
+
+Pied de page — Totaux :
+  TOTAL HT BRUT | TOTAL REMISE | TOTAL NET HT | TOTAL TVA | TOTAL FODEC | TOTAL TTC nn
+
+——————————————————————————
+3.4 DEVIS FOURNISSEUR
+——————————————————————————
+Mêmes champs et onglets que Demande de devis (3.3)
+Colonnes tableau : N° | REFRENCE | DESIGNATION | QTE | PU HT | REM% | PU TTC | VALEUR HT | VALEUR TTC |
+                   Num série | Variétés article | N°Vente | Comment.
+
+——————————————————————————
+3.5 BON DE COMMANDE (B.Commande)
+——————————————————————————
+Mêmes champs et onglets que Demande de devis (3.3)
+Colonnes tableau articles : Référence | Désignation | Empl. | Qté en stock | Stock min | t1 ht | qte en cmd | date cmd
+Colonnes lignes : N° | REFRENCE | DESIGNATION | QTE | PU HT | REM% | PU TTC | VALEUR HT | VALEUR TTC |
+                  Num série | Variétés article | N°Vente | Comment.
+
+——————————————————————————
+3.6 IMPORTATION
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Champs entête : Fournisseur, N°DOC FOURNISSEUR, Date, N°DOC SYSTEME
+
+Colonnes articles disponibles :
+  Référence | Désignation | Empl. | Qté en stock | Stock min | t1 ht | qte en cmd | date cmd
+
+Colonnes lignes importation (colonnes spécifiques) :
+  N° | REFRENCE | DESIGNATION | QTE | PU DEVISE | PU DT | Côut | VALEUR HT | VALEUR TTC
+
+Champ spécifique Importation : PU DEVISE (prix en devise étrangère) + PU DT (prix en dinars tunisiens) + Côut
+
+——————————————————————————
+3.7 BON DE RECEPTION (B.Réçeption)
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes lignes : N° | REFRENCE | DESIGNATION | QTE | PU DEVISE | PU DT | Côut | VALEUR HT | VALEUR TTC
+Champs entête : Fournisseur, N°DOC FOURNISSEUR, Date, N°DOC SYSTEME, CODE A BARRE, RÉFÉRENCE, DÉSIGNATION, QTE, PU DEVISE
+
+——————————————————————————
+3.8 BON DE RETOUR FOURNISSEUR (B.Retour)
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes lignes : N° | REFRENCE | DESIGNATION | QTE | PU HT | REM% | PU TTC | VALEUR HT | VALEUR TTC |
+                  Num série | Variétés article | N°Vente | Comment.
+
+——————————————————————————
+3.9 FACTURE FOURNISSEUR
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes lignes : N° | REFRENCE | DESIGNATION | QTE | PU HT | REM% | PU TTC | VALEUR HT | VALEUR TTC |
+                  Num série | Variétés article | N°Vente | Comment.
+
+——————————————————————————
+3.10 AVOIR FOURNISSEUR
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes lignes : N° | REFRENCE | DESIGNATION | QTE | PU HT | REM% | PU TTC | VALEUR HT | VALEUR TTC |
+                  Num série | Variétés article | N°Vente | Comment.
+
+——————————————————————————
+3.11 RAPPORT ACHAT
+——————————————————————————
+Menu de rapports avec 3 sous-sections :
+  1. Statistique achat par articles
+  2. Statistique achat par fournisseur
+  3. Statistique des dépenses
+
+——————————————————————————
+3.12 PARAMETRAGES ACHAT
+——————————————————————————
+Menu de paramétrage avec 4 sous-sections :
+  1. TVA
+  2. Fodec
+  3. Numérotation achat
+  4. Intégration comptabilité
+
+=========================================================
+4. MODULE [CRM] — GESTION DE LA RELATION CLIENT (5 SECTIONS)
+=========================================================
+Navigation : Cliquer CRM dans la barre supérieure.
+Sous-navigation : Contacts | opportunités | Mailing | Gestion des tickets SAV | Paramétrages CRM
+
+——————————————————————————
+4.1 CONTACTS
+——————————————————————————
+Vue en cartes (mode grille) des contacts.
+
+Filtres de type :
+  [Leads] [Prospects] [Clients] [Tous]
+
+Filtre Solde : [Solde : tous ▼]
+
+Chaque carte contact affiche :
+  - Photo/avatar, Nom, Code client
+  - Adresse (icône 📍)
+  - Téléphone (icône 📱)
+  - Solde (icône 💲)
+  - Actions : [♥ Favori] [< Partager] [⋮ Options] [∨ Détails]
+
+Pagination : Rows per page: 20 | 1–20 of [total]
+
+Boutons d'action (haut droite) :
+  [+ Ajouter] [✏ Modifier] [🗑 Supprimer] [🖨 Imprimer] [Excel] [✕ Fermer]
+
+——————————————————————————
+4.2 OPPORTUNITES
+——————————————————————————
+Boutons d'action :
+  [PIPELINE ⚙] [RECHERCHER DES PROSPECTS EN LIGNE 🔍] [OPPORTUNITÉ +] [AFFICHER TOUT]
+
+Filtre : Utilisateur [Admin ▼]
+
+Vue Pipeline kanban : colonnes par étape du cycle de vente
+Champs opportunité : Montant estimé, Probabilité (%), Date de clôture prévue, Client, Commercial assigné
+
+——————————————————————————
+4.3 MAILING
+——————————————————————————
+Outil d'envoi groupé d'emails aux contacts ou clients sélectionnés.
+Fonctionnalités : Créer modèle, Lancer campagne, Suivi taux d'ouverture
+
+——————————————————————————
+4.4 GESTION DES TICKETS SAV
+——————————————————————————
+Filtres :
+  - Etat : [sélection état]
+  - Date du / Date au : [période]
+  - Client : [recherche client]
+
+Boutons d'action :
+  [TICKET SAV] [TRANSFORMER]
+
+Colonnes du tableau :
+  Client | Date de réclamation | Réclamation | Etat | Intervenant | Date Intervention | Machine | Num série
+
+Formulaire ticket SAV :
+  - N° Ticket (auto-incrément), Date, Client
+  - Produit/Article, N° de série, Type de panne
+  - Etat : Ouvert, En cours, Réparé, Livré
+  - Technicien affecté, Date de retour prévue
+
+——————————————————————————
+4.5 PARAMETRAGES CRM
+——————————————————————————
+Menu de paramétrage avec 1 sous-section :
+  1. Gestion types de panne
+
+=========================================================
+5. MODULE [VENTE] — GESTION COMMERCIALE (16 SECTIONS)
+=========================================================
+Navigation : Cliquer VENTE dans la barre supérieure.
+Sous-navigation : Clients | Documents client | Suivie commande | Cloturer caisse | Dem.devis | devis |
+                  B.Commande | B.Livraison | B.Sortie | B.Retour | Facture | Avoir | Rapports |
+                  Gestion des commerciaux | Suivi des numéros de série | Paramétrages
+
+——————————————————————————
+5.1 CLIENTS (Liste des clients)
+——————————————————————————
+Liste clients en tableau avec recherche et filtres.
+Filtre Solde : [Solde : tous ▼]
+
+Colonnes du tableau :
+  [checkbox] | Code | Raison sociale | Solde | Commercial | Adresse | Ville | Gouvernorat | Tel | Mobile | Données mises à jour
+
+Boutons d'action (haut droite) :
+  [+ Ajouter] [✏ Modifier] [🗑 Supprimer] [🖨 Imprimer] [Excel] [✕ Fermer]
+
+Pied de tableau : Total Solde Clients : [montant total]
+
+Fiche client (formulaire création/modification) :
+  Onglets :
+    [Informations générales] [Autres détails] [Contacts] [Documents] [Emplacements]
+
+  Informations générales :
+    - Raison sociale (obligatoire), Matricule fiscale, Code client (auto ou manuel)
+    - Adresse / Ville / Code postal / Pays
+    - Téléphone 1 & 2 / Email / Site web
+
+  Autres détails :
+    - Catégorie client (Grossiste, Détail, Passager)
+    - Mode de règlement par défaut (Espèce, Chèque, Virement)
+    - Limite de crédit (plafond d'encours)
+    - Remise par défaut (% réduction automatique)
+
+  En-tête fiche client (informations affichées) :
+    - Client : [nom], Solde : [montant], En cours : [montant], Impayé : [montant], Risque total : [montant]
+
+——————————————————————————
+5.2 DOCUMENTS CLIENT
+——————————————————————————
+Filtres :
+  - Client : [recherche client]
+  - N°Document : [recherche document]
+  - Utilisateur : [filtre utilisateur]
+
+Colonnes du tableau :
+  Trans. | Type | Référence | Libellé | Date | Raison social | Total Ht | Total TTC | reglé | Solde
+
+——————————————————————————
+5.3 SUIVI COMMANDE
+——————————————————————————
+Vue de suivi du cycle de vie des commandes (saisie → livraison)
+
+Boutons d'état :
+  [Commander 0] [Réçeption 0] [Payement] [Livrer]
+
+Colonnes du tableau :
+  Etat | N°CMD (V.T / V.F) | Date | D.Livraison | Client | Adresse | Tel | Article | Q.Cmd | Q.Dispo
+
+——————————————————————————
+5.4 CLOTURER CAISSE
+——————————————————————————
+Validation journalière des encaissements.
+
+Filtres :
+  - Date du / Date au : [période journalière]
+
+Colonnes du tableau :
+  Date | Document | Client | Valeur TTC | Réglé | Solde
+
+——————————————————————————
+5.5 DEMANDE DE DEVIS CLIENT (Dem.devis)
+——————————————————————————
+Formulaire de création document de vente.
+
+En-tête client (affiché en haut) :
+  Client : [recherche client] | Solde : [montant] | En cours : [montant] | Impayé : [montant] | Risque total : [montant]
+
+Champs du document :
+  - Date : [date/heure, ex: 2026-05-15T13:41:00]
+  - N°DOC SYSTEME : [auto-généré]
+  - Date Livraison : [date de livraison prévue, ex: 05/15/2026]
+  - CODE A BARRE : [scan article]
+  - RÉFÉRENCE : [recherche référence]
+  - DÉSIGNATION : [recherche désignation]
+  - QTE : [quantité]
+  - PU HT : [prix unitaire HT]
+  - Re% : [remise %] (checkbox)
+  - PU TTC : [prix TTC]
+  Bouton [+] pour ajouter la ligne
+
+Onglets :
+  [Entete document] [Autres détails] [Historique article] [Dossier Technique] [Payement] [Historique]
+
+Outils texte (pour remarques) :
+  [Annuler CTRL+Z] [Rétablir CTRL+Y] [Police] [Taille]
+
+Colonnes tableau des lignes du document :
+  N° | REFRENCE | DESIGNATION | QTE | QTE C... | PU HT | REM... | PU... | VALEUR HT | VALEUR T... | Variétés article | Caractéristique | Parent
+
+Pied de page document — Totaux calculés en temps réel :
+  TOTAL HT BRUT | TOTAL REMISE | TOTAL NET HT | REDEVANCE | Total marge dpa (0%) | Total marge pmp (0%) | TOTAL TVA | TOTAL FODEC | TOTAL TTC | Montant IMP
+
+Note : Ces totaux (TOTAL HT BRUT → Montant IMP) s'appliquent à TOUS les documents de vente :
+  Demande de devis, Devis, B.Commande, B.Livraison, B.Sortie, B.Retour, Facture, Avoir
+
+——————————————————————————
+5.6 DEVIS CLIENT
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes articles disponibles :
+  Référence | Désignation | Empl. | Qté en stock | Stock min | t1 ht | qte en cmd | date cmd
+Colonnes lignes devis : N° | REFRENCE | (suite colonnes document vente)
+
+——————————————————————————
+5.7 BON DE COMMANDE CLIENT (B.Commande)
+——————————————————————————
+Sous-menu : [Bon de commande] [COMMANDE INTERNE]
+  - Bon de commande : commande standard client
+  - COMMANDE INTERNE : commande interne (entre dépôts/services)
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes articles + lignes commande identiques au Devis client
+Pied de page : TOTAL HT BRUT | TOTAL REMISE | TOTAL NET HT | REDEVANCE |
+               Total marge dpa (0%) | Total marge pmp (0%) | TOTAL TVA | TOTAL FODEC | TOTAL TTC | Montant IMP
+
+——————————————————————————
+5.8 BON DE LIVRAISON (B.Livraison)
+——————————————————————————
+En-tête client : Client | Solde | En cours | Impayé | Risque total
+Champs : Date, N°DOC SYSTEME, Date Livraison, CODE A BARRE
+Onglets : [Entete document] [Autres détails] [Historique article] [Dossier Technique] [Payement] [Historique]
+Colonnes articles : Référence | Désignation | Empl. | Qté en stock | Stock min | t1 ht | qte en cmd | date cmd | Code | Raison social
+Outils texte : [Annuler] [Rétablir] [Police] [Taille]
+
+——————————————————————————
+5.9 BON DE SORTIE (B.Sortie)
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes articles disponibles : Référence | Désignation | Empl. | Qté en stock | Stock min | t1 ht | qte en cmd | date cmd
+Colonnes lignes : N° | REFRENCE | (suite colonnes document)
+
+——————————————————————————
+5.10 BON DE RETOUR CLIENT (B.Retour)
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Colonnes articles disponibles + lignes de retour identiques à B.Sortie
+
+——————————————————————————
+5.11 FACTURE CLIENT
+——————————————————————————
+Onglets : [Entete document] [Autres détails] [Historique article] [Charges]
+Génération de la facture légale client avec totaux HT, TVA, TTC, Timbre fiscal
+
+——————————————————————————
+5.12 AVOIR CLIENT
+——————————————————————————
+En-tête client : Client | Solde | En cours | Impayé | Risque total
+Onglets : [Entete document] [Autres détails] [Historique article] [Dossier Technique] [Payement] [Historique]
+Gestion des retours de marchandise et remboursements financiers
+
+——————————————————————————
+5.13 RAPPORTS VENTE
+——————————————————————————
+Menu déroulant avec 3 sous-rapports :
+  1. Etat des soldes clients — état des créances clients
+  2. Statistique de vente — performance par produit/client/commercial
+  3. Statistique par magasin — analyse par point de vente/dépôt
+
+——————————————————————————
+5.14 GESTION DES COMMERCIAUX
+——————————————————————————
+Menu avec 3 sous-sections :
+  1. Gestion des commerciaux — fiches, objectifs, taux de commission
+  2. Mouvements des commerciaux — journal des transactions
+  3. Permutation clients entre commerciaux — transfert de portefeuille client
+
+——————————————————————————
+5.15 SUIVI DES NUMEROS DE SERIE
+——————————————————————————
+Bouton : [HISTORIQUE NUMÉRO DE SÉRIE]
+Filtre : Num Série [champ de recherche]
+
+Colonnes du tableau :
+  Date | Ref Document | Document | Fournisseur | Client | Date Réclamation | Réclamation
+
+Traçabilité produits pour gestion des garanties et SAV.
+
+——————————————————————————
+5.16 PARAMETRAGES VENTE
+——————————————————————————
+Menu de paramétrage avec 8 sous-sections :
+  1. zone de départ
+  2. Charges fixes
+  3. paramètres mobileapp
+  4. Tva
+  5. Fodec
+  6. Numérotation vente
+  7. Intégration comptabilité
+  8. Motifs d'annulation
+  9. Mise à jour prix depuis achat
+
+=========================================================
+6. MODULE [GESTION TOURNER] — LOGISTIQUE DE DISTRIBUTION (8 SECTIONS)
+=========================================================
+Navigation : Cliquer GESTION TOURNER dans la barre supérieure.
+Sous-navigation : Gestion des ordres missions | Transferts | Créer bon de sortie |
+                  Créer bon de transfert | Créer bon de transfert entre véhicules |
+                  Créer bon de retour | Gestion des commerciaux | Rapports
+
+——————————————————————————
+6.1 GESTION DES ORDRES MISSIONS
+——————————————————————————
+Menu avec 5 sous-sections :
+  1. Créer ordre mission
+  2. Liste des ordres mission
+  3. Kilométrage
+  4. Mouvements des commerciaux
+  5. Gestion des commerciaux
+  6. Regenerer remise mission
+
+——————————————————————————
+6.2 TRANSFERTS (Liste des transferts de tournée)
+——————————————————————————
+Filtres :
+  - Document : [type document]
+  - Commercial : [sélection commercial]
+
+Colonnes du tableau :
+  Trans. | Type | Référence | Code mission | Libellé | Date | Commercial | Code frs | Raison social | Depot du
+
+——————————————————————————
+6.3 CREER BON DE SORTIE
+——————————————————————————
+Formulaire de bon de sortie pour chargement véhicule.
+
+Champs de l'entête :
+  - Référence document
+  - Date document
+  - Jusqu'au [date limite]
+  - Dépot du / Dépot au
+  - adresse
+  - code mission
+  - Code à barre / Référence [scan article]
+
+Bouton : [VIDER] — efface les lignes saisies
+
+Colonnes tableau articles disponibles :
+  Référence | Désignation | Empl. | Qté en stock | Stock min | t1 ht | qte en cmd | date cmd
+
+Colonnes lignes bon de sortie :
+  # | PU.HT | (article, qté, etc.)
+
+——————————————————————————
+6.4 CREER BON DE TRANSFERT
+——————————————————————————
+Formulaire de transfert entre dépôts / véhicules.
+Mêmes champs et colonnes que Créer bon de sortie.
+Bouton : [VIDER]
+
+——————————————————————————
+6.5 CREER BON DE TRANSFERT ENTRE VEHICULES
+——————————————————————————
+Transfert de stock entre deux véhicules sur le terrain.
+Mêmes champs et colonnes que Créer bon de sortie.
+Bouton : [VIDER]
+
+——————————————————————————
+6.6 CREER BON DE RETOUR
+——————————————————————————
+Enregistrement des marchandises retournées au dépôt central.
+Mêmes champs et colonnes que Créer bon de sortie.
+Bouton : [VIDER]
+
+——————————————————————————
+6.7 GESTION DES COMMERCIAUX (Tournée)
+——————————————————————————
+Menu avec 3 sous-sections :
+  1. Gestion des commerciaux
+  2. Mouvements des commerciaux
+  3. Permutation clients entre commerciaux
+
+——————————————————————————
+6.8 RAPPORTS LOGISTIQUES
+——————————————————————————
+Sous-menu avec 3 rapports :
+  1. Etat des soldes clients — créances des clients liées aux tournées
+  2. Statistique de vente — performance de vente par tournée/commercial
+  3. Statistique par magasin — analyse par dépôt/véhicule
+
+=========================================================
+7. MODULE [CHARGE] — GESTION DES DÉPENSES (4 SECTIONS)
+=========================================================
+Navigation : Cliquer CHARGE dans la barre supérieure.
+Sous-navigation : Documents charge | Les Charges | Tiers | Rapports
+
+——————————————————————————
+7.1 DOCUMENTS CHARGE
+——————————————————————————
+Filtres :
+  - Document : [type document]
+  - Fournisseur : [recherche tiers]
+
+Colonnes du tableau :
+  Trans. | Type | Référence | N° Doc Frs | Libellé | Date | Code frs | Raison social | Total Ht | Total TTC
+
+Enregistrement des dépenses opérationnelles (loyer, électricité, maintenance, salaires, etc.)
+
+——————————————————————————
+7.2 LES CHARGES (Liste des articles/charges)
+——————————————————————————
+Colonnes du tableau :
+  Référence | Code à barre | Désignation | Catalogue | Famille | S.Famille | En stock | Pu achat.HT | T1.HT | T1.TTC
+
+Catalogue des types de charges et dépenses récurrentes.
+
+——————————————————————————
+7.3 TIERS (Liste des tiers charges)
+——————————————————————————
+Liste des prestataires externes (STEG, SONEDE, assurances, propriétaires, etc.)
+Champs : Nom du tiers, Adresse, Matricule Fiscale, Téléphone
+Actions : [Consulter Historique Factures]
+
+——————————————————————————
+7.4 RAPPORTS CHARGES
+——————————————————————————
+Sous-menu avec 2 rapports :
+  1. Statistiques des charges
+  2. Etat des soldes employers
+
+A. STATISTIQUES DES CHARGES
+  Filtre : Choisir l'année [sélection année, ex: 2026]
+  Titre affiché : "Dépenses de l'année [AAAA]"
+  Tableau annuel des dépenses :
+    Colonnes : Dépenses | Jan | Fév | Mar | Avr | Mai | Juin | Juil | Août | Sep | Oct | Nov | Déc | Total
+
+  Analyse mensuelle de toutes les catégories de charges sur l'année sélectionnée.
+
+Catégories de charges (lignes réelles visibles) :
+  - accompte sur salaire  → Jan–Déc : 0,000 (Total 0,000)
+  - Charge de bureau      → Jan–Déc : 0,000 (Total 0,000)
+  - TRANSPORT             → Jan–Déc : 0,000 (Total 0,000)
+  - BON DIESEL            → Jan–Déc : 0,000 (Total 0,000)
+  - fournisseur           → Jan: 33329,316 | Fév: 92414,273 | Mar: 276533,063 |
+                             Avr: 104910,111 | Mai: 5616,911 | Juin–Déc: 0,000
+                             Total: 512803,6...
+
+Graphique en courbes : évolution mensuelle des catégories de charges sur l'année.
+Légende : accompte sur salaire | Charge de bureau | TRANSPORT | BON DIESEL | fournisseur
+La courbe "fournisseur" domine avec un pic en Mars (276 533 TND).
+
+=========================================================
+8. MODULE [GRH] — GESTION DES RESSOURCES HUMAINES
+=========================================================
+Navigation : Cliquer GRH dans la barre supérieure → menu déroulant.
+Sous-navigation : Employers | Gestion Pointage | Gestion Crédit | Traitements | Rapports |
+                  Utilitaires | Paramétrages
+
+——————————————————————————
+8.1 EMPLOYERS (Liste des employés)
+——————————————————————————
+URL : /grh-module/list-personnels
+Filtres :
+  - Recherche : [Raison social ▼] [champ texte]
+  - Solde : [Solde : tous ✕]
+
+Colonnes du tableau :
+  N° | Code | Raison_social (tri ↑↓) | Solde initial | Débit | Crédit | Solde (tri ↑↓) | Famille | Sous famille | Archiver
+
+Boutons d'action : [+] [✏] [🗑] [🖨] [Excel] [✕]
+
+Employés existants (7 au total) :
+  4150001 | Serine chaari   | Débit: 820.000 | Solde: -820.000
+  4150002 | Samar machaoui  | Solde: 0.000
+  4150003 | sonia amich     | Solde: 0.000
+  4150005 | Hana rfifa      | Solde: 0.000
+  4150006 | Zaineb Baati    | Solde: 0.000
+  4150007 | Wassim Triki    | Débit: 50.000  | Solde: -50.000
+  4150008 | BRINI OLFA      | Débit: 9.500   | Solde: -9.500
+
+Pagination : Rows per page: 20 | 1–7 of 7
+
+——————————————————————————
+8.2 GESTION POINTAGE
+——————————————————————————
+URL : /grh-module/list-pointage
+Titre : "Liste Des pointages"
+Filtre : Choisir l'année [liste déroulante]
+Bouton : [CRÉER UNE SESSION]
+
+——————————————————————————
+8.3 GESTION CREDIT
+——————————————————————————
+URL : /grh-module/create-credit
+Formulaire de création de crédit/avance :
+  - Selectioner un employer [liste déroulante avec préremplissage : "Serine chaari Sa..."]
+  - Valeur Crédit : [montant]
+  - Nbre de tranche : [nombre de mensualités]
+  - valeur tranche : [montant par tranche, calculé automatiquement]
+  - 1ér echéance : [date picker mm/dd/yyyy]
+  Bouton : [CRÉER]
+
+——————————————————————————
+8.4 TRAITEMENTS (Paie)
+——————————————————————————
+URL : /grh-module/traitement
+Titre : "Traitement"
+Filtres :
+  - Choisir l'année [liste déroulante]
+  - Session [sélection session de paie]
+Bouton : [TRAITER] — Lancer le calcul de la paie
+
+——————————————————————————
+8.5 RAPPORTS GRH
+——————————————————————————
+URL : /grh-module/rapports
+Sous-sections : PARAMETRAGE | Etats
+Rapports de synthèse des ressources humaines (bulletins de paie, états CNSS, etc.)
+
+——————————————————————————
+8.6 UTILITAIRES GRH
+——————————————————————————
+Actions de maintenance des données RH :
+  - Supprimer tous les traitements
+  - Supprimer les notes
+  - Supprimer les pointages
+  - Supprimer les sessions
+
+——————————————————————————
+8.7 PARAMETRAGES GRH
+——————————————————————————
+Sous-menu avec 6 entrées :
+  1. Sevices (Services) — liste des services/départements
+  2. Fonctions — postes et titres
+  3. Grades — échelons hiérarchiques
+  4. Grille de Salaires — barèmes par grade
+  5. Rubriques de Paie — éléments de calcul du salaire (cotisations, primes, retenues)
+  6. Type CNSS — catégories de cotisations sociales
+
+=========================================================
+9. MODULE [GMAO] — MAINTENANCE INDUSTRIELLE (1 SECTION)
+=========================================================
+Navigation : Cliquer GMAO dans la barre supérieure.
+Sous-navigation : Machines
+
+——————————————————————————
+9.1 MACHINES
+——————————————————————————
+Bouton : [AJOUTER] — Créer une fiche machine
+
+Colonnes du tableau :
+  Num Série | Machine | Poste de charge | état | date mise en marche | valeur d'aquisition |
+  cout horaire | capacité horaire | Actions
+
+Fiche machine :
+  - Numéro de série, désignation machine
+  - Poste de charge assigné
+  - État (En marche, En panne, En maintenance)
+  - Date mise en marche, valeur d'acquisition
+  - Coût horaire, capacité horaire
+
+Gestion de la maintenance :
+  - Maintenance préventive : planning des interventions (Vidanges, Graissage, Contrôle)
+  - Alertes : notification quand une maintenance est en retard
+  - Historique des interventions passées
+  - Types de pannes : catégorisation (Électrique, Mécanique, Hydraulique)
+
+=========================================================
+10. MODULE [GPAO] — GESTION DE LA PRODUCTION (6 SECTIONS)
+=========================================================
+Navigation : Cliquer GPAO dans la barre supérieure.
+Sous-navigation : Données TECHNIQUES | LIST OFs | CALCUL BESOIN NET | ORDONNANCEMENT | PLANIFICATION | Paramétrages GPAO
+
+——————————————————————————
+10.1 DONNEES TECHNIQUES
+——————————————————————————
+Menu avec 2 sous-sections :
+  1. Gestion nomenclature — définition des BOM (Bill of Materials) :
+       Article fini, composants (matières premières + quantités + % pertes)
+  2. Gestion gammes de production — séquence des opérations :
+       Opérations (ex: Découpe → Soudure → Peinture), postes de charge, temps machine, temps main d'œuvre
+
+——————————————————————————
+10.2 LIST OFs (Ordres de Fabrication GPAO)
+——————————————————————————
+Filtres :
+  - Client : [recherche client]
+  - N°Document : [numéro OF]
+  - Utilisateur : [filtre]
+
+Colonnes du tableau :
+  Trans. | Type | Référence | Libellé | Date | Raison social | Total Coût HT | Total Coût TTC | Total HT | Total TTC
+
+États des OFs : Planifié | Lancé | En cours | Terminé
+
+——————————————————————————
+10.3 CALCUL BESOIN NET (CBN)
+——————————————————————————
+Filtres :
+  - Client : [recherche client]
+  - N°Document : [numéro document]
+  - Utilisateur : [filtre]
+
+Colonnes du tableau :
+  CBN | Type | Référence | Libellé | Date | Raison social | Total Ht | Total TTC | reglé | Solde
+
+Calcul automatique des besoins en matières premières basé sur le plan de production.
+
+——————————————————————————
+10.4 ORDONNANCEMENT
+——————————————————————————
+Filtres :
+  - Période Du [date] / Période Au [date]
+  - N° Document : [recherche]
+
+Onglets : [BON DE COMMANDE] [ORDRE DE FABRICATION]
+
+Colonnes du tableau (onglet BON DE COMMANDE) :
+  Num Ordre | Document | Libellé | Date | Date Lancement Prévu | Client | Valeur HT | Valeur TTC
+
+Données réelles visibles (exemples) :
+  CMD242977 | 2026-05-15 11:41:00 | foud lakhkh | 1329.064000 | 1836.370000
+  CMD242976 | 2026-05-15 10:48:00 | passager | 24.350000
+  CMD242975 | 2026-05-14 11:45:00 | passager | 76.023000 | 90.000000
+  CMD242974 | 2026-05-14 10:48:00 | foud lakhkh | 1165.966000 | 1524.450000
+  CMD242973 | 2026-05-14 10:25:00 | passager | 1107.041000 | 1325.315000
+
+Pagination : Rows per page: 50 | 1–50 of [total]
+
+——————————————————————————
+10.5 PLANIFICATION
+——————————————————————————
+Vue calendrier Gantt de l'occupation des machines par OF.
+
+Filtres :
+  - Période Du / Période Au : [plage de dates]
+
+Boutons :
+  [RÉSULTAT] [today] [day]
+
+Colonnes (vue horaire) :
+  Resources | 06h | 07h | 08h | 09h | 10h | 11h | 12h | 13h | 14h | 15h | 16h | 17h | 18h | 19h
+
+Actions : [Réordonnancer] [Vérifier Disponibilité Matières]
+
+——————————————————————————
+10.6 PARAMETRAGES GPAO
+——————————————————————————
+Menu de paramétrage avec 4 sous-sections :
+  1. Gestion schéma hebdomadaire — planning hebdomadaire des ressources
+  2. Gestion centre de charge — définition des centres de production
+  3. Gestion poste de charge — postes individuels de travail/machines
+  4. Gestion opérations — catalogue des opérations de fabrication
+  5. Gestion type de jalonnement — méthodes de planification (au plus tôt/tard)
+
+=========================================================
+11. MODULE [TRESORERIE] — GESTION FINANCIÈRE (9 SECTIONS)
+=========================================================
+Navigation : Cliquer TRESORERIE dans la barre supérieure.
+Sous-navigation : Réglements Clients | Décaissements Frs | Gestion chéquiers | Comptes banquaires |
+                  Mouvements compte | Extrait compte | BORDERAUX | DECAISSEMENTS TIER | Balance globale de trésorerie
+
+——————————————————————————
+11.1 REGLEMENTS CLIENTS
+——————————————————————————
+Filtres :
+  - Client : [recherche client]
+  - Utilisateur : [filtre utilisateur]
+  - Emplacement : [sélection emplacement/dépôt]
+  - Mode.pay : [Espèce, Chèque, Traite, Virement]
+  - État : [En attente, Encaissé, Impayé, Retourné]
+  - MT. Du / MT. Au : [fourchette de montant]
+  - N°CHQ-TRAITE : [numéro chèque ou traite]
+  - N°VENTE : [numéro document de vente]
+
+Boutons : [AFFICHER] [IMPRIMER]
+
+Colonnes du tableau :
+  N° | Date | Client | N°CMD | Mode de pay. | Montant | Echéance | Etat | Date Etat | Emplaçement
+
+——————————————————————————
+11.2 DECAISSEMENTS FOURNISSEURS (Décaissements Frs)
+——————————————————————————
+Filtres :
+  - Fournisseur : [recherche fournisseur]
+  - Emplacement : [sélection]
+  - Mode.pay : [mode de paiement]
+  - État : [état règlement]
+  - MT. Du / MT. Au : [fourchette montant]
+  - N°CHQ-TRAITE : [numéro]
+  - Total : [montant total affiché]
+
+Boutons : [AFFICHER] [IMPRIMER]
+
+Colonnes du tableau :
+  N° | Date | Fournisseur | Mode de pay. | Montant | Echéance | N°CHQ-TRAITE | Etat | Date Etat | Compte
+
+——————————————————————————
+11.3 GESTION CHEQUIERS
+——————————————————————————
+Boutons : [AFFICHER] [CRÉER UN NOUVEAU CHEQUIER] [IMPRIMER]
+
+Colonnes du tableau :
+  Chequier | N° | montant | Compte | déchirer | Supprimer | Tiers | Date | Echéance | Etat_Rég
+
+Gestion des carnets de chèques (numéros, états, affectations)
+
+——————————————————————————
+11.4 COMPTES BANCAIRES
+——————————————————————————
+Liste des comptes bancaires de l'entreprise.
+
+Colonnes du tableau :
+  Id | Type | Nature | Libellé | Rib | Banque | Agence | Adresse | Compte comptable | Journal
+
+Actions : [Saisir Virement] [Import Relevé Bancaire]
+
+——————————————————————————
+11.5 MOUVEMENTS COMPTE
+——————————————————————————
+Filtres :
+  - Période du / Période au : [plage de dates]
+  - Type : [type d'opération]
+
+Colonnes du tableau :
+  N° | Type | Date | Libellé | Compte | Montant | Famille | Compte Au | #
+
+——————————————————————————
+11.6 EXTRAIT COMPTE
+——————————————————————————
+Filtres/Sélection :
+  - Compte : [sélection du compte bancaire]
+  - Période du / Période au : [plage de dates]
+  - Transferer à : [compte de destination]
+
+Indicateurs calculés affichés :
+  - Solde initial
+  - Total Débit
+  - Total Crédit
+  - Solde final
+
+Colonnes du tableau :
+  # | N°CHQ-TR | Transfert | Libellé | Type | Date | Débit | Crédit | Solde | Date effet
+
+——————————————————————————
+11.7 BORDERAUX
+——————————————————————————
+Filtres :
+  - Date Du : [date picker]
+  - Compte Au : [sélection compte]
+  - Type : [type bordereau]
+
+Bouton : [FERMER]
+
+Colonnes du tableau :
+  N° | Date | Compte du | Compte au | Total | Type | Utilisateur
+
+——————————————————————————
+11.8 DECAISSEMENTS TIER
+——————————————————————————
+Filtres :
+  - Type : [type décaissement]
+  - Fournisseur : [recherche tiers]
+  - Emplacement : [sélection]
+  - Mode.pay : [mode de paiement]
+  - État : [état]
+  - MT. Du / MT. Au : [fourchette montant]
+  - N°CHQ-TRAITE : [numéro]
+  - Total : [montant total]
+
+Boutons : [AFFICHER] [IMPRIMER]
+
+Colonnes du tableau :
+  N° | Date | Tiers | Mode de pay. | Montant | Echéance | N°CHQ-TRAITE | Etat | Date Etat | Compte
+
+——————————————————————————
+11.9 BALANCE GLOBALE DE TRESORERIE
+——————————————————————————
+Boutons : [RESULTAT] [IMPRIMER]
+
+Rapport de synthèse globale de la trésorerie (entrées / sorties / soldes de tous les comptes).
+
+=========================================================
+12. MODULE [PARC ROULANT] — GESTION DE LA FLOTTE VEHICULES (1 SECTION)
+=========================================================
+Navigation : Cliquer PARC ROULANT dans la barre supérieure.
+Sous-navigation : Gestion des véhicules
+
+——————————————————————————
+12.1 GESTION DES VEHICULES
+——————————————————————————
+Liste de tous les véhicules de l'entreprise.
+
+Colonnes du tableau (données réelles visibles) :
+  Matricule | Marque | Année Model | Date Fin Assurance | Date Fin Visite | Date Pay Taxe |
+  Détails Réparation et entretien (icône 🚗) | Charges véhicule (icône 📋) |
+  Chiffre d'affaire véhicule (icône 📊) | Kilométrage (icône 📏)
+
+Véhicules existants (exemples) :
+  1075149  | LTSB1075  | 2018 | 2026-12-27 | 2026-12-46 | 2026-05-06
+  TN07649  | PEUGEOT   | 2021 |            | 2026-05-41 |
+  5183220  | Peugeot   | 2024 | 2026-05-09 | 2027-05-38 | 2026-02-06
+  1079426  | renault   | 2024 | 2026-05-43 | 2027-05-36 |
+  ...et d'autres véhicules (total ~7 lignes visibles)
+
+Alertes administratives (colonnes avec dates) :
+  - Date Fin Assurance : alerte avant expiration
+  - Date Fin Visite : alerte avant expiration visite technique
+  - Date Pay Taxe : rappel paiement vignette / taxe
+
+Actions par véhicule (colonnes icônes cliquables) :
+  - Détails Réparation et entretien → historique des interventions
+  - Charges véhicule → détail des coûts
+  - Chiffre d'affaire véhicule → CA généré par tournée
+  - Kilométrage → suivi carburant et km
+
+=========================================================
+13. PARAMETRAGES & ADMINISTRATION SYSTÈME
+=========================================================
+Accessible via le bouton logo/icône B.I.S en haut à gauche (premier .navbar-button).
+Menu déroulant contenant :
+  Dashboard | Modules | Paramétrage société | Administration | Outils |
+  Tva | Fodec | Numérotation Achat | Numérotation Vente
+
+——————————————————————————
+13.1 DASHBOARD (Accueil)
+——————————————————————————
+Retour au tableau de bord principal.
+
+——————————————————————————
+13.2 MODULES (Gestion des modules)
+——————————————————————————
+Activation/désactivation des modules disponibles pour la licence.
+
+——————————————————————————
+13.3 PARAMETRAGE SOCIETE
+——————————————————————————
+Configuration des informations légales de l'entreprise :
+  - Raison sociale, Adresse, Matricule fiscal
+  - Logo de l'entreprise (pour impression des documents)
+  - Données bancaires de la société
+  - Devise et langue par défaut
+
+——————————————————————————
+13.4 ADMINISTRATION (Gestion des utilisateurs)
+——————————————————————————
+Gestion complète des comptes utilisateurs.
+  - Créer, modifier, supprimer des utilisateurs
+  - Attribuer des accès par module
+  - Droits détaillés : lecture, écriture, modification, suppression, impression, par secteur
+
+——————————————————————————
+13.5 OUTILS SYSTEME
+——————————————————————————
+  - Sauvegarde : [Lancer Backup] → export base de données (SQL/CSV)
+  - Audit Log : journal de toutes les actions critiques (qui a fait quoi et quand)
+  - Import massif : migration de listes articles/clients via Excel/CSV
+  - Nettoyage : suppression données temporaires, optimisation index
+
+——————————————————————————
+13.6 CONFIGURATION TVA
+——————————————————————————
+  - Tableau des taux : configuration des pourcentages (7%, 13%, 19%)
+  - Association par type de produit ou service
+
+——————————————————————————
+13.7 CONFIGURATION FODEC
+——————————————————————————
+  - Activation/désactivation globale de la taxe Fodec
+  - Configuration sur les documents d'achat et de vente
+
+——————————————————————————
+13.8 NUMEROTATION ACHAT
+——————————————————————————
+  - Configuration des masques de numérotation pour chaque type de document achat
+  - Format exemple : BC-{YYYY}-{SEQ}
+  - Réinitialisation du compteur en début d'année
+
+——————————————————————————
+13.9 NUMEROTATION VENTE
+——————————————————————————
+  - Configuration des masques de numérotation pour chaque type de document vente
+  - Format exemple : FAC-{YYYY}-{SEQ}
+  - Réinitialisation du compteur en début d'année
+
+=========================================================
+14. SYSTEME DE REPORTING GLOBAL
+=========================================================
+Chaque module dispose d'une section Rapports avec :
+
+A. Rapports Stock :
+  - Etat de stock (valorisation HT/TTC à une date)
+  - Rotation de stock (articles à rotation lente)
+  - Historique des mouvements (par dépôt, article, utilisateur)
+  - Export Excel de tous les rapports
+
+B. Rapports Vente & Performance :
+  - CA par Client / par Commercial (graphiques)
+  - Top articles générant le plus de marge
+  - État des créances clients (factures non payées, ancienneté)
+  - Etat des soldes clients
+  - Statistiques de vente / par magasin
+
+C. Rapports Achat :
+  - Volume achat par Fournisseur
+  - Analyse des dépenses d'approvisionnement
+  - Rapport fournisseurs
+
+D. Rapports Trésorerie :
+  - Flux de trésorerie (Cash-flow) : Entrées vs Sorties mensuelles
+  - Balance globale de trésorerie
+  - Extrait de compte bancaire
+
+E. Rapports Charges :
+  - Analyse mensuelle par catégorie de charge
+  - Tableau annuel (Jan → Déc par type de dépense)
+  - Filtre par année
+
+F. Rapports GPAO/Production :
+  - Calcul du Besoin Net (CBN)
+  - Ordonnancement des ordres de fabrication
+  - Planification visuelle (calendrier Gantt)
+
+=========================================================
+15. ARCHITECTURE TECHNIQUE
+=========================================================
+  - Type : Application Web SPA (Single Page Application) React
+  - Frontend : React + Material-UI (MUI)
+  - Backend API : Node.js / Express à http://41.226.17.73:3050/
+  - Base de données : MySQL (nom DB : "bis")
+  - Authentification : Session React in-memory (login via POST /users/login)
+  - Export : Excel natif pour tous les tableaux
+  - Impression : PDF natif pour tous les documents
+
+=========================================================
+16. DROITS D'ACCES ADMINISTRATEUR
+=========================================================
+L'utilisateur admin (sky@com / admin) dispose de :
+  - Accès complet à tous les modules activés
+  - Modules activés : STOCK, ACHAT, CRM, VENTE, GESTION TOURNER (tournee), CHARGE (frais),
+                      GRH (rh), GMAO (gmao), GPAO (gpa), TRESORERIE, PARC ROULANT (parc)
+  - Modules NON activés dans la licence : BI, CAISSE, COMPTABILITE, PROJETS, RESEAU SOCIAUX, SERVICE
+  - Gestion complète des utilisateurs et des droits
+  - Accès aux paramétrages système
+

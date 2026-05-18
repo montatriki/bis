@@ -1,0 +1,314 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  COMMERCIAL
+  CLIENT
+}
+
+enum VehicleStatus {
+  ACTIVE
+  PARKED
+  OFFLINE
+  BREAKDOWN
+}
+
+enum OrderStatus {
+  PENDING
+  VALIDATED
+  LOADING
+  IN_ROUTE
+  DELIVERED
+  CANCELLED
+}
+
+enum DocumentType {
+  TIC
+  BL
+  AV
+  BR
+  FAC
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  login       String   @unique
+  password    String
+  role        Role
+  avatar      String?
+  phone       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  commercial  Commercial?
+  client      Client?
+  manager     Manager?
+
+  @@map("users")
+}
+
+model Manager {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  department  String?
+  createdAt   DateTime @default(now())
+
+  @@map("managers")
+}
+
+model Commercial {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  vehicleId       String?  @unique
+  vehicle         Vehicle? @relation(fields: [vehicleId], references: [id])
+  zone            String?
+  targetCA        Float    @default(5000)
+  missionCode     String?
+  currentLat      Float?
+  currentLng      Float?
+  lastGpsUpdate   DateTime?
+  createdAt       DateTime @default(now())
+
+  clients         Client[]
+  visits          Visit[]
+  documents       Document[]
+  gpsPositions    GpsPosition[]
+  recordings      Recording[]
+
+  @@map("commercials")
+}
+
+model Client {
+  id              String   @id @default(cuid())
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id])
+  commercialId    String?
+  commercial      Commercial? @relation(fields: [commercialId], references: [id])
+  name            String
+  address         String?
+  city            String?
+  governorate     String?
+  phone           String?
+  email           String?
+  taxId           String?
+  rc              String?
+  balance         Float    @default(0)
+  creditLimit     Float    @default(5000)
+  category        String?  @default("Grossiste")
+  familyClient    String?
+  isPlanned       Boolean  @default(false)
+  lat             Float?
+  lng             Float?
+  riskScore       Int      @default(0)
+  potentialScore  Int      @default(50)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  visits          Visit[]
+  documents       Document[]
+  orders          Order[]
+  claims          Claim[]
+
+  @@map("clients")
+}
+
+model Vehicle {
+  id              String        @id @default(cuid())
+  plate           String        @unique
+  brand           String
+  model           String?
+  year            Int?
+  status          VehicleStatus @default(PARKED)
+  insuranceExpiry DateTime?
+  controlExpiry   DateTime?
+  taxExpiry       DateTime?
+  currentLat      Float?
+  currentLng      Float?
+  lastUpdate      DateTime?
+  createdAt       DateTime      @default(now())
+
+  commercial      Commercial?
+  gpsPositions    GpsPosition[]
+
+  @@map("vehicles")
+}
+
+model GpsPosition {
+  id            String   @id @default(cuid())
+  commercialId  String?
+  commercial    Commercial? @relation(fields: [commercialId], references: [id])
+  vehicleId     String?
+  vehicle       Vehicle?    @relation(fields: [vehicleId], references: [id])
+  lat           Float
+  lng           Float
+  speed         Float    @default(0)
+  timestamp     DateTime @default(now())
+
+  @@map("gps_positions")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  reference   String   @unique
+  barcode     String?
+  name        String
+  family      String?
+  subFamily   String?
+  stock       Int      @default(0)
+  price       Float    @default(0)
+  priceTTC    Float    @default(0)
+  purchasePrice Float  @default(0)
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderLines    OrderLine[]
+  documentLines DocumentLine[]
+
+  @@map("products")
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  type          DocumentType
+  reference     String       @unique
+  clientId      String
+  client        Client       @relation(fields: [clientId], references: [id])
+  commercialId  String?
+  commercial    Commercial?  @relation(fields: [commercialId], references: [id])
+  totalHT       Float        @default(0)
+  totalTTC      Float        @default(0)
+  totalTVA      Float        @default(0)
+  discount      Float        @default(0)
+  status        String       @default("PENDING")
+  isValidated   Boolean      @default(false)
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  lines         DocumentLine[]
+
+  @@map("documents")
+}
+
+model DocumentLine {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  qty         Float
+  unitPrice   Float
+  discount    Float    @default(0)
+  totalHT     Float
+  totalTTC    Float
+  createdAt   DateTime @default(now())
+
+  @@map("document_lines")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  reference     String      @unique
+  clientId      String
+  client        Client      @relation(fields: [clientId], references: [id])
+  status        OrderStatus @default(PENDING)
+  totalTTC      Float       @default(0)
+  deliveryDate  DateTime?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  lines         OrderLine[]
+
+  @@map("orders")
+}
+
+model OrderLine {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  qty         Int
+  unitPrice   Float
+  totalTTC    Float
+  createdAt   DateTime @default(now())
+
+  @@map("order_lines")
+}
+
+model Visit {
+  id            String   @id @default(cuid())
+  commercialId  String
+  commercial    Commercial @relation(fields: [commercialId], references: [id])
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id])
+  checkedIn     Boolean  @default(false)
+  checkInTime   DateTime?
+  checkOutTime  DateTime?
+  duration      Int?
+  notes         String?
+  tags          String[]
+  caVisit       Float    @default(0)
+  createdAt     DateTime @default(now())
+
+  recordings    Recording[]
+
+  @@map("visits")
+}
+
+model Recording {
+  id            String   @id @default(cuid())
+  visitId       String
+  visit         Visit    @relation(fields: [visitId], references: [id])
+  commercialId  String
+  commercial    Commercial @relation(fields: [commercialId], references: [id])
+  duration      Int?
+  fileUrl       String?
+  transcript    String?
+  summary       String?
+  sentiment     String?
+  keywords      String[]
+  createdAt     DateTime @default(now())
+
+  @@map("recordings")
+}
+
+model Claim {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  type        String
+  description String
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("claims")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("notifications")
+}

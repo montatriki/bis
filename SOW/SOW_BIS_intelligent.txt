@@ -1,0 +1,990 @@
+================================================================================
+SOW — B.I.S INTELLIGENT ERP SYSTEM
+Statement of Work — Système de Gestion Intelligent & Connecté
+Version: 2.0 — Édition Intelligence Artificielle
+Date: 2026-05-17
+================================================================================
+
+VISION DU PROJET
+─────────────────────────────────────────────────────────────────────────────
+Transformer B.I.S. d'un ERP classique en une plateforme intelligente,
+connectée et prédictive — où chaque décision est guidée par la donnée,
+chaque déplacement est optimisé, et chaque interaction est tracée.
+
+4 profils utilisateurs :
+  [ADMIN]              — Vision globale, contrôle total, tableaux de bord IA
+  [MANAGER]            — Supervision opérationnelle, reporting, alertes
+  [AGENT COMMERCIAL]   — Terrain connecté, GPS, voix, commandes mobiles
+  [CLIENT]             — Portail self-service, historique, commandes en ligne
+
+================================================================================
+TABLE DES MATIÈRES
+================================================================================
+ PARTIE I   — ADMIN (Administrateur)
+   A.1  Tableau de bord intelligent avec carte Tunisie temps réel
+   A.2  Gestion des accès et droits utilisateurs (Control Panel)
+   A.3  Intelligence artificielle & analyses prédictives
+   A.4  Alertes intelligentes et notifications push
+   A.5  Modules existants (hérités de SOW_BIS_Admin.txt) — améliorés
+
+ PARTIE II  — MANAGER (Responsable)
+   M.1  Tableau de bord manager
+   M.2  Supervision des commerciaux en temps réel
+   M.3  Validation des documents et flux de travail
+   M.4  Gestion des objectifs et performances
+   M.5  Rapports et exports intelligents
+
+ PARTIE III — AGENT COMMERCIAL
+   C.1  Application mobile (héritage SOW_BIS_Commercials.txt)
+   C.2  Carte Tunisie interactive avec clients géolocalisés
+   C.3  Navigation GPS et optimisation de tournée
+   C.4  Check-in client avec bouton de présence
+   C.5  Enregistrement vocal des visites (confidentiel admin)
+   C.6  Nouvelles fonctionnalités commerciales intelligentes
+
+ PARTIE IV  — CLIENT (Portail web/mobile)
+   CL.1 Connexion et espace personnel
+   CL.2 Historique des commandes et documents
+   CL.3 Saisie de commandes en ligne
+   CL.4 Suivi de livraison en temps réel
+   CL.5 Communication directe et réclamations
+
+ PARTIE V   — INTELLIGENCE ARTIFICIELLE TRANSVERSALE
+   IA.1 Moteur de recommandations produits
+   IA.2 Prédiction de stock et réapprovisionnement automatique
+   IA.3 Détection d'anomalies financières
+   IA.4 Analyse sentiment et résumé des enregistrements vocaux
+   IA.5 Chatbot assistant interne
+   IA.6 Optimisation des prix dynamique
+   IA.7 Scoring client (risque crédit / potentiel)
+
+ PARTIE VI  — ARCHITECTURE TECHNIQUE
+   T.1  Stack technologique recommandé
+   T.2  Infrastructure et sécurité
+   T.3  APIs et intégrations externes
+
+================================================================================
+PARTIE I — ADMIN (Administrateur)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A.1  TABLEAU DE BORD INTELLIGENT — CARTE TUNISIE TEMPS RÉEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : / (accueil admin)
+
+CARTE INTERACTIVE DE TUNISIE
+  Technologie : Leaflet.js ou MapLibre GL + OpenStreetMap Tunisie
+  Centre par défaut : Sfax (34.7406, 10.7603), zoom 7
+
+  COUCHES DE LA CARTE
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  ● Véhicules (GPS temps réel, toutes les 30 secondes)          │
+  │    Icône camion colorée par statut :                            │
+  │      🟢 Vert   = en mission, en mouvement                       │
+  │      🟡 Jaune  = arrêté depuis > 10 min (peut-être chez client) │
+  │      🔴 Rouge  = en panne / hors ligne > 1h                     │
+  │      ⚫ Gris   = mission terminée / véhicule garé               │
+  │                                                                  │
+  │  ● Clients (points bleus, cliquables)                           │
+  │    Affichés/masqués selon filtres actifs                        │
+  │                                                                  │
+  │  ● Tournées du jour (lignes colorées par commercial)            │
+  │    Trait plein = déjà visité | Trait pointillé = à visiter      │
+  │                                                                  │
+  │  ● Zones de chaleur (heatmap) des ventes par région             │
+  │    Bascule ON/OFF en haut de carte                              │
+  └─────────────────────────────────────────────────────────────────┘
+
+  POPUP VÉHICULE (clic sur icône)
+    - Commercial : mokhtar trabelsi
+    - Véhicule   : 206TU7140 — Peugeot 2021
+    - Vitesse    : 0 km/h (arrêté)
+    - Dernière position : il y a 2 min
+    - Mission    : #2548 | Objectif : 21 clients | Visités : 14
+    - CA jour    : 3506.053 TND
+    - Bouton [📞 Appeler] | [💬 Envoyer message] | [📍 Centrer]
+
+  POPUP CLIENT (clic sur point bleu)
+    - Raison sociale : AGIL BEJA SUD
+    - Adresse        : EL GRIAT PK 29 SUD, BEJA 9023
+    - Solde          : 4428.262 TND (rouge)
+    - Dernier passage: 15-05-2026 | Commercial: mokhtar
+    - Statut visite  : ✅ Visité aujourd'hui | ⏳ Planifié | ❌ Non planifié
+    - Bouton [Voir fiche client] | [Créer document]
+
+  PANNEAU LATÉRAL DROIT — RÉSUMÉ TEMPS RÉEL
+    ┌─────────────────────────────────────┐
+    │  AUJOURD'HUI — 17/05/2026           │
+    │  ─────────────────────────────────  │
+    │  Véhicules actifs     :  4 / 7      │
+    │  Clients visités      : 47 / 111    │
+    │  CA du jour           : 12450 TND   │
+    │  Encaissements        :  6200 TND   │
+    │  Bons émis            :  23         │
+    │  ─────────────────────────────────  │
+    │  Alertes              :  3 🔴        │
+    │    • Stock min atteint: 2 articles   │
+    │    • Véhicule hors ligne: HICHEM     │
+    │    • Chèque échu     : 1 (2500 TND) │
+    └─────────────────────────────────────┘
+
+  FILTRES DE LA CARTE
+    - [Tous les commerciaux] / sélection individuelle
+    - [Aujourd'hui] / [Cette semaine] / [Ce mois]
+    - Afficher/masquer : véhicules | clients | tournées | heatmap
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A.2  CONTROL PANEL — GESTION DES ACCÈS UTILISATEURS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /administration/users
+
+LISTE DES UTILISATEURS
+  Colonnes : # | Nom | Email | Login | Rôle | Modules | Statut | Dernière connexion | Actions
+
+  RÔLES DISPONIBLES
+    ● ADMIN      — accès total, paramétrage système
+    ● MANAGER    — supervision, validation, rapports
+    ● COMMERCIAL — application mobile, clients, documents de vente
+    ● CLIENT     — portail client uniquement
+
+FORMULAIRE CRÉATION / MODIFICATION UTILISATEUR
+  Onglets :
+    [Identité] [Rôle & Accès] [Modules] [Droits détaillés] [Commercial]
+
+  Onglet RÔLE & ACCÈS
+    - Rôle principal     : [Admin | Manager | Commercial | Client]
+    - Statut             : [Actif | Suspendu | Archivé]
+    - Mot de passe temporaire + forcer changement à la 1ère connexion
+
+  Onglet MODULES (matrice de droits par module)
+    ┌──────────────────┬───────┬────────┬──────────┬──────────┐
+    │ Module           │ Voir  │ Créer  │ Modifier │ Supprimer│
+    ├──────────────────┼───────┼────────┼──────────┼──────────┤
+    │ Stock            │  ☑   │   ☑   │    ☑    │    ☐    │
+    │ Achat            │  ☑   │   ☑   │    ☑    │    ☐    │
+    │ Vente            │  ☑   │   ☑   │    ☑    │    ☐    │
+    │ CRM              │  ☑   │   ☑   │    ☑    │    ☐    │
+    │ GRH              │  ☑   │   ☐   │    ☐    │    ☐    │
+    │ Trésorerie       │  ☑   │   ☐   │    ☐    │    ☐    │
+    │ GPAO             │  ☐   │   ☐   │    ☐    │    ☐    │
+    │ Parc Roulant     │  ☑   │   ☐   │    ☐    │    ☐    │
+    │ Enreg. vocaux    │  ☑   │   —   │    —    │    —    │  ← Admin seulement
+    └──────────────────┴───────┴────────┴──────────┴──────────┘
+
+  Onglet COMMERCIAL (si rôle = Commercial)
+    - Véhicule assigné   : [sélection depuis parc roulant]
+    - Dépôt assigné      : [sélection dépôt]
+    - Zone géographique  : [sélection gouvernorat(s)]
+    - Clients assignés   : [liste, peut réassigner en masse]
+    - Objectif mensuel   : [montant CA cible]
+
+  AUDIT LOG UTILISATEURS
+    Toutes les connexions, déconnexions et actions critiques loguées :
+    Date | Utilisateur | Action | IP | Module | Détail
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A.3  INTELLIGENCE ARTIFICIELLE ADMIN — ANALYSES PRÉDICTIVES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(Voir aussi PARTIE V pour le détail de chaque module IA)
+
+WIDGETS IA SUR LE DASHBOARD ADMIN
+  ┌─────────────────────────────────────────────────────────────┐
+  │  🔮 PRÉVISION CA SEMAINE PROCHAINE                          │
+  │     Basé sur historique 6 mois + saisonnalité               │
+  │     Estimation : 28 400 TND (±5%)                           │
+  │     [Voir détail par commercial]                            │
+  ├─────────────────────────────────────────────────────────────┤
+  │  ⚠️  CLIENTS À RISQUE DE PERTE                              │
+  │     3 clients sans visite depuis > 30 jours                 │
+  │     Score de risque calculé par IA                          │
+  │     [Voir liste] → déclencher action commerciale            │
+  ├─────────────────────────────────────────────────────────────┤
+  │  📦 RUPTURES DE STOCK PRÉVUES (7 jours)                     │
+  │     2 articles sous seuil critique d'ici 7 jours            │
+  │     [Générer bon de commande automatique]                    │
+  ├─────────────────────────────────────────────────────────────┤
+  │  💰 ANOMALIES FINANCIÈRES DÉTECTÉES                         │
+  │     1 règlement suspect (montant inhabituel)                 │
+  │     [Voir détail]                                           │
+  └─────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A.4  ALERTES INTELLIGENTES ET NOTIFICATIONS PUSH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Centre de notifications accessible depuis la cloche 🔔 en haut à droite.
+
+TYPES D'ALERTES CONFIGURABLES
+  Catégorie Stock :
+    - Article sous stock minimum
+    - Article sans mouvement depuis X jours (stock dormant)
+    - Inventaire en attente de validation
+
+  Catégorie Finance :
+    - Chèque / traite arrivant à échéance (J-3, J-1)
+    - Client dépassant son plafond de crédit
+    - Règlement non affecté à une facture
+
+  Catégorie Commercial :
+    - Véhicule GPS hors ligne > 1h
+    - Commercial sans activité depuis > 2h en mission
+    - Objectif journalier atteint (notification positive)
+    - Ecart > 20% entre CA planifié et réalisé
+
+  Catégorie Administrative :
+    - Expiration assurance véhicule (J-30, J-7)
+    - Expiration visite technique (J-30, J-7)
+    - Utilisateur inactif depuis > 7 jours
+
+  CANAUX DE NOTIFICATION
+    - Notification push navigateur (PWA)
+    - SMS (intégration Twilio / Ooredoo API)
+    - Email (SMTP)
+    - Notification in-app (badge + sonnerie)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A.5  MODULES EXISTANTS (hérités SOW_BIS_Admin.txt) — AMÉLIORATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Tous les modules du SOW_BIS_Admin.txt sont conservés et enrichis :
+
+STOCK (2.x)
+  + Widget de stock dormant : articles sans sortie depuis > 45 jours
+  + Code couleur automatique dans la liste : Rouge < min | Orange < 2×min | Vert OK
+  + Export PDF "Rapport de stock" avec graphique camembert par famille
+  + Scan code-barres via caméra du navigateur (sans scanner physique)
+
+VENTE (5.x)
+  + Suggestion automatique : "Ce client a commandé X il y a 30 jours, relancer ?"
+  + Affichage du CA client sur 12 mois glissants dans la fiche client
+  + Génération automatique de devis récurrent (modèle mémorisé)
+  + Tableau de performance commerciaux : classement CA | Taux de concrétisation
+
+GRH (8.x)
+  + Pointage mobile par QR code (chaque employé a un QR individuel)
+  + Calcul automatique des heures supplémentaires
+  + Génération automatique des bulletins de paie au format PDF
+  + Calendrier des congés avec gestion des demandes
+
+PARC ROULANT (12.x)
+  + Historique GPS complet par véhicule (30 jours de trajet)
+  + Rapport kilométrage mensuel par véhicule automatique
+  + Rappel automatique maintenance préventive
+  + Calcul du coût par km (carburant + entretien)
+
+================================================================================
+PARTIE II — MANAGER (Responsable)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+M.1  TABLEAU DE BORD MANAGER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /manager/dashboard
+
+WIDGETS PRINCIPAUX
+  ┌──────────────────────────────────────────────────────────────┐
+  │  PERFORMANCE DU JOUR                                         │
+  │  CA Réalisé : 12 450 TND / Objectif : 18 000 TND  (69%)     │
+  │  Barre de progression ██████████░░░░░░░  69%                 │
+  │                                                              │
+  │  Par commercial :                                            │
+  │  mokhtar    ████████  3506 TND / 5000  (70%)                │
+  │  HICHEM     ██████    2900 TND / 5000  (58%)                │
+  │  FOUED      ████████  4200 TND / 5000  (84%)  ⭐            │
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  DOCUMENTS EN ATTENTE DE VALIDATION                          │
+  │  Bons de commande    : 3  [Valider tout] [Voir]              │
+  │  Avoirs              : 1  [Voir]                             │
+  │  Remises exceptionnelles : 2 (> 15%) [Urgent]               │
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  RECOUVREMENT — ÉTAT CRITIQUE                                │
+  │  Créances > 90 jours : 5 clients | 18 240 TND               │
+  │  Top créancier : AGIL BEJA SUD — 4428 TND                   │
+  │  [Envoyer rappel automatique à tous]                         │
+  └──────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+M.2  SUPERVISION COMMERCIAUX EN TEMPS RÉEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /manager/commerciaux
+
+TABLEAU DE SUIVI EN DIRECT
+  Colonnes :
+  Commercial | Statut GPS | Clients visités | CA jour | Encaissé | Crédit | Dernière action
+
+  STATUTS GPS
+    🟢 En déplacement  → vitesse > 5 km/h
+    🟡 Chez client     → arrêté < 500m d'un client planifié
+    🔵 Pause           → arrêté dans une zone inconnue
+    🔴 Injoignable     → GPS hors ligne
+
+  ACTIONS DISPONIBLES PAR COMMERCIAL
+    - [📍 Voir sur carte]   → zoom sur le véhicule dans la carte
+    - [📞 Appeler]          → déclenchement d'appel téléphonique
+    - [📋 Voir journal]     → détail de toutes ses actions du jour
+    - [🎤 Écouter enreg.]  → accès aux enregistrements vocaux (si autorisé)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+M.3  VALIDATION DES DOCUMENTS — WORKFLOW D'APPROBATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /manager/validation
+
+RÈGLES DE VALIDATION AUTOMATIQUE (configurables)
+  - Bon de livraison > 5000 TND         → validation manager requise
+  - Remise > 15%                        → validation manager requise
+  - Avoir > 1000 TND                    → validation manager requise
+  - Bon de retour > 10 articles         → validation manager requise
+
+FILE D'ATTENTE
+  Colonnes : Type | N° | Commercial | Client | Montant | Remise | Créé le | Urgence
+
+  ACTIONS
+    - [✅ Approuver]  — valide et notifie le commercial
+    - [❌ Rejeter]    — rejette avec motif obligatoire
+    - [✏️ Modifier]   — correction avant approbation
+    - [👁️ Aperçu]    — voir le document complet
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+M.4  GESTION DES OBJECTIFS ET PERFORMANCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /manager/objectifs
+
+DÉFINITION DES OBJECTIFS (par commercial, par mois)
+  Champs :
+    - Commercial  : [sélection]
+    - Mois        : [date picker mois]
+    - CA Cible    : [montant TND]
+    - Nb clients cible   : [nombre de visites]
+    - Taux encaissement cible : [%]
+    - Objectif nouveaux clients : [nombre]
+
+TABLEAU DE BORD PERFORMANCE (par commercial, sur 12 mois)
+  - Graphique en barres : CA réalisé vs CA objectif (mois par mois)
+  - Taux de réalisation : % moyen sur la période
+  - Évolution : +/- % vs même période N-1
+  - Meilleur mois | Moins bon mois
+
+CALCUL DES COMMISSIONS (automatique)
+  - Définition des paliers de commission dans les paramétrages
+    Ex : 0–80% objectif = 1% | 80–100% = 1.5% | > 100% = 2%
+  - Calcul automatique en fin de mois
+  - Export vers GRH pour intégration dans la paie
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+M.5  RAPPORTS MANAGER — EXPORTS INTELLIGENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /manager/rapports
+
+RAPPORTS DISPONIBLES
+  1. Rapport de performance commerciaux (hebdo/mensuel)
+     - CA | Nb visites | Taux recouvrement | Nouveaux clients
+  2. Rapport recouvrement
+     - Ancienneté des créances par tranche (< 30j | 30–60j | 60–90j | > 90j)
+  3. Rapport tournées (kilométrage, temps chez clients, efficacité)
+  4. Rapport produits les plus vendus par commercial
+  5. Rapport clients inactifs (sans achat depuis > 30/60/90 jours)
+
+GÉNÉRATION AUTOMATIQUE
+  - Planning de rapports : envoi email automatique (ex: rapport hebdo le lundi 8h)
+  - Destinataires configurables
+  - Format : PDF et/ou Excel
+
+================================================================================
+PARTIE III — AGENT COMMERCIAL (Application Mobile)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C.1  APPLICATION MOBILE — MODULES EXISTANTS (héritage SOW_BIS_Commercials.txt)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Tous les modules du SOW_BIS_Commercials.txt sont conservés :
+  - Catalogue produit (/catalogueProduit)
+  - Mes clients (/mesClients)
+  - Planning du jour (/planningJour)
+  - Panier de commande (modal)
+  - Recouvrement (/recouvrement)
+  - Retour de stock (/transfereStock)
+  - Journal de caisse (/journalCaisse)
+  - Réclamation client (/reclamationClient)
+  - Dernier ticket (/dernierTicket)
+  - Changer mot de passe (/MotDePasse)
+  - Bon d'approvisionnement (/bonApprovisionnement)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C.2  CARTE TUNISIE INTERACTIVE — VUE COMMERCIAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /map  (nouvelle page dans la sidebar)
+Icône sidebar : 📍
+
+AFFICHAGE DE LA CARTE (vue mobile, plein écran)
+  Technologie : Leaflet.js + GPS navigateur (Geolocation API)
+
+  ÉLÉMENTS AFFICHÉS
+    ● Position actuelle du commercial (point bleu clignotant)
+    ● Clients à visiter aujourd'hui (points rouges numérotés)
+    ● Clients déjà visités aujourd'hui (points verts ✓)
+    ● Ligne de tournée optimisée (tracé pointillé bleu)
+    ● Client actuel cible (point rouge pulsant + cercle)
+
+  LÉGENDE
+    🔴  À visiter    🟢  Visité ✓    🟡  En cours    ⭐ Priorité haute
+
+  BARRE D'INFORMATIONS (en bas de l'écran)
+    ┌─────────────────────────────────────────────────┐
+    │  Visités : 8 / 17   │   Prochain : AGIL BEJA SUD │
+    │  Distance restante : 47 km   │   ~2h15            │
+    └─────────────────────────────────────────────────┘
+
+  FILTRES (menu en haut à droite de la carte)
+    - Afficher tous les clients / seulement planifiés
+    - Afficher/masquer clients visités
+    - Filtrer par gouvernorat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C.3  NAVIGATION GPS ET OPTIMISATION DE TOURNÉE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CALCUL D'ITINÉRAIRE OPTIMISÉ
+  Algorithme : TSP (Traveling Salesman Problem) simplifié + heuristique voiture
+  API externe : OSRM (Open Source Routing Machine) ou GraphHopper (gratuit)
+
+  FONCTIONNEMENT
+    1. Le commercial ouvre le Planning du jour (17 clients)
+    2. Bouton [🗺️ Optimiser ma tournée]
+    3. L'application calcule l'ordre de visite qui minimise :
+         - Distance totale parcourue
+         - Temps de trajet total
+       En tenant compte :
+         - Des horaires d'ouverture des clients (si renseignés)
+         - Des clients prioritaires (solde élevé = visite tôt)
+    4. Résultat affiché : ordre recommandé + économie estimée
+       "Tournée optimisée : 142 km au lieu de 198 km — économie : 56 km"
+    5. Bouton [Accepter cet ordre] ou [Garder mon ordre manuel]
+
+  NAVIGATION VERS LE PROCHAIN CLIENT
+    Bouton [🧭 Y aller] sur chaque carte client :
+    → Ouvre Google Maps / Waze / Apple Maps avec l'adresse du client
+    → Ou navigation intégrée dans l'app (vue carte avec flèche directionnelle)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C.4  CHECK-IN CLIENT — BOUTON DE PRÉSENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DÉCLENCHEMENT
+  Quand le commercial est géolocalisé à moins de 200m d'un client planifié,
+  une notification pop-up s'affiche automatiquement :
+
+  ┌────────────────────────────────────────────────────────┐
+  │         📍 Vous êtes chez :                            │
+  │         AGIL BEJA SUD                                  │
+  │         EL GRIAT PK 29 SUD, BEJA                       │
+  │                                                        │
+  │   ╔═══════════════════╗   ╔════════════════════╗       │
+  │   ║  ✅ OUI JE SUIS LÀ  ║   ║  ❌ CONTINUER      ║       │
+  │   ╚═══════════════════╝   ╚════════════════════╝       │
+  └────────────────────────────────────────────────────────┘
+
+  ACTION BOUTON [✅ OUI JE SUIS LÀ]
+    1. Enregistrement horodaté de l'arrivée (timestamp + coordonnées GPS)
+    2. Démarrage automatique de l'enregistrement vocal (voir C.5)
+    3. Ouverture de la fiche client avec son panier
+    4. Mise à jour du statut sur la carte admin/manager (point jaune → en visite)
+    5. Chronomètre de durée de visite démarré
+
+  ACTION BOUTON [❌ CONTINUER]
+    - Visite marquée comme "Passée sans arrêt" avec justification optionnelle
+    - Statut : ⏭️ Ignoré
+
+  BILAN DE VISITE (à la fin, quand le commercial quitte la zone)
+    ┌─────────────────────────────────────────┐
+    │  Visite terminée — AGIL BEJA SUD       │
+    │  Durée : 23 min                         │
+    │  Documents émis : 1 TIC                 │
+    │  CA visite : 1840 TND                   │
+    │  Enregistrement : 3 min 12 sec ✓        │
+    │  [📝 Ajouter une note de visite]        │
+    └─────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C.5  ENREGISTREMENT VOCAL DES VISITES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRINCIPE
+  Chaque visite client peut être enregistrée en audio.
+  Le commercial et le client sont informés de l'enregistrement (conformité légale).
+  Seul l'admin (et le manager si autorisé) peut écouter les enregistrements.
+
+DÉCLENCHEMENT
+  - Automatique : lors du check-in [OUI JE SUIS LÀ] (si activé dans les paramètres)
+  - Manuel      : bouton [🎤 Enregistrer] dans la fiche client
+
+INTERFACE ENREGISTREMENT (commercial)
+  ┌─────────────────────────────────────────┐
+  │  🔴 Enregistrement en cours             │
+  │     AGIL BEJA SUD                       │
+  │     ██████████░░░░░  3:24               │
+  │                                         │
+  │  [⏸ Pause]  [⏹ Arrêter]  [🗑 Supprimer] │
+  └─────────────────────────────────────────┘
+
+STOCKAGE
+  - Format audio : WebM / OGG (natif navigateur)
+  - Compression : codec Opus (~10 Ko/min)
+  - Nom de fichier : [commercial]_[client]_[date]_[heure].webm
+  - Stockage serveur : /recordings/[année]/[mois]/
+  - Durée max par visite : 60 minutes (configurable)
+  - Rétention : 90 jours (configurable)
+
+INTERFACE ADMIN — ÉCOUTE DES ENREGISTREMENTS
+  URL : /admin/recordings
+  Accessible uniquement aux utilisateurs avec le droit "Enreg. vocaux = Voir"
+
+  LISTE DES ENREGISTREMENTS
+  Colonnes :
+    Date | Commercial | Client | Durée | Taille | CA visite | Résumé IA | Écouter
+
+  LECTEUR AUDIO IN-APP
+    - Lecteur audio HTML5 avec contrôle de vitesse (0.75x, 1x, 1.25x, 1.5x)
+    - Marqueurs de temps (pause, note à X:XX)
+    - Transcription automatique (voir IA.4)
+    - Résumé IA en 3 points clés de la conversation
+
+  FILTRES
+    - Commercial | Client | Période | Durée min/max | Mots-clés (si transcription)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+C.6  NOUVELLES FONCTIONNALITÉS COMMERCIALES INTELLIGENTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUGGESTION PRODUITS EN TEMPS RÉEL (IA)
+  Dans le catalogue produit, pour chaque client sélectionné :
+  Bandeau doré : "⭐ Recommandé pour ce client"
+    - Basé sur : historique d'achat client, articles populaires chez clients similaires
+    - "Ce client achète souvent : coffret echec + jeux ludo bois — proposer ensemble"
+
+ALERTE SOLDE AU MOMENT DE LA COMMANDE
+  Si le client a un solde > plafond, affichage d'une alerte rouge :
+  ┌──────────────────────────────────────────────────┐
+  │  ⚠️ ATTENTION                                    │
+  │  Solde actuel : 4428.262 TND                     │
+  │  Plafond autorisé : 5000 TND                     │
+  │  Encours après commande : 6268 TND (DÉPASSEMENT) │
+  │  [Continuer quand même]  [Annuler commande]       │
+  └──────────────────────────────────────────────────┘
+
+CATALOGUE HORS LIGNE (mode offline)
+  - Le catalogue produit et la liste clients se synchronisent au démarrage
+  - En zone sans réseau, la saisie de commande continue de fonctionner
+  - Synchronisation automatique dès la reconnexion
+  - Indicateur "Mode hors ligne" dans la barre supérieure
+
+NOTE DE VISITE RAPIDE (après chaque client)
+  Champ texte libre + tags prédéfinis :
+  [Paiement effectué] [Commande passée] [Client absent] [Réclamation] [Rappeler]
+  Visible dans la fiche client et le journal de visite
+
+================================================================================
+PARTIE IV — CLIENT (Portail Web/Mobile)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CL.1  CONNEXION ET ESPACE PERSONNEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : http://[domaine]/client/login
+
+FORMULAIRE DE CONNEXION
+  - Email / Login client
+  - Mot de passe
+  - [Se souvenir de moi]
+  - [Mot de passe oublié] → envoi email reset
+
+TABLEAU DE BORD CLIENT (après connexion)
+  ┌─────────────────────────────────────────────────────────┐
+  │  Bonjour, AGIL BEJA SUD                                 │
+  │  Votre commercial : mokhtar trabelsi  📞 [Appeler]      │
+  ├─────────────────────────────────────────────────────────┤
+  │  Solde actuel    : 4428.262 TND   [Voir détail]         │
+  │  Dernière commande : 15/05/2026   [Revoir]              │
+  │  Commandes en cours : 1           [Suivre]              │
+  ├─────────────────────────────────────────────────────────┤
+  │  ACTIONS RAPIDES                                        │
+  │  [🛒 Passer une commande]  [📋 Mes documents]           │
+  │  [💬 Contacter le commercial]  [⚠️ Faire une réclamation]│
+  └─────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CL.2  HISTORIQUE DES COMMANDES ET DOCUMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /client/historique
+
+ONGLETS
+  [Tickets / BL] [Factures] [Avoirs] [Règlements]
+
+TABLEAU DES DOCUMENTS (exemple Tickets)
+  Colonnes :
+    N° Document | Date | Articles | Montant TTC | Statut | Actions
+
+  STATUTS DOCUMENT
+    ✅ Livré    📦 En préparation    🚚 En livraison    ⏳ En attente
+
+  ACTIONS PAR DOCUMENT
+    - [👁️ Voir détail]    — affichage du bon en lecture seule
+    - [📄 Télécharger PDF] — génération PDF à la demande
+    - [🔄 Recommander]    — reprendre les mêmes articles en nouvelle commande
+
+  FILTRES
+    - Période (Du / Au)
+    - Type de document
+    - Statut
+    - Montant min/max
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CL.3  SAISIE DE COMMANDE EN LIGNE (B2B E-COMMERCE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /client/commander
+
+CATALOGUE PRODUITS (vue client)
+  - Grille de cartes produits avec image, nom, prix TTC client
+  - Son tarif spécifique appliqué automatiquement (tarif T1, T2, etc.)
+  - Stock affiché : Disponible ✅ | Stock faible ⚠️ | Épuisé ❌
+  - Filtres : Désignation | Famille | Sous-famille
+  - Recherche par code-barres ou désignation
+
+  CARTE PRODUIT (vue client)
+    - Image
+    - Désignation
+    - Prix unitaire TTC (son tarif)
+    - Remise appliquée (si existante)
+    - Bouton [-] [Qté] [+]  et  [Ajouter au panier]
+
+PANIER CLIENT
+  - Récapitulatif des articles sélectionnés
+  - Modification de quantité en ligne
+  - Total HT | TVA | Total TTC
+  - Date de livraison souhaitée (champ date)
+  - Note / commentaire libre
+  - Bouton [Confirmer la commande]
+
+CONFIRMATION
+  - Récapitulatif final + numéro de commande attribué (ex: CMD243001)
+  - Notification envoyée au commercial assigné
+  - Email de confirmation envoyé au client
+  - Statut initial : "En attente de validation"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CL.4  SUIVI DE LIVRAISON EN TEMPS RÉEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+URL : /client/suivi/[id-commande]
+
+TIMELINE DE STATUTS
+  ●────●────●────○────○
+  Commandé  Validé  Chargé  En route  Livré
+
+CARTE DE SUIVI (si commande "En route")
+  - Position GPS du véhicule en temps réel
+  - Heure d'arrivée estimée (basée sur distance + vitesse actuelle)
+  - Bouton [📞 Appeler le livreur]
+
+NOTIFICATION PUSH au client
+  - "Votre commande CMD243001 a été validée"
+  - "Votre livraison est en route — ETA : 14h30"
+  - "Votre livraison a été effectuée — Merci !"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CL.5  COMMUNICATION ET RÉCLAMATIONS CLIENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MESSAGERIE SIMPLE
+  URL : /client/messages
+  - Chat texte avec le commercial assigné (visible aussi côté commercial et manager)
+  - Pièces jointes (photos d'un produit défectueux, etc.)
+  - Historique des échanges
+
+FORMULAIRE DE RÉCLAMATION
+  URL : /client/reclamation
+  - Sélection de la commande concernée
+  - Type de réclamation : [Produit défectueux] [Livraison incorrecte] [Retard] [Autre]
+  - Description libre + photo
+  - Suivi du statut de la réclamation (Ouverte / En traitement / Résolue)
+
+================================================================================
+PARTIE V — INTELLIGENCE ARTIFICIELLE TRANSVERSALE
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.1  MOTEUR DE RECOMMANDATIONS PRODUITS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALGORITHME : Filtrage collaboratif (collaborative filtering) + analyse panier
+INPUT  : Historique de commandes de tous les clients sur 12 mois
+OUTPUT : Pour chaque client → liste de 5 produits recommandés
+
+CAS D'USAGE
+  A. Pendant la visite (commercial) :
+     "Ce client n'a jamais commandé 'mini puzzel 2 en 1' —
+      90% des clients similaires l'achètent. Proposition : 2 unités."
+
+  B. Dans le portail client (lors de la commande) :
+     "Vous achetez souvent : coffret echec 2025
+      Souvent commandé ensemble : coffret scrable 2025 — ajouter ?"
+
+  C. Pour le manager (rapport hebdo) :
+     "Top 3 produits à pousser cette semaine par zone géographique"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.2  PRÉDICTION DE STOCK — RÉAPPROVISIONNEMENT AUTOMATIQUE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALGORITHME : Régression linéaire / moyenne mobile sur la vitesse de vente
+FRÉQUENCE : Calcul quotidien, résultats disponibles chaque matin
+
+PRÉVISIONS AFFICHÉES
+  Article : coffret echec 2025
+  ├── Vitesse de vente : 8 unités / semaine (moyenne 4 semaines)
+  ├── Stock actuel     : 10 unités
+  ├── Stock prévu J+7  : 2 unités ⚠️
+  ├── Stock prévu J+14 : -6 unités (rupture prévue J+11)
+  └── Recommandation   : Commander 40 unités avant le [date]
+      [✉️ Générer bon de commande automatique]
+
+TABLEAU DE BORD STOCK PRÉDICTIF (Admin)
+  Colonnes :
+  Article | Stock actuel | Vente/semaine | Jours avant rupture | Qté à commander | Action
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.3  DÉTECTION D'ANOMALIES FINANCIÈRES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES DE DÉTECTION AUTOMATIQUE
+  1. Remise inhabituelle :
+     "Commercial X accorde habituellement 5–10% de remise.
+      Cette transaction : 45% — flaggée pour vérification"
+
+  2. Encaissement suspect :
+     "Règlement espèces de 8000 TND d'un client ayant toujours payé par chèque"
+
+  3. Tournée anormale :
+     "mokhtar a fait seulement 3 visites aujourd'hui vs 14 en moyenne"
+
+  4. Doublon de paiement :
+     "Même montant (1840 TND) du même client en 2 heures"
+
+  5. Crédit dépassé répété :
+     "AGIL BEJA SUD dépasse son plafond pour le 3ème mois consécutif"
+
+TABLEAU DE SIGNALEMENT (Admin/Manager)
+  Date | Commercial | Client | Type anomalie | Montant | Risque | Statut
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.4  TRANSCRIPTION ET ANALYSE DES ENREGISTREMENTS VOCAUX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PIPELINE DE TRAITEMENT (en arrière-plan, après chaque visite)
+  1. Audio WebM → API de transcription (Whisper OpenAI ou Faster-Whisper local)
+  2. Transcription texte en français/arabe tunisien
+  3. Analyse NLP :
+     - Sentiment général : positif / neutre / négatif
+     - Mots-clés détectés : commande | prix | réclamation | concurrent | livraison
+     - Sujets abordés : liste automatique
+  4. Résumé auto en 3 points (via LLM — Claude API)
+  5. Stockage dans la fiche client
+
+EXEMPLE DE RÉSUMÉ AFFICHÉ (Admin)
+  ┌────────────────────────────────────────────────────────────┐
+  │  Visite : mokhtar → AGIL BEJA SUD — 15/05/2026 — 23 min   │
+  │  Sentiment : 🟡 Neutre (léger mécontentement)              │
+  │  Résumé automatique :                                      │
+  │  • Client demande une remise supplémentaire de 5%          │
+  │  • Problème signalé : délai de livraison de la semaine passée │
+  │  • A commandé : coffret echec (×10) + jeux ludo (×5)       │
+  │  [🎤 Écouter]  [📄 Voir transcription complète]            │
+  └────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.5  CHATBOT ASSISTANT INTERNE ("BIS Assistant")
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Icône : 💬 (flottante, coin bas-droite de toutes les pages)
+
+CAPACITÉS DU CHATBOT
+  Pour l'Admin :
+    "Quel est le CA de ce mois ?"
+    → "CA mai 2026 : 62 400 TND (+12% vs mai 2025)"
+
+    "Montre-moi les clients qui n'ont pas payé depuis 2 mois"
+    → Tableau des 8 clients concernés avec montants
+
+    "Génère un bon de commande pour les articles en rupture prévue"
+    → Bon de commande pré-rempli
+
+  Pour le Commercial :
+    "Quels produits proposer à AGIL BEJA SUD ?"
+    → 5 recommandations basées sur historique
+
+    "Quel est le solde d'AGIL BEJA SUD ?"
+    → "Solde : 4428.262 TND — plafond autorisé : 5000 TND"
+
+  Pour le Manager :
+    "Qui est le meilleur commercial ce mois ?"
+    → Classement et comparaison
+
+TECHNOLOGIE
+  - LLM backend : Claude API (claude-sonnet-4-6) avec contexte ERP
+  - Données injectées via RAG (Retrieval-Augmented Generation) en temps réel
+  - Pas d'entraînement sur données sensibles — requêtes API sécurisées
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.6  OPTIMISATION DYNAMIQUE DES PRIX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ANALYSE AUTOMATIQUE (hebdomadaire)
+  Pour chaque article :
+    - Comparer le prix de vente moyen réalisé vs prix catalogue
+    - Identifier les articles où des remises excessives sont systématiques
+    - Suggérer un ajustement de prix catalogue basé sur les données réelles
+
+RAPPORT "OPTIMISATION PRIX" (Admin)
+  Article              | Prix cat. | Prix moyen vendu | Remise moy. | Suggestion
+  coffret echec 2025   | 15.000    | 10.500           | 30%         | Revoir tarif T2
+  jeux ludo bois       | 8.000     | 7.800            | 2.5%        | OK ✅
+
+SIMULATION "ET SI ?"
+  "Si je supprime les remises > 20% sur le catalogue jouets :
+   Impact CA estimé : -3% | Impact marge : +8%"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IA.7  SCORING CLIENT (RISQUE CRÉDIT & POTENTIEL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCORE DE RISQUE CRÉDIT (0-100, 100 = très risqué)
+  Critères :
+    - Ancienneté de la créance (en jours)
+    - Fréquence des dépassements de plafond
+    - Historique des paiements (ponctualité)
+    - Ratio créance / CA total du client
+
+  Affichage : badge coloré sur chaque carte client
+    🟢 Score 0–30    : Risque faible
+    🟡 Score 31–60   : Risque modéré — surveiller
+    🔴 Score 61–100  : Risque élevé — action requise
+
+SCORE DE POTENTIEL (0-100, 100 = très fort potentiel)
+  Critères :
+    - Fréquence d'achat
+    - Diversité des produits commandés
+    - Évolution du CA sur 12 mois
+    - Réponse aux propositions commerciales
+
+  Utilisation :
+    - Prioriser les visites vers les clients à fort potentiel non exploité
+    - Identifier les clients "dormants" à relancer
+
+================================================================================
+PARTIE VI — ARCHITECTURE TECHNIQUE
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+T.1  STACK TECHNOLOGIQUE RECOMMANDÉ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FRONTEND
+  - Framework   : React 18 + TypeScript
+  - UI Library  : Material-UI v5 (existant, à conserver)
+  - Cartographie: Leaflet.js + React-Leaflet + OpenStreetMap
+  - Routing     : React Router v6 (existant)
+  - État global : Zustand ou Redux Toolkit
+  - PWA         : Vite PWA plugin (service worker, offline, push notifications)
+  - Audio       : Web Audio API (MediaRecorder natif navigateur)
+
+BACKEND
+  - Runtime    : Node.js (existant)
+  - Framework  : Express.js (existant)
+  - API GPS    : Socket.io pour la mise à jour en temps réel des positions
+  - Base de données : MySQL (existante) + Redis (cache temps réel)
+
+SERVICES IA
+  - Transcription vocale : Faster-Whisper (self-hosted, modèle medium/large)
+                           ou OpenAI Whisper API (cloud)
+  - LLM / Chatbot       : Claude API (claude-sonnet-4-6) via Anthropic SDK
+  - Recommandations     : Algorithme interne Python (scikit-learn) ou service dédié
+  - Calcul d'itinéraire : OSRM self-hosted (Open Source Routing Machine)
+
+GPS TRACKING
+  - Application mobile commercial : navigator.geolocation (Geolocation API navigateur)
+  - Envoi position : WebSocket ou POST /api/gps/update toutes les 30 secondes en mission
+  - Stockage : table `gps_positions` (commercial_id, lat, lng, timestamp, vitesse)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+T.2  INFRASTRUCTURE ET SÉCURITÉ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SÉCURITÉ
+  - HTTPS obligatoire (Let's Encrypt)
+  - JWT avec rotation des tokens (access token 15min + refresh token 7 jours)
+  - Rate limiting sur toutes les routes API
+  - Chiffrement des enregistrements audio au repos (AES-256)
+  - Logs d'audit complets (qui a écouté quel enregistrement)
+  - RGPD : consentement enregistrement + droit à l'effacement
+
+PERFORMANCES
+  - CDN pour les images produits
+  - Pagination serveur sur tous les tableaux (pas de chargement 111 clients en une fois)
+  - Cache Redis pour les données fréquentes (catalogue, liste clients)
+  - Compression Gzip/Brotli
+
+BACKUP
+  - Backup MySQL automatique quotidien (3h du matin)
+  - Backup des enregistrements audio vers stockage objet (S3 compatible)
+  - Rétention : 30 jours DB | 90 jours audio
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+T.3  APIS ET INTÉGRATIONS EXTERNES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INTÉGRATIONS RECOMMANDÉES
+  Cartographie    : OpenStreetMap (gratuit) + Nominatim (géocodage gratuit)
+  Navigation GPS  : OSRM self-hosted (gratuit, illimité) ou GraphHopper Cloud
+  SMS             : Twilio ou OrangeSMS Tunisie (alertes, confirmations client)
+  Email           : SMTP existant ou Mailgun (emails transactionnels)
+  IA Vocale       : Faster-Whisper (self-hosted, GRATUIT) ou OpenAI Whisper
+  LLM             : Claude API Anthropic (pay-per-use, environ 0.003$/1K tokens)
+  Push Web        : Web Push API (natif navigateur, GRATUIT)
+
+RÉDUCTION DES COÛTS (objectif économies)
+  ┌───────────────────────────────────────────────────────┐
+  │  OPTIMISATION KILOMÉTRIQUE                            │
+  │  Économie tournée optimisée : ~25% km en moins        │
+  │  Exemple : 198 km → 142 km par commercial par jour    │
+  │  7 commerciaux × 56 km × 250 jours × 0.2 TND/km      │
+  │  = ~19 600 TND/an de carburant économisé              │
+  ├───────────────────────────────────────────────────────┤
+  │  RÉDUCTION RUPTURES DE STOCK                          │
+  │  Prédiction 7 jours → zéro vente perdue par rupture   │
+  │  Estimation : 5% du CA récupéré = ~15 000 TND/an      │
+  ├───────────────────────────────────────────────────────┤
+  │  RECOUVREMENT ACCÉLÉRÉ                               │
+  │  Alertes automatiques + visite guidée par créance     │
+  │  Réduction DSO (délai paiement) estimée : -8 jours    │
+  │  Impact trésorerie : ~20 000 TND de cash libéré        │
+  ├───────────────────────────────────────────────────────┤
+  │  RÉDUCTION FRAUDES / ABUS                             │
+  │  Détection anomalies remises excessives               │
+  │  Estimation : 2–3% du CA sécurisé                     │
+  └───────────────────────────────────────────────────────┘
+
+================================================================================
+PLAN DE DÉPLOIEMENT RECOMMANDÉ — PHASES
+================================================================================
+PHASE 1 — Fondations (Mois 1–2)
+  ✅ Carte GPS admin + tracking véhicules (A.1)
+  ✅ Control panel utilisateurs + 4 rôles (A.2)
+  ✅ Portail client — login + historique (CL.1, CL.2)
+
+PHASE 2 — Commercial augmenté (Mois 3–4)
+  ✅ Carte commerciale avec clients (C.2)
+  ✅ Optimisation de tournée GPS (C.3)
+  ✅ Check-in client + bouton présence (C.4)
+  ✅ Enregistrement vocal visites (C.5)
+
+PHASE 3 — Intelligence (Mois 5–6)
+  ✅ Transcription + résumé IA des enregistrements (IA.4)
+  ✅ Recommandations produits (IA.1)
+  ✅ Prédiction de stock (IA.2)
+  ✅ Commande en ligne client (CL.3, CL.4)
+
+PHASE 4 — Optimisation avancée (Mois 7–8)
+  ✅ Chatbot BIS Assistant (IA.5)
+  ✅ Scoring client risque/potentiel (IA.7)
+  ✅ Détection anomalies financières (IA.3)
+  ✅ Dashboard manager complet (M.1–M.5)
+  ✅ Notifications push SMS/Web (A.4)
+
+================================================================================
+FIN DU DOCUMENT — SOW B.I.S INTELLIGENT v2.0
+================================================================================

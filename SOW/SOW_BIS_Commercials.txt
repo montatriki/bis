@@ -1,0 +1,609 @@
+================================================================================
+SOW — BIS COMMERCIAL APPLICATION
+Application: B.I.S. Commercial (Mobile PWA)
+URL: http://41.226.17.73:3000/
+Credentials: Login: mokhtar | Password: 007 | DB: bis (auto-filled)
+Date: 2026-05-16
+================================================================================
+
+NOTES TECHNIQUES
+─────────────────────────────────────────────────────────────────────────────
+- Application React SPA (Progressive Web App, mobile-first)
+- Authentification via JWT (POST /users/generateToken → POST /users/login)
+- Le token JWT est stocké en mémoire React (non persisté en localStorage)
+- Navigation interne via React Router (window.history.pushState)
+- Tout rechargement de page (page.goto) perd la session — navigation pushState requise
+- Viewport optimisé mobile (~375px), affiché ici en 1440px
+- Dépôt par défaut : Dépôt principal
+- Commercial connecté : mokhtar trabelsi | Véhicule : 206TU7140 | Mission : 2548
+
+================================================================================
+TABLE DES MATIÈRES
+================================================================================
+ 1. CONNEXION (Login)
+ 2. ACCUEIL / TABLEAU DE BORD
+ 3. CATALOGUE PRODUIT           (/catalogueProduit)
+ 4. MES CLIENTS                 (/mesClients)
+ 5. PLANNING DU JOUR            (/planningJour)
+ 6. PANIER DE COMMANDE          (modal, accessible depuis fiche client)
+ 7. RECOUVREMENT                (/recouvrement)
+ 8. RETOUR DE STOCK             (/transfereStock)
+ 9. JOURNAL DE CAISSE           (/journalCaisse)
+10. RÉCLAMATION CLIENT          (/reclamationClient)
+11. DERNIER TICKET              (/dernierTicket)
+12. CHANGER MOT DE PASSE        (/MotDePasse)
+13. BON D'APPROVISIONNEMENT     (/bonApprovisionnement)
+14. NAVIGATION LATÉRALE (Sidebar)
+
+================================================================================
+1. CONNEXION (Login)
+================================================================================
+URL : http://41.226.17.73:3000/login
+
+CHAMPS DU FORMULAIRE
+  - Login    : champ texte  | id="login"    | saisie du nom d'utilisateur
+  - DB       : champ texte  | id="db"       | auto-rempli avec "bis" après saisie du login (~800ms)
+  - Password : champ texte  | id="password" | mot de passe
+
+COMPORTEMENT
+  - À la saisie du login, le champ DB se remplit automatiquement ("bis") via un mécanisme
+    de correspondance login→base de données
+  - Délai nécessaire : attendre ~1 seconde après saisie du login avant de remplir le mot de passe
+  - Si le champ DB ne se remplit pas automatiquement, injecter la valeur via React nativeInputValueSetter
+
+BOUTON
+  - [SE CONNECTER] — soumet le formulaire
+
+FLUX D'AUTHENTIFICATION
+  1. POST /users/generateToken  → obtention d'un token JWT
+  2. POST /users/login          → authentification avec le token
+  3. Token stocké en mémoire React (perdu si la page est rechargée)
+  4. Toutes les requêtes API suivantes incluent le JWT dans le corps de la requête
+
+================================================================================
+2. ACCUEIL / TABLEAU DE BORD
+================================================================================
+URL : http://41.226.17.73:3000/ (après login)
+
+CONTENU
+  - Page d'accueil après connexion réussie
+  - Accès à la navigation latérale (sidebar) avec les 10 modules principaux
+  - Affichage du nom du commercial connecté
+
+INFORMATIONS AFFICHÉES
+  - Identité commercial : mokhtar trabelsi
+  - Mission courante : code 2548
+  - Véhicule assigné : 206TU7140
+
+================================================================================
+3. CATALOGUE PRODUIT
+================================================================================
+URL : /catalogueProduit
+
+DESCRIPTION
+  Affichage de tous les produits disponibles en stock sous forme de grille de cartes.
+  Sert de référence produit et de point de départ pour la saisie de commande.
+
+FILTRES (barre supérieure)
+  - Désignation     : champ texte libre (recherche par nom)
+  - Code à barre    : champ texte libre (recherche par code-barres)
+  - Fam-art         : liste déroulante | valeur par défaut : Tous
+  - Sous-Fam-art    : liste déroulante | valeur par défaut : Tous
+
+CARTE PRODUIT (répétée pour chaque article)
+  Chaque carte contient :
+  - Image du produit
+  - Désignation (nom du produit)
+    Exemple : coffret echec 2025
+  - Code à barres
+    Exemple : 6192207300848
+  - Stock disponible (chiffre vert)
+    Exemple : 10
+  - Quantité en cours de commande (chiffre blanc sur fond gris)
+    Exemple : 193
+  - Icônes d'action :
+      [%]   — appliquer un pourcentage de remise
+      [$]   — saisir un prix manuel
+      [-]   — décrémenter la quantité
+      [+]   — incrémenter la quantité
+      [🗑]  — supprimer l'article du panier
+
+EXEMPLES DE PRODUITS VISIBLES
+  Désignation                 | Code-barres    | Stock | Qté cmd
+  coffret echec 2025          | 6192207300848  | 10    | 193
+  Conte hikayeti 2026         | 6192207300250  | 20    | 387
+  BALLON 6PSC 2026            | 6192207300541  | 22    | 2207
+  coffret scrable 2025        | 6192207300817  | 10    | 620
+  Echec bois 2023             | 6192207300121  | 15    | 117
+  jeux ludo bois              | 6192207300084  | 9     | 90
+  mini box 9pcs 2026          | 6192207300326  | 19    | 133
+  mini puzzel 2 en 1 70 pcs   | 6192207300015  | 13    | -86
+  Surprise DouDou 12 pcs      | 6192107903026  | 14    | 447.5
+  surprise rolly poly         | 6192207300503  | 12    | 2871
+
+PAGINATION
+  - Navigation par pages (1, 2, 3, …)
+
+COMPTEUR
+  - Badge panier en haut à droite : nombre total d'articles dans le panier en cours
+
+================================================================================
+4. MES CLIENTS
+================================================================================
+URL : /mesClients
+
+DESCRIPTION
+  Liste de tous les clients du commercial courant (111 clients au total).
+  Permet de consulter la situation de chaque client, d'accéder à son panier,
+  ou de créer un ticket/bon de livraison.
+
+FILTRES (barre supérieure)
+  - Recherche       : champ texte libre (recherche par nom ou téléphone)
+  - Gouvernorat     : liste déroulante | valeur par défaut : Tous clients
+  - Clients planifiés : case à cocher
+  - Ville           : liste déroulante
+  - Fam-client      : liste déroulante | valeur par défaut : tous
+
+COMPTEURS GLOBAUX
+  - Nbr : (111)             — nombre total de clients
+  - Reste Plafond : 0.000   — solde plafond total restant
+
+CARTE CLIENT (répétée pour chaque client)
+  Chaque carte contient :
+  - Avatar commercial (photo)
+  - Numéro de séquence / rang
+  - Raison sociale du client
+  - Numéro de téléphone (si disponible)
+  - Adresse : Gouvernorat - Ville
+  - Solde restant dû (en rouge si débiteur)
+  - Date et heure de la dernière visite
+  - Nombre de tickets (badge)
+  - Activité client (type de commerce)
+  - Nom du commercial assigné : mokhtar trabelsi
+  - Badges statut :
+      [Planifié]   — client prévu dans le planning du jour
+      [pour vente] — client actif pour la vente
+      [Panier]     — panier de commande en cours
+  - Bouton [BL]   — créer / voir un Bon de Livraison
+  - Bouton [TIC]  — créer / voir un Ticket
+
+EXEMPLES DE CLIENTS
+  Raison sociale              | Adresse              | Solde      | Tickets
+  librairie Synotec sarl      | Ariana - Ariana      | 0.000      | BL 0
+  ste medinart                | Tunis                | 0.000      | TIC 2
+  librairie saphir            | Tunis - Tunis        | 2738.102   | TIC 10
+  société Orchid trading      | TUNIS                | 630.499    | TIC 35
+  AGIL BEJA SUD               |                      | 4428.262   | TIC 17
+  AGIL BEJA NORD              |                      | 4291.121   | TIC 16
+  AGIL SIDI KHLIFA            |                      | 3659.434   | TIC 27
+  AGIL MAHDIA                 |                      | 3408.199   | TIC 78
+  ola agereb                  |                      | 2765.625   | AV 22
+
+================================================================================
+5. PLANNING DU JOUR
+================================================================================
+URL : /planningJour
+
+DESCRIPTION
+  Affichage de la tournée planifiée pour la journée courante.
+  Sous-ensemble ordonné des clients (17 clients planifiés sur 111).
+  Les clients sont numérotés dans l'ordre de visite prévu.
+
+FILTRES (identiques à Mes Clients)
+  - Recherche       : champ texte libre
+  - Gouvernorat     : liste déroulante | Tous clients
+  - Clients planifiés : case à cocher (cochée par défaut sur cette page)
+  - Ville           : liste déroulante
+  - Fam-client      : liste déroulante | tous
+
+COMPTEUR
+  - Nbr : (17) — nombre de clients planifiés pour la journée
+
+CARTE CLIENT (identique à Mes Clients, avec numéro d'ordre en plus)
+  - Numéro de visite : 1, 2, 3, … (ordre de tournée)
+  - Raison sociale
+  - Téléphone
+  - Adresse (Gouvernorat - Ville)
+  - Solde
+  - Date/heure dernière visite
+  - Nombre tickets
+  - Activité
+  - Commercial : mokhtar trabelsi
+  - Badges : [Planifié] [pour vente] [Panier]
+  - Bouton [TIC]
+
+EXEMPLES DE CLIENTS PLANIFIÉS (ordre de visite)
+  N° | Raison sociale                         | Adresse             | Solde    | Tickets
+   1 | SOCIÉTÉ SPICE LAND HBIB ZGHAL          | Sfax - Sfax         | 0.000    | TIC 2
+   2 | Ste Anouar express bareka              | Nabeul - Hammamet   | 418.050  | TIC 8
+   3 | Ste anouar express wed baten           | Nabeul - Hammamet   | 363.550  | TIC 12
+   4 | Ste Anouar express la sirène           | Nabeul              | —        | —
+  …  | …                                      | …                   | …        | …
+  17 | (17ème client planifié)                | —                   | —        | —
+
+================================================================================
+6. PANIER DE COMMANDE
+================================================================================
+ACCÈS : modal déclenchée depuis la fiche client (bouton [Panier] ou [TIC])
+
+DESCRIPTION
+  Panier de commande associé à un client spécifique.
+  Affiché sous forme de boîte de dialogue modale (dialog) au-dessus de la liste clients.
+  Contient le détail du bon de livraison / ticket en cours de création.
+
+EN-TÊTE MODAL
+  - Logo et raison sociale de la société émettrice :
+      STE SKY EDITION ET DISTRIBUTION
+      RTE MZEL CHAKER KM4, Oued chaabouni, Sfax Ouest, Sfax, 3071
+      MF : 1584153T/A/M/000
+  - Commercial : mokhtar trabelsi
+  - N° ticket  : TIC252816
+  - Date       : 15-05-2026 T 11:22:00
+
+SECTION "Bon de livraison"
+  - Client   : (nom du client sélectionné, ex : AGIL BEJA SUD)
+  - Adresse  : (adresse client, ex : 000 , EL GRIAT PK 29 SUD , BEJA 9023)
+  - MF       : (matricule fiscal client, ex : 1400127Z/P/E/004)
+  - RC       : (registre de commerce)
+
+TABLEAU DES LIGNES ARTICLE
+  Colonnes :
+  - ARTICLE  — désignation du produit
+  - Qté      — quantité commandée
+  - PU TTC   — prix unitaire TTC
+  - MT TTC   — montant total TTC
+  - REM      — remise appliquée (ex : REM : 100 %)
+
+EXEMPLES DE LIGNES
+  coffret echec 2025    | 1 | 0.000 | 0.000 | REM : 100 %
+  jeux de bois 4 en 1   | 1 | 0.000 | 0.000 | REM : 100 %
+
+PIED DE TICKET
+  - Montant HT   : 0.000
+  - Taux TVA     : 19%
+  - TVA          : 0.000
+  - Net à payer  : 0.000
+
+SECTION MODE DE PAIEMENT
+  - Espèce : 0.000
+  - (zones de signature : Sig.Commercial | Décharge client)
+
+BOUTONS
+  - [IMPRIMER] — imprimer le ticket
+  - [✕]        — fermer la modal
+
+================================================================================
+7. RECOUVREMENT
+================================================================================
+URL : /recouvrement
+
+DESCRIPTION
+  Gestion du recouvrement (créances clients).
+  Affiche tous les clients ayant un solde débiteur, classés par montant décroissant.
+  Permet de saisir des règlements (espèces, chèques, traites, avoirs).
+
+EN-TÊTE
+  - Bouton [AJOUTER] — ajouter un règlement manuel
+  - Total global des créances : 44405.166
+
+FILTRES (identiques à Mes Clients)
+  - Recherche       : champ texte libre
+  - Gouvernorat     : liste déroulante | Tous clients
+  - Clients planifiés : case à cocher
+  - Ville           : liste déroulante
+  - Fam-client      : liste déroulante | tous
+
+COMPTEUR
+  - Mes clients (111) — nombre total de clients dans la liste de recouvrement
+
+CARTE CLIENT (avec informations de recouvrement)
+  - Numéro de ticket courant
+  - Raison sociale client
+  - Solde dû (en rouge)
+  - Date et heure de la dernière opération
+  - Badges : [Planifié] [pour vente] [Panier]
+  - Nom du commercial
+  - Boutons d'action :
+      [TIC] — créer un ticket de vente
+      [AV]  — créer un avoir
+      [BR]  — créer un bon de règlement
+
+EXEMPLES DE CLIENTS EN RECOUVREMENT (classés par solde décroissant)
+  Rang | Raison sociale     | Solde (TND)  | Dernière op.
+  17   | AGIL BEJA SUD      | 4428.262     | 26-05-15 11:22
+  16   | AGIL BEJA NORD     | 4291.121     | 26-05-15 10:00
+       | AGIL SIDI KHLIFA   | 3659.434     | 26-04-23 02:05
+  27   | AGIL MAHDIA        | 3408.199     | 26-04-01 12:32
+  22   | ola agereb         | 2765.625     | 26-04-30 12:10
+  …    | …                  | …            | …
+  TOTAL                     | 44405.166
+
+================================================================================
+8. RETOUR DE STOCK
+================================================================================
+URL : /transfereStock
+
+DESCRIPTION
+  Gestion des retours de marchandises au dépôt.
+  Permet de réaliser un inventaire, un retour ou un transfert de stock.
+
+EN-TÊTE
+  - Titre : "Retour de stock"
+  - Dépôt : "Dépôt principal" (affiché en vert, sélectionnable)
+
+FILTRES
+  - Tous les articles : case à cocher (affiche tous les articles, cochée par défaut)
+  - Code à barre      : champ texte libre (recherche par code-barres)
+
+ONGLETS (cases à cocher pour le type d'opération)
+  - [☐] Inventaire  — réaliser un inventaire de stock
+  - [☐] Retour      — enregistrer un retour de marchandise
+  - [☐] Transfert   — transférer des articles vers un autre dépôt
+
+BOUTON
+  - [INVENTAIRE] — valider et soumettre l'inventaire
+
+CARTE ARTICLE (répétée pour chaque article en stock)
+  Chaque carte contient :
+  - Image du produit
+  - Désignation (nom du produit)
+  - Code à barres
+  - Stock physique disponible (chiffre vert)
+    Icône camion + chiffre (stock théorique / en transit)
+  - Case à cocher (sélection manuelle de l'article)
+  - "Qte ret" + bouton [-] + champ quantité + bouton [+]
+
+EXEMPLES D'ARTICLES
+  Désignation                 | Code-barres    | Stock physique | Stock théorique | Qte ret
+  coffret echec 2025          | 6192207300848  | 10             | 193             | [champ éditable]
+  Conte hikayeti 2026         | 6192207300250  | 20             | 387             | [champ éditable]
+  BALLON 6PSC 2026            | 6192207300541  | 22             | 2207            | [champ éditable]
+  coffret scrable 2025        | 6192207300817  | 10             | 620             | [champ éditable]
+  Echec bois 2023             | 6192207300121  | 15             | 117             | [champ éditable]
+  jeux ludo bois              | 6192207300084  | 9              | 90              | [champ éditable]
+  mini box 9pcs 2026          | 6192207300326  | 19             | 133             | [champ éditable]
+  mini puzzel 2 en 1 70 pcs   | 6192207300015  | 13             | -86             | [champ éditable]
+  Surprise DouDou 12 pcs      | 6192107903026  | 14             | 447.5           | [champ éditable]
+  surprise rolly poly         | 6192207300503  | 12             | 2871            | [champ éditable]
+
+PAGINATION
+  - Navigation par pages (1, 2, 3, …)
+
+================================================================================
+9. JOURNAL DE CAISSE
+================================================================================
+URL : /journalCaisse
+
+DESCRIPTION
+  Récapitulatif financier de la période de mission du commercial.
+  Affiche le chiffre d'affaires, les encaissements et le crédit en cours.
+
+FILTRES DE PÉRIODE
+  - Du  : 09-05-2026 01:02 (date/heure de début de période)
+  - AU  : 16-05-2026 02:13 (date/heure de fin de période)
+
+INFORMATIONS DE MISSION
+  - Commercial         : mokhtar trabelsi
+  - Véhicule           : 206TU7140
+  - Code de Mission    : 2548
+  - Parcours total     : -733201 Km (kilométrage cumulé)
+  - Objectifs réalisés : 21
+
+TABLEAU DE BORD FINANCIER
+  Ligne                  | Montant (TND)
+  Chiffre d'affaires     | 3506.053
+  Retour                 | 0.000
+  ─────────────────────────────────────
+  Espèce                 | 934.562
+  Chèque (1)             | 884.580
+  Traite (0)             | 0.000
+  Retenue                | 0.000
+  Total réglements       | 1819.142
+  Total crédit           | 1686.911
+
+BOUTON
+  - [IMPRIMER] — imprimer le journal de caisse
+
+================================================================================
+10. RÉCLAMATION CLIENT
+================================================================================
+URL : /reclamationClient
+
+DESCRIPTION
+  Gestion des réclamations (plaintes) des clients.
+  Permet d'enregistrer et de suivre les problèmes signalés par les clients.
+
+BOUTON
+  - [AJOUTER +] — créer une nouvelle réclamation
+
+TABLEAU DES RÉCLAMATIONS
+  Colonnes :
+  - Client      — raison sociale du client concerné
+  - Réclamation — description / objet de la réclamation
+  - Action      — actions disponibles (modifier, supprimer)
+
+PIED DE PAGE
+  - Nbr réclamation : 0  (nombre total de réclamations actives)
+
+FORMULAIRE "AJOUTER" (déclenché par le bouton [AJOUTER +])
+  Champs attendus :
+  - Client      — sélection du client (liste)
+  - Réclamation — texte libre de description
+
+================================================================================
+11. DERNIER TICKET
+================================================================================
+URL : /dernierTicket
+
+DESCRIPTION
+  Affichage du dernier ticket émis par le commercial.
+  Même interface que le Panier (modal) mais en lecture seule pour le dernier bon.
+
+AFFICHAGE (modal "Panier" en lecture seule)
+  - Titre : "Panier"
+  - Logo et raison sociale de l'émetteur :
+      STE SKY EDITION ET DISTRIBUTION
+      RTE MZEL CHAKER KM4, Oued chaabouni, Sfax Ouest, Sfax, 3071
+      MF : 1584153T/A/M/000
+  - Commercial : mokhtar trabelsi
+  - N° ticket  : TIC252816
+  - Date       : 15-05-2026 T 11:22:00
+
+SECTION "Bon de livraison"
+  - Client   : AGIL BEJA SUD
+  - Adresse  : 000 , EL GRIAT PK 29 SUD , BEJA 9023
+  - MF       : 1400127Z/P/E/004
+  - RC       : (registre de commerce)
+
+TABLEAU DES ARTICLES
+  - ARTICLE | Qté | PU TTC | MT TTC | REM
+  Ex : coffret echec 2025 | 1 | 0.000 | 0.000 | REM : 100 %
+
+TOTAUX
+  - Montant HT   : 0.000
+  - Taux TVA     : 19%
+  - TVA          : 0.000
+  - Net à payer  : 0.000
+
+MODE DE PAIEMENT
+  - Espèce : 0.000
+
+ZONES DE SIGNATURE
+  - Sig.Commercial
+  - Décharge client
+
+BOUTON
+  - [IMPRIMER] — imprimer le dernier ticket
+
+================================================================================
+12. CHANGER MOT DE PASSE
+================================================================================
+URL : /MotDePasse
+
+DESCRIPTION
+  Formulaire de modification du mot de passe du commercial connecté.
+
+CHAMPS
+  - Mot de passe actuel    : champ mot de passe (pré-rempli : "007")
+  - Nouveau mot de passe   : champ mot de passe (vide)
+  - Confirmer le mot de passe : champ mot de passe (vide)
+
+BOUTON
+  - [ENREGISTER] (sic) — valider le changement de mot de passe
+
+================================================================================
+13. BON D'APPROVISIONNEMENT
+================================================================================
+URL : /bonApprovisionnement
+
+DESCRIPTION
+  Liste des produits disponibles pour la saisie d'un bon d'approvisionnement.
+  Interface identique au Catalogue Produit mais sans les filtres Fam-art / Sous-Fam-art.
+  Permet au commercial de commander du stock supplémentaire auprès du dépôt.
+
+FILTRES
+  - Désignation  : champ texte libre (recherche par nom)
+  - Code à barre : champ texte libre (recherche par code-barres)
+  (Pas de filtre Fam-art ni Sous-Fam-art contrairement au Catalogue)
+
+CARTE ARTICLE (identique au Catalogue Produit)
+  - Image
+  - Désignation (nom du produit)
+  - Code à barres
+  - Stock disponible (chiffre vert)
+  - Quantité à commander (chiffre blanc sur fond gris)
+  - Icônes : [%] [$] [-] [+] [🗑]
+
+EXEMPLES D'ARTICLES (identiques au catalogue)
+  coffret echec 2025        | 6192207300848 | Stock : 10  | Qté : 193
+  Conte hikayeti 2026       | 6192207300250 | Stock : 20  | Qté : 387
+  BALLON 6PSC 2026          | 6192207300541 | Stock : 22  | Qté : 2207
+  coffret scrable 2025      | 6192207300817 | Stock : 10  | Qté : 620
+  Echec bois 2023           | 6192207300121 | Stock : 15  | Qté : 117
+  jeux ludo bois            | 6192207300084 | Stock : 9   | Qté : 90
+  mini box 9pcs 2026        | 6192207300326 | Stock : 19  | Qté : 133
+  mini puzzel 2 en 1 70 pcs | 6192207300015 | Stock : 13  | Qté : -86
+  Surprise DouDou 12 pcs    | 6192107903026 | Stock : 14  | Qté : 447.5
+  surprise rolly poly       | 6192207300503 | Stock : 12  | Qté : 2871
+
+PAGINATION
+  - Navigation par pages (1, 2, 3, …)
+
+================================================================================
+14. NAVIGATION LATÉRALE (Sidebar)
+================================================================================
+DESCRIPTION
+  Menu latéral accessible depuis toutes les pages de l'application.
+  Contient les 10 modules principaux de l'application commerciale.
+  L'icône hamburger (☰) ou swipe ouvre/ferme le drawer.
+
+ÉLÉMENTS DU MENU (dans l'ordre d'affichage)
+   1. Catalogue produit        → /catalogueProduit
+   2. Mes clients              → /mesClients
+   3. Planning du jour         → /planningJour
+   4. Recouvrement             → /recouvrement
+   5. Retour de stock          → /transfereStock
+   6. Journal de caisse        → /journalCaisse
+   7. Réclamation client       → /reclamationClient
+   8. Dernier ticket           → /dernierTicket
+   9. Changer mot de passe     → /MotDePasse
+  10. Bon d'approvisionnement  → /bonApprovisionnement
+
+EN-TÊTE SIDEBAR
+  - Nom du commercial : mokhtar trabelsi
+  - Logo / nom de la société
+
+PIED DE SIDEBAR
+  - Bouton de déconnexion
+
+================================================================================
+ENTITÉS MÉTIER — RÉCAPITULATIF
+================================================================================
+
+CLIENTS (111 clients dans le portefeuille de mokhtar trabelsi)
+  Types d'activités observés :
+  - librairie
+  - vente en gros
+  - gros alimentaire
+  - magasin (jouets)
+  - superette
+  - GMS (grande et moyenne surface)
+  Exemple de clients clés :
+  - AGIL BEJA SUD    | Créance : 4428.262 TND
+  - AGIL BEJA NORD   | Créance : 4291.121 TND
+  - AGIL SIDI KHLIFA | Créance : 3659.434 TND
+  - AGIL MAHDIA      | Créance : 3408.199 TND
+
+PRODUITS (catalogue de la société STE SKY EDITION ET DISTRIBUTION)
+  Gamme : jouets et jeux éducatifs
+  - coffret echec 2025 / coffret scrable 2025
+  - Conte hikayeti 2026
+  - BALLON 6PSC 2026
+  - Echec bois 2023 / jeux ludo bois / jeux de bois 4 en 1
+  - mini box 9pcs 2026 / mini puzzel 2 en 1 70 pcs
+  - Surprise DouDou 12 pcs / surprise rolly poly
+
+SOCIÉTÉ ÉMETTRICE (sur les tickets)
+  - Raison sociale : STE SKY EDITION ET DISTRIBUTION
+  - Adresse        : RTE MZEL CHAKER KM4, Oued chaabouni, Sfax Ouest, Sfax, 3071
+  - MF             : 1584153T/A/M/000
+  - TVA applicable : 19%
+
+TYPES DE DOCUMENTS ÉMIS
+  - TIC  : Ticket de vente
+  - BL   : Bon de Livraison
+  - AV   : Avoir
+  - BR   : Bon de Règlement
+
+DONNÉES FINANCIÈRES (mission 2548 — période 09/05 au 16/05/2026)
+  - Chiffre d'affaires : 3506.053 TND
+  - Total encaissé     : 1819.142 TND
+    dont Espèce        :  934.562 TND
+    dont Chèque (1)    :  884.580 TND
+    dont Traite (0)    :    0.000 TND
+  - Total crédit       : 1686.911 TND
+  - Créances globales  : 44405.166 TND (tous clients)
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================
