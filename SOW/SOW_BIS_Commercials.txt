@@ -1,6 +1,6 @@
 ================================================================================
 SOW — BIS COMMERCIAL APPLICATION
-Application: B.I.S. Commercial (Mobile PWA)
+Application: S.K.Y. Commercial (Mobile PWA)
 URL: http://41.226.17.73:3000/
 Credentials: Login: mokhtar | Password: 007 | DB: bis (auto-filled)
 Date: 2026-05-16

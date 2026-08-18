@@ -1,5 +1,5 @@
 
-STATEMENT OF WORK (SOW) — B.I.S ERP SYSTEM
+STATEMENT OF WORK (SOW) — S.K.Y ERP SYSTEM
 Business Intelligence Solution — Système de Gestion Intégré
 URL: http://41.226.17.73:3001/  |  API: http://41.226.17.73:3050/
 Admin Access: Email: sky@com | Login: admin | All modules enabled
@@ -1198,7 +1198,7 @@ Actions par véhicule (colonnes icônes cliquables) :
 =========================================================
 13. PARAMETRAGES & ADMINISTRATION SYSTÈME
 =========================================================
-Accessible via le bouton logo/icône B.I.S en haut à gauche (premier .navbar-button).
+Accessible via le bouton logo/icône S.K.Y en haut à gauche (premier .navbar-button).
 Menu déroulant contenant :
   Dashboard | Modules | Paramétrage société | Administration | Outils |
   Tva | Fodec | Numérotation Achat | Numérotation Vente

@@ -344,3 +344,94 @@ body::after {
   border: 1px solid var(--border-primary);
   z-index: 9999;
 }
+
+/* ============================================================
+   Impression des traites bancaires (module KEMBYELTY)
+   Le formulaire papier est PRÉ-IMPRIMÉ : l'imprimante ne doit sortir que les
+   valeurs, posées au millimètre par src/lib/traite-layout.ts. Tous les repères
+   d'écran (cadres, libellés, grille) portent `print:hidden`.
+   ============================================================ */
+
+/* Aperçu écran : mise à l'échelle sans toucher aux cotes en mm. */
+.traite-zoom {
+  transform: scale(var(--zoom, 1));
+  transform-origin: top left;
+}
+
+/* Copie greffée sur <body>, seule version réellement imprimée : invisible et
+   sans encombrement à l'écran, elle ne réapparaît que dans @media print. */
+.traite-portail {
+  display: none;
+}
+
+@media print {
+  /* Paysage sans marge : les mm du gabarit se mesurent alors depuis le bord
+     physique de la feuille, ce qui est indispensable pour tomber dans les cases. */
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  .traite-zoom { transform: none !important; }
+
+  /* Seule la feuille sort de l'imprimante : on masque les enfants directs de
+     <body> (toute l'application) puis on ne laisse que le portail de la traite.
+     `display` et non `visibility` : un élément simplement invisible occuperait
+     encore la page et pousserait la traite sur une seconde feuille. */
+  body.impression-traite > * { display: none !important; }
+  body.impression-traite > .traite-portail { display: block !important; }
+
+  body.impression-traite > .traite-portail {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.impression-traite #traite-feuille {
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Le cadre de l'application couvre tout l'écran : il barrerait la traite. */
+  body.impression-traite::after { display: none !important; }
+
+  /* Le papier fournit déjà le fond : on n'imprime aucun aplat blanc. */
+  .traite-feuille { background: transparent !important; }
+}
+
+/* ============================================================
+   Impression d'un ticket de vente (rouleau 80 mm)
+   Le ticket sort seul : toute l'application est masquée, comme pour les
+   traites. Format rouleau et non A4 — c'est l'imprimante de tournée.
+   ============================================================ */
+
+@media print {
+  body.impression-ticket > * { display: none !important; }
+  /* Le ticket vit dans un calque en position fixed, enfant direct de <body>. */
+  body.impression-ticket > div:has(#ticket-impression) {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: #fff !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.impression-ticket #ticket-impression {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #000 !important;
+  }
+
+  /* Le cadre de l'application déborderait sur le ticket. */
+  body.impression-ticket::after { display: none !important; }
+}

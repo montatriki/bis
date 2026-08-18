@@ -59,7 +59,7 @@ export default function LoginPage() {
             </div>
           </motion.div>
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">B.I.S</h1>
+            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">S.K.Y</h1>
             <div className="text-blue-400 font-semibold text-lg mb-1">Système Intelligent de Distribution</div>
             <div className="text-slate-500 text-sm mb-10">STE SKY EDITION ET DISTRIBUTION</div>
           </motion.div>
@@ -83,7 +83,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
               <span className="text-white font-black text-xl">B</span>
             </div>
-            <div><div className="font-black text-slate-800 text-xl">B.I.S Demo</div><div className="text-slate-500 text-xs">Système Intelligent de Distribution</div></div>
+            <div><div className="font-black text-slate-800 text-xl">S.K.Y Demo</div><div className="text-slate-500 text-xs">Système Intelligent de Distribution</div></div>
           </div>
 
           <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.35 }}>
@@ -130,6 +130,13 @@ export default function LoginPage() {
                     className="w-full pl-10 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition font-medium text-slate-800 placeholder:text-slate-300"
                     placeholder="admin, mokhtar, client..." />
                 </div>
+                {/* Chaque commercial a son propre portefeuille : la liste évite
+                    d'avoir à deviner les identifiants pour tester l'isolation. */}
+                <p className="mt-1.5 text-[11px] text-slate-400 leading-relaxed">
+                  Commerciaux (mot de passe <span className="font-semibold text-slate-500">007</span>) :
+                  mokhtar, foued, walid, jamil, ghassen, ahmad, souhaib, heni, brahim,
+                  sihem, aziz, soumaya, iyed, ilyes, hichem, zied
+                </p>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1.5 block uppercase tracking-wider">Mot de passe</label>

@@ -1,202 +1,199 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Download, FileText, Calendar, TrendingUp, Users, Truck, AlertCircle } from "lucide-react";
-import { CommercialBarChart } from "@/components/charts/CAChart";
+import { BarChart3, Download, TrendingUp, Users, AlertCircle, Package, Map, Loader2 } from "lucide-react";
 
-const REPORTS = [
-  {
-    id: 1, title: "Performance commerciaux", icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200",
-    desc: "CA, visites, taux recouvrement, nouveaux clients", periods: ["Hebdomadaire", "Mensuel", "Trimestriel"],
-    preview: [{ name: "Mokhtar", ca: "62 400", pct: 104, visits: 287 }, { name: "FOUED", ca: "71 300", pct: 119, visits: 312 }, { name: "HICHEM", ca: "54 200", pct: 90, visits: 241 }, { name: "Anis", ca: "48 900", pct: 89, visits: 198 }]
-  },
-  {
-    id: 2, title: "Recouvrement & créances", icon: AlertCircle, color: "text-red-500", bg: "bg-red-50", border: "border-red-200",
-    desc: "Ancienneté par tranche : <30j | 30–60j | 60–90j | >90j", periods: ["Hebdomadaire", "Mensuel"],
-    preview: [{ tranche: "< 30 jours", montant: "12 450", nb: 8 }, { tranche: "30–60 jours", montant: "8 200", nb: 5 }, { tranche: "60–90 jours", montant: "6 100", nb: 3 }, { tranche: "> 90 jours", montant: "18 240", nb: 5 }]
-  },
-  {
-    id: 3, title: "Tournées & kilométrage", icon: Truck, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200",
-    desc: "Km parcourus, temps chez clients, efficacité route", periods: ["Hebdomadaire", "Mensuel"],
-    preview: null
-  },
-  {
-    id: 4, title: "Produits les plus vendus", icon: BarChart3, color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200",
-    desc: "Top 10 produits par commercial et par région", periods: ["Mensuel", "Trimestriel"],
-    preview: null
-  },
-  {
-    id: 5, title: "Clients inactifs", icon: Users, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200",
-    desc: "Sans achat depuis 30 / 60 / 90 jours", periods: ["Hebdomadaire", "Mensuel"],
-    preview: null
-  },
-];
+type Ligne = { cle: string; libelle: string; qte: number; ht: number; ttc: number; docs: number };
+type Resultat = { axe: string; rows: Ligne[]; total: number; totalHT: number; totalTTC: number; totalDocs: number };
+
+const fmt = (v: unknown) =>
+  new Intl.NumberFormat("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(v) || 0);
+
+/**
+ * Rapports du manager — tous alimentés par `/api/rapports-vente`.
+ * `unite` décrit ce que porte la colonne `qte` selon l'axe.
+ */
+const RAPPORTS = [
+  { axe: "commercial", title: "Performance commerciaux", icon: TrendingUp, color: "#2563eb", desc: "CA et nombre de documents par commercial", colCle: "Commercial", unite: null },
+  { axe: "creances", title: "Recouvrement & créances", icon: AlertCircle, color: "#dc2626", desc: "Balance âgée : <30j · 30–60j · 60–90j · >90j", colCle: "Tranche", unite: null },
+  { axe: "article", title: "Produits les plus vendus", icon: Package, color: "#7c3aed", desc: "Classement des articles par chiffre d'affaires", colCle: "Référence", unite: "Qté" },
+  { axe: "inactifs", title: "Clients inactifs", icon: Users, color: "#f59e0b", desc: "Sans achat depuis 30 jours ou plus", colCle: "Client", unite: "Jours" },
+  { axe: "gouvernorat", title: "Ventes par région", icon: Map, color: "#16a34a", desc: "Répartition du CA par gouvernorat", colCle: "Gouvernorat", unite: null },
+] as const;
+
+function defautDu() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 11, 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function RapportsPage() {
-  const [selectedReport, setSelectedReport] = useState(REPORTS[0]);
-  const [period, setPeriod] = useState("Mensuel");
-  const [generating, setGenerating] = useState(false);
+  const [axe, setAxe] = useState<string>("commercial");
+  const [du, setDu] = useState(defautDu());
+  const [au, setAu] = useState(new Date().toISOString().slice(0, 10));
+  const [applied, setApplied] = useState({ du: defautDu(), au: new Date().toISOString().slice(0, 10) });
+  const [data, setData] = useState<Resultat | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  function generate() {
-    setGenerating(true);
-    setTimeout(() => setGenerating(false), 1800);
+  const rapport = RAPPORTS.find((r) => r.axe === axe)!;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/rapports-vente?axe=${axe}&du=${applied.du}&au=${applied.au}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) { setData(d); setLoading(false); } })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [axe, applied]);
+
+  function exportCsv() {
+    if (!data) return;
+    const head = [rapport.colCle, "Libellé", ...(rapport.unite ? [rapport.unite] : []), "Documents", "Montant"].join(";");
+    const lines = data.rows.map((r) =>
+      [r.cle, r.libelle.replace(/;/g, ","), ...(rapport.unite ? [r.qte] : []), r.docs, r.ttc].join(";")
+    );
+    const csv = "﻿" + [head, ...lines].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `rapport-${axe}.csv`; a.click();
+    URL.revokeObjectURL(url);
   }
 
+  const max = Math.max(1, ...(data?.rows ?? []).map((r) => Math.abs(r.ttc)));
+  // La période ne s'applique pas aux créances (photo à l'instant T).
+  const periodePertinente = axe !== "creances";
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Rapports & Exports</h1>
-          <p className="text-slate-500 text-sm">Génération automatique — Mai 2026</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Rapports</h1>
+          <p className="text-[var(--text-secondary)] text-sm">Générés depuis les données réelles de l&apos;ERP</p>
         </div>
+        <button onClick={exportCsv} disabled={!data?.rows?.length}
+          className="flex items-center gap-1.5 border border-[var(--border-primary)] text-emerald-600 px-3 py-2 rounded-xl text-sm disabled:opacity-40">
+          <Download size={15} /> Exporter Excel
+        </button>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Report list */}
-        <div className="space-y-3">
-          {REPORTS.map((r, i) => {
-            const Icon = r.icon;
-            const active = selectedReport.id === r.id;
-            return (
-              <motion.div key={r.id} onClick={() => setSelectedReport(r)}
-                className={`bg-white rounded-2xl border-2 shadow-sm p-4 cursor-pointer transition-all ${active ? `${r.border} ring-2 ring-offset-1 ring-blue-100` : "border-slate-100 hover:border-slate-200"}`}
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-                whileHover={{ y: -1 }}>
-                <div className="flex items-start gap-3">
-                  <div className={`w-9 h-9 ${r.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                    <Icon size={17} className={r.color} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-slate-800 text-sm">{r.title}</div>
-                    <div className="text-slate-400 text-xs mt-0.5 leading-snug">{r.desc}</div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Report preview */}
-        <div className="lg:col-span-2 space-y-5">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 ${selectedReport.bg} rounded-xl flex items-center justify-center`}>
-                  <selectedReport.icon size={17} className={selectedReport.color} />
-                </div>
-                <div>
-                  <h2 className="font-bold text-slate-800">{selectedReport.title}</h2>
-                  <p className="text-slate-400 text-xs">{selectedReport.desc}</p>
-                </div>
+      {/* Choix du rapport */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {RAPPORTS.map((r) => {
+          const on = axe === r.axe;
+          return (
+            <button key={r.axe} onClick={() => { setLoading(true); setAxe(r.axe); }}
+              className={`text-left p-4 rounded-2xl border transition ${
+                on ? "border-transparent shadow-md text-white" : "bg-[var(--bg-card)] border-[var(--border-primary)] hover:shadow-sm"
+              }`}
+              style={on ? { background: r.color } : undefined}>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${on ? "bg-white/20" : ""}`}
+                style={on ? undefined : { background: r.color + "18", color: r.color }}>
+                <r.icon size={17} />
               </div>
-              <div className="flex items-center gap-2">
-                <select value={period} onChange={e => setPeriod(e.target.value)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-300 bg-white">
-                  {selectedReport.periods.map(p => <option key={p}>{p}</option>)}
-                </select>
-                <motion.button onClick={generate} disabled={generating}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-1.5 rounded-xl text-sm font-medium hover:bg-blue-500 transition disabled:opacity-60"
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  {generating ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Download size={14} />
+              <div className="font-bold text-sm">{r.title}</div>
+              <div className={`text-xs mt-0.5 leading-snug ${on ? "opacity-80" : "text-[var(--text-secondary)]"}`}>{r.desc}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Période */}
+      <div className="flex items-end gap-2 flex-wrap bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl p-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Du</span>
+          <input type="date" value={du} onChange={(e) => setDu(e.target.value)} disabled={!periodePertinente}
+            className="px-2.5 py-1.5 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none disabled:opacity-50" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Au</span>
+          <input type="date" value={au} onChange={(e) => setAu(e.target.value)} disabled={!periodePertinente}
+            className="px-2.5 py-1.5 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none disabled:opacity-50" />
+        </label>
+        <button onClick={() => { setLoading(true); setApplied({ du, au }); }} disabled={!periodePertinente}
+          className="px-4 py-1.5 text-sm font-semibold text-white rounded-lg disabled:opacity-50" style={{ background: rapport.color }}>
+          Appliquer
+        </button>
+        {!periodePertinente && (
+          <span className="text-xs text-[var(--text-secondary)] pb-1.5">
+            Les créances sont une photo à l&apos;instant présent — la période ne s&apos;applique pas.
+          </span>
+        )}
+      </div>
+
+      {/* Totaux */}
+      {data && !loading && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Tile label="Lignes" value={String(data.total)} color={rapport.color} />
+          <Tile label="Documents" value={String(data.totalDocs)} color={rapport.color} />
+          <Tile label={axe === "creances" ? "Total créances" : "Total TTC"} value={`${fmt(data.totalTTC)} TND`} color={rapport.color} strong />
+        </div>
+      )}
+
+      {/* Tableau */}
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border-primary)] flex items-center gap-2">
+          <BarChart3 size={16} style={{ color: rapport.color }} />
+          <span className="font-bold text-[var(--text-primary)] text-sm">{rapport.title}</span>
+        </div>
+        <div className="overflow-auto max-h-[55vh]">
+          <table className="w-full text-sm">
+            <thead className="bg-[var(--bg-primary)] border-b border-[var(--border-primary)] sticky top-0 z-10">
+              <tr className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
+                <th className="px-4 py-2.5 text-left font-semibold">{rapport.colCle}</th>
+                {rapport.unite && <th className="px-4 py-2.5 text-right font-semibold">{rapport.unite}</th>}
+                <th className="px-4 py-2.5 text-right font-semibold">Documents</th>
+                <th className="px-4 py-2.5 text-right font-semibold">Montant</th>
+                <th className="px-4 py-2.5 w-32 font-semibold">Part</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr><td colSpan={5} className="py-12 text-center text-[var(--text-secondary)]">
+                  <Loader2 className="animate-spin inline mr-2" size={18} /> Génération du rapport…
+                </td></tr>
+              )}
+              {!loading && (data?.rows ?? []).length === 0 && (
+                <tr><td colSpan={5} className="py-12 text-center text-sm text-[var(--text-secondary)]">
+                  {axe === "article"
+                    ? "Aucune ligne de document en base : ce rapport se remplira à mesure de la saisie."
+                    : "Aucune donnée sur cette période."}
+                </td></tr>
+              )}
+              {!loading && (data?.rows ?? []).map((r, i) => (
+                <motion.tr key={r.cle} className="border-b border-[var(--border-primary)]/60 hover:bg-[var(--accent-light)]"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-[var(--text-primary)] truncate max-w-xs" title={r.libelle}>{r.libelle}</div>
+                    {r.cle !== r.libelle && <div className="text-[10px] font-mono text-[var(--text-secondary)]">{r.cle}</div>}
+                  </td>
+                  {rapport.unite && (
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {axe === "inactifs" ? `${r.qte} j` : r.qte}
+                    </td>
                   )}
-                  {generating ? "Génération..." : "Exporter PDF"}
-                </motion.button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {selectedReport.id === 1 && (
-                <div className="space-y-4">
-                  <CommercialBarChart />
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          {["Commercial", "CA Réalisé", "Objectif", "Taux", "Visites"].map(h => (
-                            <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(selectedReport.preview as any[]).map((row: any) => (
-                          <tr key={row.name} className="border-b border-slate-50 hover:bg-slate-50 transition">
-                            <td className="py-3 px-3 font-medium text-slate-800">{row.name}</td>
-                            <td className="py-3 px-3 text-slate-700">{row.ca} TND</td>
-                            <td className="py-3 px-3 text-slate-500">60 000 TND</td>
-                            <td className="py-3 px-3">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${row.pct >= 100 ? "bg-emerald-100 text-emerald-700" : row.pct >= 80 ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-                                {row.pct}%
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-slate-700">{row.visits}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {selectedReport.id === 2 && (
-                <div className="space-y-3">
-                  {(selectedReport.preview as any[]).map((row: any) => (
-                    <div key={row.tranche} className="flex items-center gap-4 bg-slate-50 rounded-xl p-4">
-                      <div className="flex-1">
-                        <div className="font-semibold text-slate-800 text-sm">{row.tranche}</div>
-                        <div className="text-slate-400 text-xs">{row.nb} clients concernés</div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`font-bold text-lg ${row.tranche.includes("90") ? "text-red-600" : row.tranche.includes("60") ? "text-amber-600" : "text-slate-700"}`}>
-                          {row.montant} TND
-                        </div>
-                      </div>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-[var(--text-secondary)]">{r.docs}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{fmt(r.ttc)}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="h-1.5 rounded-full bg-[var(--bg-primary)] overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${(Math.abs(r.ttc) / max) * 100}%`, background: rapport.color }} />
                     </div>
-                  ))}
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
-                    <span className="font-bold text-red-800">Total créances</span>
-                    <span className="font-black text-red-700 text-xl">44 990 TND</span>
-                  </div>
-                </div>
-              )}
-
-              {!selectedReport.preview && (
-                <div className="text-center py-16">
-                  <selectedReport.icon size={40} className={`mx-auto mb-4 opacity-20 ${selectedReport.color}`} />
-                  <div className="font-semibold text-slate-700 mb-2">Rapport {selectedReport.title}</div>
-                  <p className="text-slate-400 text-sm mb-6">{selectedReport.desc}</p>
-                  <button onClick={generate} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-blue-500 transition text-sm">
-                    Générer le rapport
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Scheduled reports */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <Calendar size={16} className="text-blue-500" />
-              Rapports planifiés
-            </h3>
-            <div className="space-y-3">
-              {[
-                { report: "Performance commerciaux", schedule: "Lundi 08h00", recipients: "manager@bis.tn, admin@bis.tn", format: "PDF + Excel" },
-                { report: "Recouvrement mensuel", schedule: "1er du mois 07h00", recipients: "manager@bis.tn", format: "PDF" },
-              ].map((s, i) => (
-                <div key={i} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl text-sm">
-                  <div>
-                    <div className="font-semibold text-slate-800">{s.report}</div>
-                    <div className="text-slate-400 text-xs mt-0.5">{s.schedule} · {s.recipients}</div>
-                  </div>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg font-medium">{s.format}</span>
-                </div>
+                  </td>
+                </motion.tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function Tile({ label, value, color, strong }: { label: string; value: string; color: string; strong?: boolean }) {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-primary)] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] font-semibold">{label}</div>
+      <div className={`tabular-nums ${strong ? "text-lg font-extrabold" : "text-base font-bold"}`} style={strong ? { color } : undefined}>
+        {value}
       </div>
     </div>
   );

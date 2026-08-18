@@ -1,10 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { 
-  Users, Truck, TrendingUp, AlertTriangle, 
-  ArrowUpRight, ArrowDownRight, Cpu, Brain, 
-  Battery, Radio, BarChart2
+import Link from "next/link";
+import ValorisationFamilles from "@/components/erp/ValorisationFamilles";
+import DetailAchats from "@/components/erp/DetailAchats";
+import DetailCreances from "@/components/erp/DetailCreances";
+import DetailRuptures from "@/components/erp/DetailRuptures";
+import {
+  Users, Truck, TrendingUp, AlertTriangle,
+  ArrowUpRight, ArrowDownRight, Cpu, Brain,
+  BarChart2, MessageCircle
 } from "lucide-react";
 const CAAreaChart = dynamic(() => import("@/components/charts/CAChart").then(m => m.CAAreaChart), {
   ssr: false,
@@ -24,7 +29,6 @@ const CommercialBarChart = dynamic(() => import("@/components/charts/CAChart").t
   ),
 });
 
-import { DEMO_VEHICLES } from "@/lib/dummy-data";
 
 const TunisiaMap = dynamic(() => import("@/components/map/TunisiaMap"), {
   ssr: false,
@@ -35,45 +39,174 @@ const TunisiaMap = dynamic(() => import("@/components/map/TunisiaMap"), {
   ),
 });
 
-const STATS = [
-  { label: "CA du jour", value: "12 450 TND", sub: "+8.2% vs hier", up: true, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
-  { label: "Véhicules actifs", value: "3 / 5", sub: "1 en panne, 1 pause", up: null, icon: Truck, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
-  { label: "Clients visités", value: "47 / 111", sub: "Taux: 42%", up: false, icon: Users, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
-  { label: "Alertes actives", value: "3", sub: "2 urgentes", up: false, icon: AlertTriangle, color: "text-red-500", bg: "bg-red-50", border: "border-red-100" },
-];
+// Séparateur de milliers sur tous les montants du tableau de bord.
+const fmt0 = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n ?? 0);
+const fmtPct = (n: number) => `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n ?? 0)}%`;
 
-const AI_WIDGETS = [
-  { icon: "🔮", code: "AGENT_PROJECTION_V4.2", confidence: 98, title: "Prévision CA semaine prochaine", value: "28 400 TND", detail: "±5% basé sur historique 6 mois + saisonnalité", action: "Voir détail", color: "bg-purple-500/10 border-purple-500/20", titleColor: "text-purple-400", valueColor: "text-purple-400" },
-  { icon: "⚠️", code: "AGENT_RETENTION_V2.9", confidence: 91, title: "Clients à risque de perte", value: "3 clients", detail: "Sans visite depuis > 30 jours — score IA calculé", action: "Voir liste", color: "bg-amber-500/10 border-amber-500/20", titleColor: "text-amber-400", valueColor: "text-amber-400" },
-  { icon: "📦", code: "AGENT_STOCKS_V3.1", confidence: 95, title: "Ruptures prévues (7 jours)", value: "2 articles", detail: "coffret echec 2025, jeux ludo bois — sous seuil critique", action: "Générer BC", color: "bg-red-500/10 border-red-500/20", titleColor: "text-red-400", valueColor: "text-red-400" },
-  { icon: "💰", code: "AGENT_FRAUD_V1.8", confidence: 97, title: "Anomalies financières", value: "1 détectée", detail: "Règlement de 8500 TND inhabituel — vérification requise", action: "Voir détail", color: "bg-blue-500/10 border-blue-500/20", titleColor: "text-blue-400", valueColor: "text-blue-400" },
-];
+type Alerte = { type: string; niveau: "critique" | "avertissement" | "info"; message: string; detail?: string };
+type TopClient = { nom: string; codeCli: number | null; ca: number; docs: number };
+type DocRecent = { refDoc: string; typeDoc: string; raisonSocial: string | null; dateDoc: string | null; ttcNet: number };
 
-const ALERTS = [
-  { type: "STOCK", icon: "📦", msg: "coffret echec 2025 — stock: 2 (min: 5)", time: "5 min", urgent: true },
-  { type: "GPS", icon: "🚗", msg: "238TU1019 HICHEM — hors ligne depuis 2h", time: "2h", urgent: true },
-  { type: "FINANCE", icon: "💰", msg: "Chèque 2500 TND échu — Librairie El Wafa", time: "1h", urgent: false },
-];
-
-const SYSTEM_LOGS = [
-  { time: "00:29:45", source: "GPS_DEMO_206", msg: "Ping GPS validé — Sousse Route (Vitesse: 64 km/h)", type: "info" },
-  { time: "00:28:12", source: "AI_PREDICT", msg: "Ajustement courbe prévision CA hebdomadaire (+28 400 TND)", type: "ai" },
-  { time: "00:26:01", source: "SYS_SECURITY", msg: "Vérification anomalie financière chèque Librairie El Wafa OK", type: "success" },
-  { time: "00:24:50", source: "STOCK_WARN", msg: "Alerte seuil critique: 'coffret echec 2025' sous le minimum", type: "warn" },
-  { time: "00:22:15", source: "COMM_SYNC", msg: "Synchronisation catalogue hors ligne — Commercial Mokhtar", type: "info" }
-];
-
-const VEHICLE_STATUS = {
-  active: { label: "En mission", dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" },
-  moving: { label: "En déplacement", dot: "bg-blue-500", badge: "bg-blue-500/10 text-blue-500 border border-blue-500/20" },
-  stopped: { label: "Arrêté", dot: "bg-amber-500", badge: "bg-amber-500/10 text-amber-500 border border-amber-500/20" },
-  offline: { label: "Hors ligne", dot: "bg-red-400", badge: "bg-red-500/10 text-red-500 border border-red-500/20" },
+type ClientRisque = {
+  codeCli: number; nom: string; ville: string | null; jours: number; solde: number;
+  score: number; commercial: string | null;
+  telCommercial: string | null; telClient: string | null;
+  whatsapp: { tel: string; vers: "commercial" | "client" } | null;
 };
 
+type Insights = {
+  periode: { mois: number; annee: number };
+  objectif: {
+    objectifCA: number; realise: number; taux: number; reste: number; nbVendeurs: number;
+    parVendeur: { vendeur: string; ca: number; objectifCA: number; taux: number }[];
+  };
+  clientsRisque: {
+    total: number; seuilJours: number;
+    jamaisCommande: number; inactifs: number; nbClients: number;
+    rows: ClientRisque[];
+  };
+  rupturesStock: {
+    nb: number; nbArticles: number; taux: number; valeurManquante: number;
+    rows: { refArt: string; designation: string; stock: number; stMin: number; suggere: number; puAchat: number }[];
+  };
+  rupturesDebout: {
+    nb: number; taux: number; seuilDefaut: number; nbAvecSeuil: number;
+    rows: { refArt: string; designation: string; stock: number; stMin: number; seuilApplique: number; manque: number }[];
+  };
+};
+
+const MOIS_LONGS = ["janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+/**
+ * Lien de relance WhatsApp. `wa.me` ouvre l'application (mobile ou web) avec le
+ * message pré-rempli ; l'utilisateur garde la main sur l'envoi.
+ */
+function lienWhatsapp(c: ClientRisque): string | null {
+  if (!c.whatsapp) return null;
+  const texte =
+    c.whatsapp.vers === "commercial"
+      ? `Bonjour ${c.commercial ?? ""}, le client « ${c.nom} »${c.ville ? ` (${c.ville})` : ""} n'a pas commandé depuis ${c.jours} jours${c.solde > 0 ? ` et présente une créance de ${fmt0(c.solde)} TND` : ""}. Peux-tu programmer une visite de relance ?`
+      : `Bonjour, cela fait ${c.jours} jours sans commande de votre part. Pouvons-nous convenir d'un rendez-vous ?`;
+  return `https://wa.me/${c.whatsapp.tel}?text=${encodeURIComponent(texte)}`;
+}
+
+const STATS_FALLBACK = [
+  { label: "Chiffre d'affaires", value: "—", sub: "chargement…", up: true, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
+  { label: "Achats", value: "—", sub: "chargement…", up: null, icon: Truck, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
+  { label: "Clients", value: "—", sub: "chargement…", up: false, icon: Users, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
+  { label: "Ruptures stock", value: "—", sub: "chargement…", up: false, icon: AlertTriangle, color: "text-red-500", bg: "bg-red-50", border: "border-red-100" },
+];
+
+/**
+ * Les quatre indicateurs de tête, construits depuis `/api/insights`.
+ * Ordre demandé : objectif, clients à risque, ruptures stock, ruptures debout.
+ */
+function widgetsDepuisInsights(d: Insights) {
+  const periode = `${MOIS_LONGS[d.periode.mois - 1]} ${d.periode.annee}`;
+  return [
+    {
+      icon: "🎯", code: "OBJECTIF", title: "Objectif du mois",
+      value: d.objectif.objectifCA > 0 ? fmtPct(d.objectif.taux) : "—",
+      detail: d.objectif.objectifCA > 0
+        ? `${fmt0(d.objectif.realise)} / ${fmt0(d.objectif.objectifCA)} TND — ${periode}`
+        : `Aucun objectif fixé pour ${periode}`,
+      action: "Voir par vendeur",
+      color: "bg-purple-500/10 border-purple-500/20", titleColor: "text-purple-500", valueColor: "text-purple-500",
+    },
+    {
+      icon: "⚠️", code: "CLIENTS_RISQUE", title: "Clients à risque de perte",
+      value: `${fmt0(d.clientsRisque.total)} clients`,
+      detail: d.clientsRisque.jamaisCommande > 0
+        ? `${fmt0(d.clientsRisque.inactifs)} sans commande depuis +${d.clientsRisque.seuilJours} j · `
+          + `${fmt0(d.clientsRisque.jamaisCommande)} jamais servis — sur ${fmt0(d.clientsRisque.nbClients)} clients`
+        : `Sans commande depuis plus de ${d.clientsRisque.seuilJours} jours `
+          + `— sur ${fmt0(d.clientsRisque.nbClients)} clients`,
+      action: "Relancer sur WhatsApp",
+      color: "bg-amber-500/10 border-amber-500/20", titleColor: "text-amber-500", valueColor: "text-amber-500",
+    },
+    {
+      icon: "📦", code: "RUPTURES_STOCK", title: "Ruptures stock",
+      // Exprimé en part du catalogue : « 30 % du catalogue en rupture ».
+      value: fmtPct(d.rupturesStock.taux),
+      detail: `${fmt0(d.rupturesStock.nb)} articles à zéro sur ${fmt0(d.rupturesStock.nbArticles)} référencés`,
+      action: "Voir les articles",
+      color: "bg-red-500/10 border-red-500/20", titleColor: "text-red-500", valueColor: "text-red-500",
+    },
+    {
+      icon: "📉", code: "RUPTURES_DEBOUT", title: "Ruptures debout",
+      value: `${fmt0(d.rupturesDebout.nb)} articles`,
+      detail: d.rupturesDebout.nb > 0
+        ? `Sous le seuil${d.rupturesDebout.nbAvecSeuil === 0 ? ` de ${d.rupturesDebout.seuilDefaut} u.` : " minimum"}`
+          + ` — ${fmtPct(d.rupturesDebout.taux)} du catalogue`
+        : "Aucun article sous son seuil minimum",
+      action: "Voir les articles",
+      color: "bg-blue-500/10 border-blue-500/20", titleColor: "text-blue-500", valueColor: "text-blue-500",
+    },
+  ];
+}
+
+
+
+
 export default function AdminDashboard() {
+  // Fenêtre « valorisation par famille », ouverte depuis la carte Chiffre d'affaires.
+  const [voirFamilles, setVoirFamilles] = useState(false);
+  // Fenêtre « détail des achats », ouverte depuis la carte Achats.
+  const [voirAchats, setVoirAchats] = useState(false);
+  // Fenêtre « créances & trésorerie », ouverte depuis la carte Créances.
+  const [voirCreances, setVoirCreances] = useState(false);
+  // Fenêtre « ruptures de stock », ouverte depuis la carte Ruptures.
+  const [voirRuptures, setVoirRuptures] = useState(false);
+  // Couche affichée sur la carte de supervision (trafic / clients / zones).
+  const [coucheGis, setCoucheGis] = useState<"trafic" | "clients" | "zones">("trafic");
   const [activeTheme, setActiveTheme] = useState<"latte" | "espresso" | "matcha">("latte");
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
-  const [agentActionState, setAgentActionState] = useState<Record<string, string>>({});
+
+  // Live ERP stats from Postgres via /api/synthese
+  const [STATS, setStats] = useState(STATS_FALLBACK);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/synthese").then((r) => r.json()).then((d) => {
+      if (cancelled || !d?.ventes) return;
+      setStats([
+        { label: "Chiffre d'affaires", value: `${fmt0(d.ventes.ttc)} TND`, sub: `${fmt0(d.ventes.nb)} documents`, up: true, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
+        { label: "Achats", value: `${fmt0(d.achats.ttc)} TND`, sub: `${fmt0(d.achats.nb)} documents`, up: null, icon: Truck, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
+        { label: "Créances clients", value: `${fmt0(d.creancesClients)} TND`, sub: `Trésorerie: ${fmt0(d.tresorerie.solde)}`, up: false, icon: Users, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
+        { label: "Ruptures stock", value: `${d.stock.nbRuptures}`, sub: `${d.stock.nbArticles} articles · ${fmt0(d.stock.valeur)} TND`, up: false, icon: AlertTriangle, color: "text-red-500", bg: "bg-red-50", border: "border-red-100" },
+      ]);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Alertes d'exploitation, top clients et derniers documents — données réelles.
+  const [alertes, setAlertes] = useState<Alerte[]>([]);
+  const [topClients, setTopClients] = useState<TopClient[]>([]);
+  const [recents, setRecents] = useState<DocRecent[]>([]);
+  const [insights, setInsights] = useState<Insights | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/alertes").then((r) => r.json()),
+      fetch("/api/dashboard?scope=admin").then((r) => r.json()),
+      fetch("/api/erp?resource=documents&nature=Vente&type=%25&page=0").then((r) => r.json()),
+      fetch("/api/insights").then((r) => r.json()),
+    ])
+      .then(([a, d, docs, ins]) => {
+        if (cancelled) return;
+        setAlertes(a.alertes ?? []);
+        setTopClients(d.topClients ?? []);
+        setRecents((docs.rows ?? []).slice(0, 8));
+        if (ins?.objectif) setInsights(ins);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const widgets = insights ? widgetsDepuisInsights(insights) : [];
+
+  const maxClientCA = Math.max(1, ...topClients.map((c) => c.ca));
 
   const applyTheme = (theme: "latte" | "espresso" | "matcha") => {
     if (typeof window === "undefined") return;
@@ -178,7 +311,17 @@ export default function AdminDashboard() {
       {/* Stats row with Interactive Sparklines */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {STATS.map((s, i) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-[var(--border-primary)] shadow-sm p-5 relative overflow-hidden group transition-all duration-300 animate-fade-in"
+          <div key={s.label}
+            onClick={i === 0 ? () => setVoirFamilles(true)
+                   : i === 1 ? () => setVoirAchats(true)
+                   : i === 2 ? () => setVoirCreances(true)
+                   : () => setVoirRuptures(true)}
+            role="button"
+            title={i === 0 ? "Voir la répartition par famille d'articles"
+                 : i === 1 ? "Voir le détail des achats (fournisseur, mois, type)"
+                 : i === 2 ? "Voir les créances par ancienneté, commercial, client et la trésorerie"
+                 : "Voir les articles en rupture, par famille et les stocks négatifs"}
+            className="bg-white rounded-2xl border border-[var(--border-primary)] shadow-sm p-5 relative overflow-hidden group transition-all duration-300 animate-fade-in cursor-pointer hover:shadow-md hover:-translate-y-0.5"
             style={{ animationDelay: `${i * 0.06}s` }}>
             <div className="flex items-start justify-between mb-2">
               <div className="w-10 h-10 bg-[var(--accent-light)] rounded-xl flex items-center justify-center border border-[var(--border-primary)]">
@@ -194,7 +337,10 @@ export default function AdminDashboard() {
             
             <div className="relative z-10">
               <div className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">{s.value}</div>
-              <div className="text-[var(--text-secondary)] font-bold text-xs mt-1">{s.label}</div>
+              <div className="text-[var(--text-secondary)] font-bold text-xs mt-1 flex items-center gap-1">
+                {s.label}
+                {i <= 1 && <ArrowUpRight size={11} className="opacity-50" />}
+              </div>
               <div className="text-[var(--text-secondary)] opacity-70 text-[10px] mt-0.5">{s.sub}</div>
             </div>
 
@@ -231,74 +377,63 @@ export default function AdminDashboard() {
               <p className="text-[var(--text-secondary)] opacity-70 text-[10px] mt-0.5">Mise à jour télémétrique en temps réel (GPS 30s)</p>
             </div>
             
-            {/* GIS Toggles */}
+            {/* Sélecteur de couche cartographique */}
             <div className="flex items-center gap-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg p-0.5">
-              <button className="px-2.5 py-1 text-[9px] font-bold rounded bg-white text-[var(--text-primary)] shadow-sm transition">Trafic</button>
-              <button className="px-2.5 py-1 text-[9px] font-bold rounded text-[var(--text-secondary)] opacity-80 hover:text-[var(--text-primary)] transition">Clients</button>
-              <button className="px-2.5 py-1 text-[9px] font-bold rounded text-[var(--text-secondary)] opacity-80 hover:text-[var(--text-primary)] transition">Zones</button>
+              {([
+                { v: "trafic", l: "Trafic" },
+                { v: "clients", l: "Clients" },
+                { v: "zones", l: "Zones" },
+              ] as const).map((c) => (
+                <button key={c.v} onClick={() => setCoucheGis(c.v)}
+                  className={`px-2.5 py-1 text-[9px] font-bold rounded transition ${
+                    coucheGis === c.v
+                      ? "bg-white text-[var(--text-primary)] shadow-sm"
+                      : "text-[var(--text-secondary)] opacity-80 hover:text-[var(--text-primary)]"
+                  }`}>
+                  {c.l}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="h-[390px] min-h-[390px] w-full relative"><TunisiaMap /></div>
+          <div className="h-[390px] min-h-[390px] w-full relative"><TunisiaMap couche={coucheGis} /></div>
         </div>
 
-        {/* Vehicles side-scroller with progress telemetry */}
+        {/* Top clients réels — remplace la télémétrie GPS (aucune donnée GPS en base) */}
         <div className="space-y-3 flex flex-col justify-start animate-fade-in" style={{ animationDelay: "0.12s" }}>
           <div className="flex items-center justify-between px-1">
-            <h3 className="font-extrabold text-[var(--text-secondary)] text-sm">Flotte active — {DEMO_VEHICLES.filter(v => v.status !== "offline").length} en mission</h3>
-            <span className="text-[9px] font-extrabold bg-[var(--accent-light)] text-[var(--accent-primary)] px-2.5 py-0.5 rounded-full uppercase tracking-wider">Temps réel</span>
+            <h3 className="font-extrabold text-[var(--text-secondary)] text-sm">
+              Meilleurs clients — {topClients.length} affichés
+            </h3>
+            <span className="text-[9px] font-extrabold bg-[var(--accent-light)] text-[var(--accent-primary)] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              12 derniers mois
+            </span>
           </div>
 
-          <div className="space-y-3 max-h-[405px] overflow-y-auto pr-1">
-            {DEMO_VEHICLES.map((v, i) => {
-              const s = VEHICLE_STATUS[v.status as keyof typeof VEHICLE_STATUS];
+          <div className="space-y-2.5 max-h-[405px] overflow-y-auto pr-1">
+            {topClients.length === 0 && (
+              <div className="py-10 text-center text-xs text-[var(--text-secondary)]">Chargement…</div>
+            )}
+            {topClients.map((c, i) => {
+              const part = maxClientCA > 0 ? (c.ca / maxClientCA) * 100 : 0;
               return (
-                <div key={v.plate} className="bg-white rounded-2xl border border-[var(--border-primary)] shadow-sm p-4 relative group hover:scale-[1.01] transition-all duration-300 animate-fade-in"
-                  style={{ animationDelay: `${i * 0.05}s` }}>
-                  
-                  {/* Top Driver Info */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="font-extrabold text-[var(--text-primary)] text-xs tracking-tight">{v.driver}</div>
-                      <div className="text-[var(--text-secondary)] opacity-70 text-[10px] font-mono mt-0.5">{v.plate}</div>
+                <div key={String(c.codeCli ?? c.nom)}
+                  className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm p-3.5 animate-fade-in"
+                  style={{ animationDelay: `${i * 0.04}s` }}>
+                  <div className="flex items-start justify-between mb-2 gap-2">
+                    <div className="min-w-0">
+                      <div className="font-extrabold text-[var(--text-primary)] text-xs tracking-tight truncate" title={c.nom}>
+                        {c.nom}
+                      </div>
+                      <div className="text-[var(--text-secondary)] opacity-70 text-[10px] font-mono mt-0.5">
+                        {c.docs} document(s)
+                      </div>
                     </div>
-                    <span className={`text-[8px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider flex items-center gap-1.5 ${s.badge}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot} animate-pulse-dot`} />
-                      {s.label}
+                    <span className="text-[10px] font-black text-[var(--text-primary)] tabular-nums shrink-0">
+                      {fmt0(c.ca)} TND
                     </span>
                   </div>
-
-                  {/* Route Progress Bar */}
-                  <div className="mb-3">
-                    <div className="flex justify-between text-[9px] text-[var(--text-secondary)] opacity-70 mb-1">
-                      <span>Progression visites</span>
-                      <span className="font-bold text-[var(--text-primary)]">{v.visited} / {v.total}</span>
-                    </div>
-                    <div className="w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden border border-[var(--border-primary)]">
-                      <div className="bg-gradient-primary h-full rounded-full" style={{ width: `${(v.visited / v.total) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Telemetry Metrics Grid */}
-                  <div className="grid grid-cols-3 gap-1.5 mb-2.5">
-                    {[
-                      ["Objectif CA", `${(v.ca/1000).toFixed(1)}k TND`],
-                      ["Vitesse", `${v.speed} km/h`],
-                      ["Précision", "GPS OK"]
-                    ].map(([l, val]) => (
-                      <div key={l} className="bg-[var(--bg-primary)] rounded-lg p-1.5 text-center border border-[var(--border-primary)]">
-                        <div className="text-[8px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-wide">{l}</div>
-                        <div className="font-extrabold text-xs text-[var(--text-primary)] mt-0.5">{val}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Telemetry metadata footer */}
-                  <div className="text-[9px] text-[var(--text-secondary)] bg-[var(--bg-primary)] rounded-lg px-2.5 py-1.5 truncate border border-[var(--border-primary)] font-mono mb-2">{v.lastAction}</div>
-
-                  <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] opacity-80 border-t border-[var(--border-primary)] pt-2 font-mono">
-                    <span className="flex items-center gap-1"><Battery size={10} className="text-[var(--text-secondary)]" /> Batt: {95 - i * 8}%</span>
-                    <span className="flex items-center gap-1"><Radio size={10} className="text-[var(--text-secondary)]" /> Sig: 98%</span>
-                    <span className="flex items-center gap-1">🛰️ Sats: 12</span>
+                  <div className="w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden border border-[var(--border-primary)]">
+                    <div className="bg-gradient-primary h-full rounded-full" style={{ width: `${part}%` }} />
                   </div>
                 </div>
               );
@@ -314,30 +449,29 @@ export default function AdminDashboard() {
             <Brain size={15} />
           </div>
           <div>
-            <h2 className="font-extrabold text-[var(--text-primary)] text-sm">Intelligence Artificielle — Insights & Recommandations</h2>
-            <p className="text-[var(--text-secondary)] opacity-70 text-[10px]">Modèles neuronaux actifs & agents cognitifs autonomes</p>
+            <h2 className="font-extrabold text-[var(--text-primary)] text-sm">Indicateurs de pilotage</h2>
+            <p className="text-[var(--text-secondary)] opacity-70 text-[10px]">Objectifs, rétention client et tension sur les stocks — calculés en base</p>
           </div>
-          <span className="text-[9px] bg-purple-500/10 text-purple-500 border border-purple-500/20 px-2.5 py-0.5 rounded-full font-black ml-auto animate-blink uppercase">IA ACTIVE</span>
+          <span className="text-[9px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-black ml-auto uppercase">Données réelles</span>
         </div>
-        
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {AI_WIDGETS.map((w, i) => (
-            <div key={w.code} translate="no" className={`notranslate rounded-2xl border p-4 ${w.color} relative overflow-hidden group transition-all duration-300 flex flex-col justify-between animate-fade-in hover:shadow-lg hover:shadow-black/5`}
-              style={{ animationDelay: `${0.18 + i * 0.05}s` }}>
-              
-              <div>
-                <div className="flex items-center justify-between text-[8px] font-mono text-[var(--text-secondary)] bg-[var(--bg-primary)]/60 px-2 py-0.5 rounded border border-[var(--border-primary)] mb-2.5">
-                  <span>{w.code}</span>
-                  <span className="text-emerald-500 font-extrabold uppercase">Conf: {w.confidence}%</span>
-                </div>
 
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {widgets.length === 0 &&
+            [0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-44 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)]/40 animate-pulse" />
+            ))}
+          {widgets.map((w, i) => (
+            <div key={w.code} className={`rounded-2xl border p-4 ${w.color} relative overflow-hidden group transition-all duration-300 flex flex-col justify-between animate-fade-in hover:shadow-lg hover:shadow-black/5`}
+              style={{ animationDelay: `${0.18 + i * 0.05}s` }}>
+
+              <div>
                 <div className="text-xl mb-1.5">{w.icon}</div>
                 <div className={`text-[9px] font-black uppercase tracking-wider mb-1 ${w.titleColor}`}>{w.title}</div>
                 <div className={`text-xl font-black tracking-tight mb-1.5 ${w.valueColor}`}>{w.value}</div>
                 <div className="text-xs text-[var(--text-secondary)] opacity-90 mb-3.5 leading-relaxed">{w.detail}</div>
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => setSelectedAgent(w)}
                 className={`text-xs font-black ${w.valueColor} hover:underline flex items-center gap-1 mt-auto uppercase`}
               >
@@ -365,82 +499,99 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-4 border-b border-[var(--border-primary)] pb-2">
             <div>
               <h3 className="font-extrabold text-[var(--text-primary)] text-sm">Performance par Commercial</h3>
-              <p className="text-[var(--text-secondary)] opacity-70 text-[10px]">Objectifs fixés vs Ventes réalisées — Mai 2026</p>
+              <p className="text-[var(--text-secondary)] opacity-70 text-[10px]">Objectifs fixés vs Ventes réalisées</p>
             </div>
-            <BarChart2 size={16} className="text-[var(--text-secondary)] opacity-60" />
+            <Link href="/admin/commerciaux"
+              className="text-[10px] font-black uppercase text-[var(--accent-primary)] hover:underline flex items-center gap-1">
+              Fiches <ArrowUpRight size={12} />
+            </Link>
           </div>
           <CommercialBarChart />
         </div>
       </div>
 
-      {/* Incidents Alerts & Live Telemetry Terminal */}
+      {/* Alertes d'exploitation & activité récente — données réelles */}
       <div className="grid lg:grid-cols-2 gap-6 animate-fade-in" style={{ animationDelay: "0.22s" }}>
-        {/* Active Alerts */}
-        <div className="bg-white rounded-2xl border border-[var(--border-primary)] shadow-sm overflow-hidden flex flex-col">
+        {/* Alertes calculées depuis l'état de la base */}
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-primary)]/40">
-            <h3 className="font-extrabold text-[var(--text-primary)] text-sm">Alertes critiques du système</h3>
-            <span className="text-[9px] bg-red-500/10 text-red-500 border border-red-500/20 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">{ALERTS.length} ACTIVES</span>
+            <h3 className="font-extrabold text-[var(--text-primary)] text-sm">Alertes d&apos;exploitation</h3>
+            <span className="text-[9px] bg-red-500/10 text-red-500 border border-red-500/20 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+              {alertes.length} ACTIVES
+            </span>
           </div>
-          <div className="divide-y divide-[var(--border-primary)]">
-            {ALERTS.map((a, i) => (
-              <div key={i} className={`flex items-start gap-3 px-5 py-4 ${a.urgent ? "bg-red-500/05" : ""}`}>
-                <span className="text-lg flex-shrink-0 mt-0.5">{a.icon}</span>
+          <div className="divide-y divide-[var(--border-primary)] max-h-[280px] overflow-y-auto">
+            {alertes.length === 0 && (
+              <div className="px-5 py-10 text-center text-xs text-[var(--text-secondary)]">
+                Aucune alerte — tout est nominal.
+              </div>
+            )}
+            {alertes.map((a, i) => (
+              <div key={i} className={`flex items-start gap-3 px-5 py-3.5 ${a.niveau === "critique" ? "bg-red-500/5" : ""}`}>
+                <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                  a.niveau === "critique" ? "bg-red-500" : a.niveau === "avertissement" ? "bg-amber-500" : "bg-blue-500"
+                }`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-wider">{a.type}</span>
-                    {a.urgent && <span className="text-[8px] bg-red-500/15 text-red-500 px-1.5 py-0.2 rounded font-black border border-red-500/20 animate-blink">URGENT</span>}
+                    {a.niveau === "critique" && (
+                      <span className="text-[8px] bg-red-500/15 text-red-500 px-1.5 rounded font-black border border-red-500/20">CRITIQUE</span>
+                    )}
                   </div>
-                  <div className="text-xs text-[var(--text-primary)] font-bold mt-1">{a.msg}</div>
-                  <div className="text-[10px] text-[var(--text-secondary)] opacity-60 mt-0.5 font-mono">Il y a {a.time}</div>
+                  <div className="text-xs text-[var(--text-primary)] font-bold mt-1">{a.message}</div>
+                  {a.detail && <div className="text-[10px] text-[var(--text-secondary)] opacity-70 mt-0.5">{a.detail}</div>}
                 </div>
-                <button className="text-[10px] text-[var(--accent-primary)] font-black hover:underline uppercase flex-shrink-0 mt-0.5">Traiter</button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Live Telemetry Terminal Console (Intelligent Logs) */}
-        <div className="bg-white rounded-2xl border border-[var(--border-primary)] shadow-sm overflow-hidden flex flex-col">
+        {/* Derniers documents enregistrés */}
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-primary)]/40">
             <div>
-              <h3 className="font-extrabold text-[var(--text-primary)] text-sm">Console Événements Temps Réel</h3>
-              <p className="text-[var(--text-secondary)] opacity-70 text-[10px] mt-0.5">Flux d'activités, télémétries et logs système</p>
+              <h3 className="font-extrabold text-[var(--text-primary)] text-sm">Activité récente</h3>
+              <p className="text-[var(--text-secondary)] opacity-70 text-[10px] mt-0.5">Derniers documents enregistrés</p>
             </div>
-            <span className="flex items-center gap-1.5 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-wide">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-dot" /> STREAMING
-            </span>
           </div>
-
-          <div translate="no" className="notranslate flex-1 p-4 bg-slate-950 font-mono text-[10px] text-slate-400 space-y-2 max-h-[250px] overflow-y-auto select-all">
-            {SYSTEM_LOGS.map((l, i) => (
-              <div key={i} className="flex items-start gap-2 hover:bg-slate-900/50 py-0.5 rounded px-1 transition-colors">
-                <span className="text-amber-500/80 flex-shrink-0">[{l.time}]</span>
-                <span className={`font-bold flex-shrink-0 ${l.type === "ai" ? "text-purple-400" : l.type === "warn" ? "text-red-400" : l.type === "success" ? "text-emerald-400" : "text-blue-400"}`}>
-                  {l.source}:
+          <div className="divide-y divide-[var(--border-primary)] max-h-[280px] overflow-y-auto">
+            {recents.length === 0 && (
+              <div className="px-5 py-10 text-center text-xs text-[var(--text-secondary)]">Aucun document récent.</div>
+            )}
+            {recents.map((d) => (
+              <div key={d.refDoc} className="flex items-center gap-3 px-5 py-3">
+                <span className="text-[9px] font-black px-2 py-1 rounded-lg bg-[var(--accent-light)] text-[var(--accent-primary)] flex-shrink-0">
+                  {d.typeDoc}
                 </span>
-                <span className="text-slate-300 break-all leading-normal">{l.msg}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-[var(--text-primary)] truncate">{d.refDoc}</div>
+                  <div className="text-[10px] text-[var(--text-secondary)] opacity-70 truncate">
+                    {d.raisonSocial || "—"}
+                    {d.dateDoc ? ` · ${new Date(d.dateDoc).toLocaleDateString("fr-FR")}` : ""}
+                  </div>
+                </div>
+                <span className="text-[11px] font-black text-[var(--text-primary)] tabular-nums flex-shrink-0">
+                  {fmt0(d.ttcNet)} TND
+                </span>
               </div>
             ))}
-            <div className="text-slate-500 animate-pulse text-[9px] pt-1">_ En attente de nouveaux paquets de données...</div>
           </div>
         </div>
       </div>
 
-      {/* Modern Tactical AI Agent Details Modal Overlay */}
+      {/* Détail d'un indicateur */}
       {selectedAgent && (
-        <div translate="no" className="notranslate fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative animate-scale-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in"
+          onClick={() => setSelectedAgent(null)}>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative animate-scale-in"
+            onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-5 border-b border-[var(--border-primary)] flex items-center justify-between bg-[var(--bg-primary)]/45">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{selectedAgent.icon}</span>
                 <div>
                   <h3 className="font-extrabold text-sm text-[var(--text-primary)]">{selectedAgent.title}</h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[8px] font-mono text-[var(--text-secondary)] opacity-80">{selectedAgent.code}</span>
-                    <span className="w-1 h-1 bg-[var(--text-secondary)] rounded-full opacity-40"></span>
-                    <span className="text-[9px] text-emerald-500 font-extrabold">Conf: {selectedAgent.confidence}%</span>
-                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)] opacity-80 mt-0.5">{selectedAgent.value}</div>
                 </div>
               </div>
               <button onClick={() => setSelectedAgent(null)} className="w-7 h-7 rounded-full bg-[var(--bg-primary)] border border-[var(--border-primary)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition font-black text-sm">
@@ -450,102 +601,118 @@ export default function AdminDashboard() {
 
             {/* Body */}
             <div className="p-6 overflow-y-auto max-h-[70vh] space-y-5">
-              {/* AGENT_PROJECTION_V4.2 */}
-              {selectedAgent.code === "AGENT_PROJECTION_V4.2" && (
+              {/* Objectif du mois — réalisé par vendeur */}
+              {selectedAgent.code === "OBJECTIF" && insights && (
                 <div className="space-y-4">
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                    Modèle prédictif neuronal entraîné sur 6 mois d'historique de ventes + facteurs de saisonnalité.
+                    Objectif de chiffre d&apos;affaires fixé pour {MOIS_LONGS[insights.periode.mois - 1]} {insights.periode.annee},
+                    comparé aux ventes réellement enregistrées.
                   </p>
-                  
-                  <div className="bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4 space-y-2.5">
-                    <div className="text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-wider">Prévisions CA Journalières</div>
-                    <div className="space-y-1.5">
-                      {[
-                        { day: "Lundi (Demain)", val: "23 800 TND", trend: "+4%" },
-                        { day: "Mardi", val: "24 500 TND", trend: "+6%" },
-                        { day: "Mercredi", val: "26 100 TND", trend: "+10%" },
-                        { day: "Jeudi", val: "25 400 TND", trend: "-2%" },
-                        { day: "Vendredi (Pic)", val: "28 400 TND", trend: "+15%" },
-                        { day: "Samedi", val: "27 900 TND", trend: "+12%" },
-                      ].map(d => (
-                        <div key={d.day} className="flex justify-between items-center text-xs border-b border-[var(--border-primary)]/40 pb-1.5 last:border-0 last:pb-0">
-                          <span className="font-bold text-[var(--text-primary)]">{d.day}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[var(--text-primary)]">{d.val}</span>
-                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${d.trend.startsWith("+") ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>{d.trend}</span>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { l: "Réalisé", v: fmt0(insights.objectif.realise) },
+                      { l: "Objectif", v: fmt0(insights.objectif.objectifCA) },
+                      { l: "Reste à faire", v: fmt0(insights.objectif.reste) },
+                    ].map((x) => (
+                      <div key={x.l} className="bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-3 text-center">
+                        <div className="text-[9px] font-black uppercase text-[var(--text-secondary)] tracking-wider">{x.l}</div>
+                        <div className="text-sm font-black text-[var(--text-primary)] mt-1 tabular-nums">{x.v}</div>
+                        <div className="text-[9px] text-[var(--text-secondary)] opacity-70">TND</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {insights.objectif.parVendeur.length === 0 ? (
+                    <p className="text-xs text-[var(--text-secondary)] text-center py-6 opacity-70">
+                      Aucun objectif enregistré pour cette période.
+                    </p>
+                  ) : (
+                    <div className="bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4 space-y-3">
+                      <div className="text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-wider">Réalisé par vendeur</div>
+                      {insights.objectif.parVendeur.map((v) => (
+                        <div key={v.vendeur}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="font-bold text-[var(--text-primary)]">{v.vendeur}</span>
+                            <span className="font-mono text-[var(--text-primary)] tabular-nums">
+                              {fmt0(v.ca)} / {fmt0(v.objectifCA)} TND
+                              <span className={`ml-2 font-black ${v.taux >= 100 ? "text-emerald-500" : v.taux >= 80 ? "text-amber-500" : "text-red-500"}`}>
+                                {fmtPct(v.taux)}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden border border-[var(--border-primary)]">
+                            <div className={`h-full rounded-full ${v.taux >= 100 ? "bg-emerald-500" : v.taux >= 80 ? "bg-amber-500" : "bg-red-500"}`}
+                              style={{ width: `${Math.min(100, v.taux)}%` }} />
                           </div>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  )}
 
-                  <div className="text-xs text-[var(--text-secondary)] bg-purple-500/05 border border-purple-500/10 rounded-2xl p-4 leading-relaxed">
-                    💡 <strong>Insight IA :</strong> La hausse marquée en milieu et fin de semaine est corrélée aux cycles de livraison réguliers des grossistes (mardi/vendredi) ainsi qu'aux facteurs saisonniers climatiques favorables.
-                  </div>
-
-                  <div className="flex gap-3 justify-end pt-3">
+                  <div className="flex justify-end pt-3">
                     <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition">
                       Fermer
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setAgentActionState(prev => ({ ...prev, [selectedAgent.code]: "SUCCESS" }));
-                      }}
-                      disabled={agentActionState[selectedAgent.code] === "SUCCESS"}
-                      className={`px-4 py-2 text-xs font-black rounded-xl transition flex items-center gap-1.5 ${
-                        agentActionState[selectedAgent.code] === "SUCCESS"
-                          ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                          : "bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-500/10"
-                      }`}
-                    >
-                      {agentActionState[selectedAgent.code] === "SUCCESS" ? "✓ Synchronisé avec Trésorerie" : "Synchroniser Trésorerie"}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* AGENT_RETENTION_V2.9 */}
-              {selectedAgent.code === "AGENT_RETENTION_V2.9" && (
+              {/* Clients à risque — relance WhatsApp vers le commercial */}
+              {selectedAgent.code === "CLIENTS_RISQUE" && insights && (
                 <div className="space-y-4">
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                    Détection proactive des clients à haut risque d'attrition basée sur la fréquence des visites et le volume de commande.
+                    Clients sans commande depuis plus de {insights.clientsRisque.seuilJours} jours.
+                    Le bouton WhatsApp ouvre une conversation avec le commercial en charge,
+                    message de relance pré-rempli.
                   </p>
 
                   <div className="space-y-2.5">
-                    {[
-                      { name: "AGIL SIDI KHLIFA", last: "34 jours", solde: "3 659 TND", score: "88% Risque" },
-                      { name: "AGIL MAHDIA", last: "31 jours", solde: "3 408 TND", score: "72% Risque" },
-                      { name: "librairie saphir", last: "41 jours", solde: "2 738 TND", score: "68% Risque" },
-                    ].map(c => {
-                      const key = `${selectedAgent.code}_${c.name}`;
-                      const actionDone = agentActionState[key];
-                      
+                    {insights.clientsRisque.rows.map((c) => {
+                      const lien = lienWhatsapp(c);
                       return (
-                        <div key={c.name} className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 text-xs bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4">
-                          <div>
-                            <div className="font-extrabold text-[var(--text-primary)]">{c.name}</div>
-                            <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-secondary)] opacity-80">
-                              <span>Dernière visite: {c.last}</span>
-                              <span className="w-1 h-1 bg-[var(--text-secondary)] rounded-full opacity-40 text-[6px]"></span>
-                              <span>Créance: {c.solde}</span>
+                        <div key={c.codeCli} className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 text-xs bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4">
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-[var(--text-primary)] truncate">{c.nom}</div>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-secondary)] opacity-80 flex-wrap">
+                              <span>Sans commande depuis {fmt0(c.jours)} j</span>
+                              {c.solde > 0 && (
+                                <>
+                                  <span className="w-1 h-1 bg-[var(--text-secondary)] rounded-full opacity-40" />
+                                  <span>Créance: {fmt0(c.solde)} TND</span>
+                                </>
+                              )}
+                              {c.commercial && (
+                                <>
+                                  <span className="w-1 h-1 bg-[var(--text-secondary)] rounded-full opacity-40" />
+                                  <span>Commercial: {c.commercial}</span>
+                                </>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 ml-auto sm:ml-0">
-                            <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{c.score}</span>
-                            <button
-                              onClick={() => {
-                                setAgentActionState(prev => ({ ...prev, [key]: "PLANNED" }));
-                              }}
-                              disabled={actionDone === "PLANNED"}
-                              className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
-                                actionDone === "PLANNED"
-                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                  : "bg-amber-500 text-amber-950 hover:bg-amber-400"
-                              }`}
-                            >
-                              {actionDone === "PLANNED" ? "✓ Planifié" : "Planifier visite"}
-                            </button>
+                          <div className="flex items-center gap-2 ml-auto sm:ml-0 flex-shrink-0">
+                            <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              {c.score}% risque
+                            </span>
+                            {lien ? (
+                              <a
+                                href={lien}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={c.whatsapp?.vers === "commercial"
+                                  ? `Relancer ${c.commercial} sur WhatsApp`
+                                  : "Contacter le client sur WhatsApp (commercial sans numéro)"}
+                                className="px-3 py-1.5 text-[10px] font-black rounded-lg transition bg-emerald-500 text-white hover:bg-emerald-600 flex items-center gap-1.5"
+                              >
+                                <MessageCircle size={12} />
+                                {c.whatsapp?.vers === "commercial" ? "Relancer" : "Client"}
+                              </a>
+                            ) : (
+                              <span className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-primary)]">
+                                Sans numéro
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
@@ -560,187 +727,115 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* AGENT_STOCKS_V3.1 */}
-              {selectedAgent.code === "AGENT_STOCKS_V3.1" && (
+              {/* Ruptures de stock — articles à zéro */}
+              {selectedAgent.code === "RUPTURES_STOCK" && insights && (
                 <div className="space-y-4">
-                  {agentActionState[selectedAgent.code] === "SUCCESS" ? (
-                    <div className="space-y-4 text-center py-6 animate-fade-in">
-                      <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-xl animate-bounce">
-                        ✓
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="font-extrabold text-sm text-[var(--text-primary)]">Bon de Commande Généré !</h4>
-                        <p className="text-xs text-[var(--text-secondary)] opacity-85 leading-relaxed">
-                          BC #2026-0084 a été généré avec succès et envoyé au fournisseur <strong>SOUHA SA</strong> via EDI.
-                        </p>
-                      </div>
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                    {fmt0(insights.rupturesStock.nb)} articles sont à zéro, soit {fmtPct(insights.rupturesStock.taux)} du
+                    catalogue vendable ({fmt0(insights.rupturesStock.nbArticles)} références).
+                  </p>
 
-                      <div className="bg-[var(--bg-primary)]/60 border border-[var(--border-primary)] rounded-2xl p-4 text-left font-mono text-[10px] text-[var(--text-primary)] max-w-sm mx-auto space-y-1.5">
-                        <div className="border-b border-[var(--border-primary)] pb-1.5 mb-1.5 flex justify-between font-bold">
-                          <span>DOCUMENT: BC #2026-0084</span>
-                          <span>DATE: 18/05/2026</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>coffret echec 2025 (20u)</span>
-                          <span>250.00 TND</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>jeux ludo bois (15u)</span>
-                          <span>150.00 TND</span>
-                        </div>
-                        <div className="border-t border-dashed border-[var(--border-primary)] pt-1.5 mt-1.5 flex justify-between font-black text-xs">
-                          <span>TOTAL HT:</span>
-                          <span>400.00 TND</span>
-                        </div>
-                        <div className="flex justify-between text-[9px] opacity-80">
-                          <span>TVA 19%:</span>
-                          <span>76.00 TND</span>
-                        </div>
-                        <div className="flex justify-between font-black text-xs text-emerald-500">
-                          <span>TOTAL TTC:</span>
-                          <span>476.00 TND</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition">
-                          Quitter
-                        </button>
-                      </div>
+                  <div className="bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4 space-y-3">
+                    <div className="text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-wider">
+                      Articles à réapprovisionner
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                        Détection proactive de ruptures imminentes de stocks sous 7 jours. Générateur automatique de Bon de Commande réglementaire.
-                      </p>
-
-                      <div className="bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4 space-y-3">
-                        <div className="text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-wider">Articles en rupture imminente</div>
-                        
-                        <div className="space-y-2.5">
-                          {[
-                            { name: "coffret echec 2025", stock: 2, min: 5, sugg: 20, price: "12.5 TND" },
-                            { name: "jeux ludo bois", stock: 9, min: 10, sugg: 15, price: "10.0 TND" },
-                          ].map(a => (
-                            <div key={a.name} className="flex justify-between items-start text-xs border-b border-[var(--border-primary)]/40 pb-2 last:border-0 last:pb-0">
-                              <div>
-                                <span className="font-extrabold text-[var(--text-primary)]">{a.name}</span>
-                                <div className="text-[10px] text-[var(--text-secondary)] opacity-85 mt-0.5">Stock: {a.stock} | Seuil min: {a.min}</div>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-[10px]">{a.sugg} unités suggérées</span>
-                                <div className="text-[10px] text-[var(--text-secondary)] opacity-85 mt-0.5">P.U: {a.price}</div>
-                              </div>
+                    <div className="space-y-2.5">
+                      {insights.rupturesStock.rows.map((a) => (
+                        <div key={a.refArt} className="flex justify-between items-start text-xs border-b border-[var(--border-primary)]/40 pb-2 last:border-0 last:pb-0 gap-3">
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-[var(--text-primary)] break-words">{a.designation || a.refArt}</span>
+                            <div className="text-[10px] text-[var(--text-secondary)] opacity-85 mt-0.5 font-mono">
+                              Réf. {a.refArt} · stock {fmt0(a.stock)}{a.stMin > 0 ? ` / min ${fmt0(a.stMin)}` : ""}
                             </div>
-                          ))}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <span className="font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-[10px] whitespace-nowrap">
+                              {fmt0(a.suggere)} u. suggérées
+                            </span>
+                            <div className="text-[10px] text-[var(--text-secondary)] opacity-85 mt-0.5 tabular-nums">
+                              P.A: {fmt0(a.puAchat)} TND
+                            </div>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="text-[11px] text-[var(--text-secondary)] bg-red-500/05 border border-red-500/10 rounded-2xl p-4 leading-relaxed flex items-start gap-2.5">
-                        <span className="text-base mt-0.5">⚠️</span>
-                        <span>
-                          <strong>Fournisseur sélectionné : SOUHA SA</strong><br />
-                          En validant, le système génère un document PDF d'achat officiel et transmet la commande via le canal EDI sécurisé.
-                        </span>
-                      </div>
-
-                      <div className="flex gap-3 justify-end pt-3">
-                        <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition">
-                          Fermer
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setAgentActionState(prev => ({ ...prev, [selectedAgent.code]: "SUCCESS" }));
-                          }}
-                          className="px-4 py-2 text-xs font-black rounded-xl bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-500/10 transition flex items-center gap-1.5"
-                        >
-                          ⚡ Valider & Envoyer le BC
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-3">
+                    <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition">
+                      Fermer
+                    </button>
+                    <Link href="/admin/modules/stock" className="px-4 py-2 text-xs font-black rounded-xl bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-500/10 transition">
+                      Ouvrir le module Stock
+                    </Link>
+                  </div>
                 </div>
               )}
 
-              {/* AGENT_FRAUD_V1.8 */}
-              {selectedAgent.code === "AGENT_FRAUD_V1.8" && (
+              {/* Ruptures debout — sous le seuil minimum */}
+              {selectedAgent.code === "RUPTURES_DEBOUT" && insights && (
                 <div className="space-y-4">
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                    Détection d'anomalies de flux et transactions atypiques par comparaison comportementale.
+                    Articles encore disponibles mais passés sous leur seuil minimum : ils se vendent
+                    toujours et tomberont en rupture sans réapprovisionnement.
                   </p>
 
-                  <div className="bg-blue-500/05 border border-blue-500/10 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center gap-2 border-b border-[var(--border-primary)]/50 pb-2">
-                      <span className="text-base">🚨</span>
-                      <div>
-                        <div className="text-xs font-black text-blue-500">Alerte Réf: #TRX-94821</div>
-                        <div className="text-[9px] text-[var(--text-secondary)] opacity-80">Score suspicion IA: 97%</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-[var(--text-secondary)]">Client ciblé:</span>
-                        <span className="font-bold text-[var(--text-primary)]">AGIL BEJA SUD</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--text-secondary)]">Transaction:</span>
-                        <span className="font-bold text-red-500">Règlement 8 500 TND</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--text-secondary)]">Facteur de risque:</span>
-                        <span className="font-bold text-[var(--text-primary)]">Dépassement de 2.3x limite de crédit</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--text-secondary)]">Empreinte hash:</span>
-                        <span className="font-mono text-[10px] text-[var(--text-secondary)]">0xfa849c...192f</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-[var(--text-secondary)] leading-relaxed bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4">
-                    🔎 <strong>Recommandation IA :</strong> Cette transaction a été bloquée temporairement car elle dévie du profil de règlement habituel de ce client (délai moyen de 45j vs versement immédiat hors norme).
-                  </div>
-
-                  {agentActionState[selectedAgent.code] ? (
-                    <div className={`p-3 rounded-xl border text-center text-xs font-bold animate-fade-in ${
-                      agentActionState[selectedAgent.code] === "APPROVED"
-                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                        : "bg-red-500/10 text-red-500 border-red-500/20"
-                    }`}>
-                      {agentActionState[selectedAgent.code] === "APPROVED"
-                        ? "✓ Transaction Approuvée & Enregistrée avec succès !"
-                        : "✗ Compte suspendu temporairement pour enquête."}
-                    </div>
+                  {insights.rupturesDebout.rows.length === 0 ? (
+                    <p className="text-xs text-[var(--text-secondary)] text-center py-8 opacity-70">
+                      ✓ Aucun article sous son seuil minimum.
+                    </p>
                   ) : (
-                    <div className="flex gap-2 sm:gap-3 justify-end pt-3">
-                      <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition">
-                        Fermer
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setAgentActionState(prev => ({ ...prev, [selectedAgent.code]: "BLOCKED" }));
-                        }}
-                        className="px-4 py-2 text-xs font-black rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/15 border border-red-500/20 transition"
-                      >
-                        Bloquer
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setAgentActionState(prev => ({ ...prev, [selectedAgent.code]: "APPROVED" }));
-                        }}
-                        className="px-4 py-2 text-xs font-black rounded-xl bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-500/10 transition"
-                      >
-                        Approuver
-                      </button>
+                    <div className="bg-[var(--bg-primary)]/50 border border-[var(--border-primary)] rounded-2xl p-4 space-y-2.5">
+                      {insights.rupturesDebout.rows.map((a) => (
+                        <div key={a.refArt} className="flex justify-between items-start text-xs border-b border-[var(--border-primary)]/40 pb-2 last:border-0 last:pb-0 gap-3">
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-[var(--text-primary)] break-words">{a.designation || a.refArt}</span>
+                            <div className="text-[10px] text-[var(--text-secondary)] opacity-85 mt-0.5 font-mono">Réf. {a.refArt}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0 tabular-nums">
+                            <span className="font-bold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded text-[10px] whitespace-nowrap">
+                              {fmt0(a.stock)} / min {fmt0(a.stMin)}
+                            </span>
+                            <div className="text-[10px] text-[var(--text-secondary)] opacity-85 mt-0.5">
+                              manque {fmt0(a.manque)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
+
+                  <div className="flex justify-end pt-3">
+                    <button onClick={() => setSelectedAgent(null)} className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition">
+                      Fermer
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
+      {/* Répartition du stock par famille — ouverte depuis la carte CA. */}
+      {voirFamilles && (
+        <ValorisationFamilles accent="var(--accent-primary)" onClose={() => setVoirFamilles(false)} />
+      )}
+
+      {/* Détail des achats — ouvert depuis la carte Achats. */}
+      {voirAchats && (
+        <DetailAchats accent="var(--accent-primary)" onClose={() => setVoirAchats(false)} />
+      )}
+
+      {/* Créances & trésorerie — ouvert depuis la carte Créances clients. */}
+      {voirCreances && (
+        <DetailCreances accent="var(--accent-primary)" onClose={() => setVoirCreances(false)} />
+      )}
+
+      {/* Ruptures de stock — ouvert depuis la carte Ruptures stock. */}
+      {voirRuptures && (
+        <DetailRuptures accent="var(--accent-primary)" onClose={() => setVoirRuptures(false)} />
+      )}
+
     </div>
   );
 }

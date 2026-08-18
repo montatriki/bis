@@ -1,0 +1,780 @@
+[
+ {
+  "endpoint": "POST users/listDb",
+  "count": 1,
+  "keys": [
+   "mail",
+   "raison",
+   "nom",
+   "activite",
+   "pays",
+   "tel",
+   "db",
+   "echeance",
+   "licence",
+   "defaultdb",
+   "id",
+   "achat",
+   "ai_magerie",
+   "ai_vocale",
+   "bi",
+   "caisse",
+   "caisse_pro",
+   "caisse_res",
+   "chat",
+   "crm",
+   "comptabilite",
+   "frais",
+   "gmao",
+   "gpa",
+   "parc",
+   "projets",
+   "reseau_sociaux",
+   "rh",
+   "service",
+   "stock",
+   "tournee",
+   "tresorerie",
+   "vente",
+   "vente_enLigne",
+   "garage"
+  ],
+  "sample": "[{\"mail\":\"sky@com\",\"raison\":\"bis\",\"nom\":\"amir kacem\",\"activite\":\"distribution\",\"pays\":\"Tunisia\",\"tel\":\"22622550\",\"db\":\"bis\",\"echeance\":null,\"licence\":null,\"defaultdb\":0,\"id\":27,\"achat\":1,\"ai_magerie\":0,\"ai_vocale\":0,\"bi\":0,\"caisse\":0,\"caisse_pro\":0,\"caisse_res\":0,\"chat\":0,\"crm\":1,\"comptabilite\":0,\"frais\":1,\"gmao\":1,\"gpa\":1,\"parc\":1,\"projets\":0,\"reseau_sociaux\":0,\"rh\":1,\"service\":0,\"stock\":1,\"tournee\":1,\"tresorerie\":1,\"vente\":1,\"vente_enLigne\":0,\"garage\":0}]"
+ },
+ {
+  "endpoint": "POST users/login",
+  "count": 1,
+  "keys": [
+   "utilisateur",
+   "Activer",
+   "Code_mag",
+   "password",
+   "mod_stock",
+   "mod_client",
+   "mod_vente",
+   "mod_frs",
+   "mod_achat",
+   "mod_tresorerie",
+   "mod_compta",
+   "mod_charges",
+   "mod_garage",
+   "mod_paramétrages",
+   "Mod_outil",
+   "mod_impression",
+   "mod_gpao",
+   "password_del",
+   "id",
+   "souche",
+   "caisse",
+   "souche_ach",
+   "commercial",
+   "application",
+   "Code_cli",
+   "bloquer",
+   "tokenFireBase"
+  ],
+  "sample": "[{\"utilisateur\":\"Admin\",\"Activer\":null,\"Code_mag\":1,\"password\":\"0502765210\",\"mod_stock\":null,\"mod_client\":null,\"mod_vente\":null,\"mod_frs\":null,\"mod_achat\":null,\"mod_tresorerie\":null,\"mod_compta\":null,\"mod_charges\":null,\"mod_garage\":null,\"mod_paramétrages\":null,\"Mod_outil\":null,\"mod_impression\":null,\"mod_gpao\":null,\"password_del\":\"\",\"id\":1,\"souche\":0,\"caisse\":0,\"souche_ach\":0,\"commercial\":\"sky edition \",\"application\":\"manager\",\"Code_cli\":0,\"bloquer\":0,\"tokenFireBase\":\"\"}]"
+ },
+ {
+  "endpoint": "POST droit_list_doc_vente//get-all-by-attr",
+  "count": 1,
+  "keys": [
+   "user",
+   "imp_list",
+   "supp_doc",
+   "modif_doc",
+   "creat_doc",
+   "imp_doc",
+   "aff_total",
+   "aff_valeur",
+   "transform",
+   "access",
+   "id"
+  ],
+  "sample": "[{\"user\":\"Admin\",\"imp_list\":1,\"supp_doc\":1,\"modif_doc\":1,\"creat_doc\":1,\"imp_doc\":1,\"aff_total\":1,\"aff_valeur\":1,\"transform\":1,\"access\":1,\"id\":9}]"
+ },
+ {
+  "endpoint": "POST component_user_droit//get-all-by-attr-join",
+  "count": 53,
+  "keys": [
+   "component",
+   "func_name",
+   "func_lib",
+   "id",
+   "type_fn",
+   "num_order",
+   "user",
+   "value_access",
+   "idDroit"
+  ],
+  "sample": "[{\"component\":\"liste-documents-vente\",\"func_name\":\"Accees\",\"func_lib\":\"Accees\",\"id\":12,\"type_fn\":\"\",\"num_order\":1,\"user\":\"Admin\",\"value_access\":1,\"idDroit\":233}]"
+ },
+ {
+  "endpoint": "POST exercices_comptable/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "PUT users/update",
+  "keys": [
+   "status",
+   "message",
+   "data"
+  ],
+  "sample": "{\"status\":201,\"message\":\"Mise à jour avec succès\",\"data\":{\"utilisateur\":\"Admin\",\"Activer\":null,\"Code_mag\":1,\"password\":\"0502765210\",\"mod_stock\":null,\"mod_client\":null,\"mod_vente\":null,\"mod_frs\":null,\"mod_achat\":null,\"mod_tresorerie\":null,\"mod_compta\":null,\"mod_charges\":null,\"mod_garage\":null,\"mod_paramétrages\":null,\"Mod_outil\":null,\"mod_impression\":null,\"mod_gpao\":null,\"password_del\":\"\",\"id\":1,\"souche\":0,\"caisse\":0,\"souche_ach\":0,\"commercial\":\"sky edition \",\"application\":\"manager\",\"Code_cli\":0,\"bloquer\":0,\"tokenFireBase\":null}}"
+ },
+ {
+  "endpoint": "POST type-documents-vente/",
+  "count": 10,
+  "keys": [
+   "Type_doc",
+   "Carc_doc",
+   "Lib_doc",
+   "compteur",
+   "timbre",
+   "T_stock",
+   "T_Solde",
+   "Nature_Doc",
+   "order_commercial",
+   "couleur",
+   "conditions",
+   "modele_impression",
+   "conditions_height",
+   "souche",
+   "id",
+   "actif_endist",
+   "avec_reg",
+   "plafonner",
+   "signature"
+  ],
+  "sample": "[{\"Type_doc\":\"AV\",\"Carc_doc\":\"AVC\",\"Lib_doc\":\"Avoir\",\"compteur\":\"220001\",\"timbre\":\"0.000000\",\"T_stock\":\"E\",\"T_Solde\":\"C\",\"Nature_Doc\":\"Vente\",\"order_commercial\":2,\"couleur\":\"#e17440\",\"conditions\":\"\",\"modele_impression\":0,\"conditions_height\":0,\"souche\":0,\"id\":1,\"actif_endist\":0,\"avec_reg\":0,\"plafonner\":0,\"signature\":0}]"
+ },
+ {
+  "endpoint": "POST type-documents-achat/",
+  "count": 21,
+  "keys": [
+   "Type_doc",
+   "Carc_doc",
+   "Lib_doc",
+   "compteur",
+   "timbre",
+   "T_stock",
+   "T_Solde",
+   "Nature_Doc",
+   "order_commercial",
+   "couleur",
+   "conditions",
+   "id",
+   "souche_ach",
+   "mvt",
+   "T_mvt",
+   "type_tourner",
+   "doc_stk"
+  ],
+  "sample": "[{\"Type_doc\":\"AV\",\"Carc_doc\":\"ARA\",\"Lib_doc\":\"Avoir\",\"compteur\":\"230001\",\"timbre\":\"0.000000\",\"T_stock\":\"N\",\"T_Solde\":\"D\",\"Nature_Doc\":\"Achat\",\"order_commercial\":2,\"couleur\":\"#e63c6f\",\"conditions\":\"\",\"id\":1,\"souche_ach\":1,\"mvt\":1,\"T_mvt\":\"T\",\"type_tourner\":\"document stock\",\"doc_stk\":0}]"
+ },
+ {
+  "endpoint": "POST application-modules//get-all-by-attr",
+  "count": 9,
+  "keys": [
+   "id",
+   "navbar_title",
+   "parent_id",
+   "component_order",
+   "component_file_name",
+   "divider",
+   "raccourcis_h",
+   "image",
+   "link",
+   "raccourcis_v",
+   "type_document",
+   "caractere_document",
+   "raccourcis_v_text",
+   "raccourcis_h_text"
+  ],
+  "sample": "[{\"id\":1,\"navbar_title\":\"gestion du stock\",\"parent_id\":0,\"component_order\":3,\"component_file_name\":\"inventoryModule\",\"divider\":0,\"raccourcis_h\":0,\"image\":\"storage.png\",\"link\":\"inventoryModule\",\"raccourcis_v\":0,\"type_document\":\"\",\"caractere_document\":\"0\",\"raccourcis_v_text\":\"\",\"raccourcis_h_text\":\"\"}]"
+ },
+ {
+  "endpoint": "POST navbar_components//get-all-by-attr",
+  "count": 11,
+  "keys": [
+   "id",
+   "utilisateur",
+   "navbar_title",
+   "link",
+   "image",
+   "module_title",
+   "module_image"
+  ],
+  "sample": "[{\"id\":56,\"utilisateur\":\"Admin\",\"navbar_title\":\"Liste des transferts\",\"link\":\"inventoryModule/liste-transfer\",\"image\":\"new-property.png\",\"module_title\":\"gestion du stock\",\"module_image\":\"storage.png\"}]"
+ },
+ {
+  "endpoint": "POST articles-groups/",
+  "keys": [
+   "unities",
+   "familles",
+   "sousFamilles",
+   "emplacements",
+   "catalogue"
+  ],
+  "sample": "{\"unities\":[{\"unité\":\"Litre\"},{\"unité\":\"kg\"},{\"unité\":\"ML\"},{\"unité\":\"M²\"},{\"unité\":\"PACKET\"},{\"unité\":\"PCS\"},{\"unité\":\"horaires\"},{\"unité\":\"dinars\"}],\"familles\":[{\"code_fam\":0,\"lib_fam\":\"Matiére premiére\",\"Image\":null,\"chemin\":\"\",\"Printer\":null,\"policebtn\":6,\"couleurbtn\":0,\"charge\":0,\"id\":15},{\"code_fam\":1,\"lib_fam\":\"Charge\",\"Image\":null,\"chemin\":\"\",\"Printer\":null,\"policebtn\":6,\"couleurbtn\":0,\"charge\":0,\"id\":16},{\"code_fam\":2,\"lib_fam\":\"cahier\",\"Image\":null,\"chemin\":\"\",\"Printer\":null,\"policebtn\":6,\"couleurbtn\":0,\"charge\":0,\"id\":17},{\"code_fam\":3,\"lib_fam\":\"surprise\",\"Image\":null,\"chemin\":\"\",\"Printer\":null,\"policebtn\":6,\"couleurbtn\":0,\"charge\":0,\"id\":18},{\"code_fam\":4,\"lib_fam\":\"jeux educatif\",\"Image\":null,\"chemin\":\"\",\"Printer\":null,\"policebtn\":6,\"couleurbtn\":0,\"charge\":0,\"id\":19},{\"code_fam\":5,\"lib_fam\":\"jeux\",\"Image\":null,\"chemin\":\"\",\"Printer\":null,\"policebtn\":6,\"couleurbtn\":0,\"charge\""
+ },
+ {
+  "endpoint": "POST articles/get-filtred-article",
+  "keys": [
+   "articles",
+   "nbPages",
+   "nbrProd"
+  ],
+  "sample": "{\"articles\":[{\"pu_achat_ttc\":0.15,\"rem_achat\":0,\"remise_par_qte\":0,\"remise_offerte\":0,\"vendable\":1,\"service\":0,\"code_catalogue\":0,\"catalogue\":null,\"achetable\":1,\"archiver\":0,\"ref_art\":\"divers\",\"code_barre\":\"\",\"des_art\":\"Achat divers\",\"caract_art\":\"achat divers\",\"pu_inv\":\"0.000000\",\"pu_achat\":\"0.125000\",\"pmp\":\"0.000000\",\"dpa\":\"0.000000\",\"ma_tarif1\":-100,\"tarif1_ht\":\"0.000000\",\"ma_tarif2\":0,\"tarif2_ht\":\"0.000000\",\"ma_tarif3\":0,\"tarif3_ht\":\"0.000000\",\"ma_tarif4\":0,\"tarif4_ht\":\"0.000000\",\"ma_tarif5\":0,\"tarif5_ht\":\"0.000000\",\"ref_origine\":\"\",\"Unité\":\"PCS\",\"Taux_tva\":19,\"Taux_fodec\":0,\"Code_fam\":1,\"Code_sou_fam\":1,\"stock_ini\":-480,\"entrer\":482,\"sortie\":0,\"en_stock\":2,\"fodec2\":1,\"Code_fab\":\"\",\"t1_ttc\":\"0.000000\",\"t2_ttc\":\"0.000000\",\"t3_ttc\":\"0.000000\",\"t4_ttc\":\"0.000000\",\"t5_ttc\":\"0.000000\",\"ges_lot\":0,\"fifo\":0,\"lifo\":0,\"cump\":0,\"ger_serie\":0,\"st_min\":0,\"st_max\":0,\"rem_max\":40,\"Exclu\":0,\"poids\""
+ },
+ {
+  "endpoint": "POST articles-groups/createGroup",
+  "keys": [
+   "fieldCount",
+   "affectedRows",
+   "insertId",
+   "info",
+   "serverStatus",
+   "warningStatus"
+  ],
+  "sample": "{\"fieldCount\":0,\"affectedRows\":1,\"insertId\":0,\"info\":\"\",\"serverStatus\":2,\"warningStatus\":3}"
+ },
+ {
+  "endpoint": "POST depots/get-depot-by-ref/undefined",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST depots/",
+  "count": 10,
+  "keys": [
+   "Code_mag",
+   "Libelle_mag",
+   "Adresse",
+   "current_mag",
+   "client_counter",
+   "api_url",
+   "provider_counter",
+   "is_main_base",
+   "phone",
+   "rc",
+   "tva",
+   "matricule",
+   "fixe"
+  ],
+  "sample": "[{\"Code_mag\":1,\"Libelle_mag\":\"Dépôt principale\",\"Adresse\":null,\"current_mag\":0,\"client_counter\":0,\"api_url\":\"\",\"provider_counter\":0,\"is_main_base\":1,\"phone\":\"\",\"rc\":\"\",\"tva\":\"\",\"matricule\":\"\",\"fixe\":1}]"
+ },
+ {
+  "endpoint": "POST documents-achats/get-filtered-documents",
+  "count": 4,
+  "keys": [
+   "Type_doc",
+   "Ref_doc",
+   "Lib_doc",
+   "Date_doc",
+   "Code_cli",
+   "Raison_social",
+   "adr_cli",
+   "MF",
+   "Num_Seq",
+   "tht_brut",
+   "tot_remise",
+   "tht_net",
+   "tot_tva",
+   "timbre",
+   "totfodec",
+   "ttc_net",
+   "enlettre",
+   "Code_mag",
+   "Utilisateur",
+   "Code_magau",
+   "exo",
+   "assuj",
+   "nonsoumi",
+   "Num_fac_frs",
+   "Facturer",
+   "generer",
+   "Cara_doc",
+   "Tot_dc",
+   "Date_debut_prevu",
+   "Date_debut",
+   "Date_fin",
+   "Etat_av",
+   "a_transformer",
+   "transfer_from",
+   "transfer_to",
+   "transfer_source_validated",
+   "transfer_destination_validated",
+   "Solde_doc",
+   "total_regle",
+   "echeance",
+   "etat",
+   "mode_payement",
+   "conditions",
+   "cours_devise",
+   "tiers",
+   "adresse",
+   "vehicule",
+   "order_num",
+   "cloturer",
+   "id_mission",
+   "id_du",
+   "id_au",
+   "kilometrage",
+   "comptabiliser",
+   "couleur",
+   "Libelle_mag"
+  ],
+  "sample": "[{\"Type_doc\":\"INV\",\"Ref_doc\":\"INV220627\",\"Lib_doc\":\"INVENTAIRE\",\"Date_doc\":\"2026-06-03 13:04:00\",\"Code_cli\":0,\"Raison_social\":\"\",\"adr_cli\":\"\",\"MF\":\"\",\"Num_Seq\":220627,\"tht_brut\":\"-952.320000\",\"tot_remise\":\"0.000000\",\"tht_net\":\"-952.320000\",\"tot_tva\":\"-180.941000\",\"timbre\":\"0.000000\",\"totfodec\":\"0.000000\",\"ttc_net\":\"-1133.261000\",\"enlettre\":\"\",\"Code_mag\":1,\"Utilisateur\":\"\",\"Code_magau\":0,\"exo\":0,\"assuj\":0,\"nonsoumi\":0,\"Num_fac_frs\":\"\",\"Facturer\":0,\"generer\":0,\"Cara_doc\":\"INV\",\"Tot_dc\":\"0.000000\",\"Date_debut_prevu\":\"0000-00-00 00:00:00\",\"Date_debut\":\"0000-00-00 00:00:00\",\"Date_fin\":\"0000-00-00 00:00:00\",\"Etat_av\":\"\",\"a_transformer\":0,\"transfer_from\":0,\"transfer_to\":0,\"transfer_source_validated\":0,\"transfer_destination_validated\":0,\"Solde_doc\":-1133.26,\"total_regle\":0,\"echeance\":null,\"etat\":\"\",\"mode_payement\":\"\",\"conditions\":\"\",\"cours_devise\":0,\"tiers\":null,\"adresse\":\"\",\"vehicule\":null,\"ord"
+ },
+ {
+  "endpoint": "POST commerciaux/",
+  "count": 13,
+  "keys": [
+   "Raison_social_com",
+   "pourcentage",
+   "Taux_gasoil",
+   "Taux_vheicule",
+   "date_solde_depart",
+   "solde_depart",
+   "code",
+   "plafond_encour",
+   "tous_credit",
+   "ticket_dist"
+  ],
+  "sample": "[{\"Raison_social_com\":\"sky edition \",\"pourcentage\":0,\"Taux_gasoil\":0,\"Taux_vheicule\":0,\"date_solde_depart\":\"2024-07-15\",\"solde_depart\":0,\"code\":711012,\"plafond_encour\":\"0.000\",\"tous_credit\":0,\"ticket_dist\":0}]"
+ },
+ {
+  "endpoint": "POST vehicules/",
+  "count": 7,
+  "keys": [
+   "id_veh",
+   "Matricule",
+   "NChassis",
+   "AnneModel",
+   "Type",
+   "Marque",
+   "Couleur",
+   "CodeCL",
+   "AnModel",
+   "MoyKM",
+   "date_debut_assurance",
+   "date_fin_assurance",
+   "assureur",
+   "date_liv_visite",
+   "date_fin_visite",
+   "date_fin_taxe",
+   "date_pay_taxe",
+   "consom_moy_j",
+   "consom_carbur"
+  ],
+  "sample": "[{\"id_veh\":1,\"Matricule\":\"206TU7140\",\"NChassis\":\"WF7VB9HFAJZ044041\",\"AnneModel\":\"2018\",\"Type\":\"jumpy\",\"Marque\":\"CITROEN\",\"Couleur\":\"BLANC\",\"CodeCL\":0,\"AnModel\":\"\",\"MoyKM\":0,\"date_debut_assurance\":\"2024-12-28\",\"date_fin_assurance\":\"2025-12-27\",\"assureur\":\"ATTAKAFULIA\",\"date_liv_visite\":\"2023-12-02\",\"date_fin_visite\":\"2024-12-01\",\"date_fin_taxe\":\"2026-01-10\",\"date_pay_taxe\":\"2025-01-10\",\"consom_moy_j\":0,\"consom_carbur\":6.5}]"
+ },
+ {
+  "endpoint": "POST documents-achats/get-sum-documents",
+  "count": 1,
+  "keys": [
+   "ht",
+   "ttc",
+   "nbr"
+  ],
+  "sample": "[{\"ht\":null,\"ttc\":null,\"nbr\":0}]"
+ },
+ {
+  "endpoint": "POST documents-achats/filter-groups",
+  "keys": [
+   "types",
+   "fournisseurs"
+  ],
+  "sample": "{\"types\":[{\"Type_doc\":\"AV\",\"Carc_doc\":\"ARA\",\"Lib_doc\":\"Avoir\",\"compteur\":\"230001\",\"timbre\":\"0.000000\",\"T_stock\":\"N\",\"T_Solde\":\"D\",\"Nature_Doc\":\"Achat\",\"order_commercial\":2,\"couleur\":\"#e63c6f\",\"conditions\":\"\",\"id\":1,\"souche_ach\":1,\"mvt\":1,\"T_mvt\":\"T\",\"type_tourner\":\"document stock\",\"doc_stk\":0},{\"Type_doc\":\"BRE\",\"Carc_doc\":\"BAO\",\"Lib_doc\":\"Bon de reçeption\",\"compteur\":\"230001\",\"timbre\":\"0.000000\",\"T_stock\":\"E\",\"T_Solde\":\"C\",\"Nature_Doc\":\"Achat\",\"order_commercial\":4,\"couleur\":\"#e8c04a\",\"conditions\":\"\",\"id\":3,\"souche_ach\":0,\"mvt\":1,\"T_mvt\":\"T\",\"type_tourner\":\"document stock\",\"doc_stk\":0},{\"Type_doc\":\"BRE\",\"Carc_doc\":\"RRA\",\"Lib_doc\":\"Bon de retour\",\"compteur\":\"230001\",\"timbre\":\"0.000000\",\"T_stock\":\"S\",\"T_Solde\":\"D\",\"Nature_Doc\":\"Achat\",\"order_commercial\":4,\"couleur\":\"#ef589f\",\"conditions\":\"\",\"id\":4,\"souche_ach\":1,\"mvt\":0,\"T_mvt\":\"T\",\"type_tourner\":\"document stock\",\"doc_stk\":0},{\"Type_doc\":\"T"
+ },
+ {
+  "endpoint": "POST ordre_mission/",
+  "count": 2483,
+  "keys": [
+   "id_day",
+   "utilisateur",
+   "commercial",
+   "vehicule",
+   "date_ordre",
+   "km_depart",
+   "km_arrive",
+   "etat",
+   "du",
+   "au",
+   "id_users",
+   "id_vehicule"
+  ],
+  "sample": "[{\"id_day\":19,\"utilisateur\":\"Admin\",\"commercial\":\"ahmad ben romthane \",\"vehicule\":\"207TU2456\",\"date_ordre\":\"2024-02-23\",\"km_depart\":505395,\"km_arrive\":674282,\"etat\":\"Cloturé\",\"du\":\"2024-02-14 09:08:00\",\"au\":\"2025-09-01 16:06:00\",\"id_users\":2,\"id_vehicule\":11}]"
+ },
+ {
+  "endpoint": "POST motifs_annulation/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST documents-ventes/get-nomenclature-for-documents",
+  "keys": [
+   "produitsFinis",
+   "composants",
+   "commandes"
+  ],
+  "sample": "{\"produitsFinis\":[],\"composants\":[],\"commandes\":[]}"
+ },
+ {
+  "endpoint": "POST documents-ventes/get-sum-documents",
+  "count": 1,
+  "keys": [
+   "ht",
+   "ttc",
+   "nbr"
+  ],
+  "sample": "[{\"ht\":\"533241.118000\",\"ttc\":\"611989.012000\",\"nbr\":146}]"
+ },
+ {
+  "endpoint": "POST documents-ventes/get-filtered-documents",
+  "count": 50,
+  "keys": [
+   "Type_doc",
+   "Ref_doc",
+   "Lib_doc",
+   "Date_doc",
+   "Code_cli",
+   "Raison_social",
+   "adr_cli",
+   "MF",
+   "Num_Seq",
+   "tht_brut",
+   "tot_remise",
+   "tht_net",
+   "tot_tva",
+   "timbre",
+   "totfodec",
+   "ttc_net",
+   "enlettre",
+   "Utilisateur",
+   "Code_mag",
+   "ModePay",
+   "commentpayement",
+   "exo",
+   "assuj",
+   "nonsoumi",
+   "Solde_doc",
+   "generer",
+   "Facturer",
+   "Raison_social_com",
+   "Cara_doc",
+   "Redevance",
+   "chauffeur",
+   "matricule",
+   "conditions",
+   "ID_journee",
+   "cloturer",
+   "Taux_change",
+   "tot_dt",
+   "consult_num",
+   "poids",
+   "colis",
+   "km",
+   "panne",
+   "Etat_av",
+   "sortie_le",
+   "shipping",
+   "ID_prj",
+   "ID_pc",
+   "debut_prevu",
+   "fin_prevu",
+   "fin_reel",
+   "debut_reel",
+   "dayID",
+   "cash",
+   "card",
+   "checks",
+   "reference_ticket",
+   "echeance",
+   "mode_payement",
+   "etat",
+   "total_regle",
+   "num_doc_manuel",
+   "conditions_height",
+   "ttc_old",
+   "photo",
+   "valid_tech",
+   "valid_fin",
+   "liv_part",
+   "Annuler",
+   "Bloquer",
+   "Pointé",
+   "mt_imp",
+   "depot_du",
+   "depot_au",
+   "comptabiliser",
+   "commander",
+   "commander_par",
+   "motif",
+   "etat_of",
+   "date_lanc_prev",
+   "date_fin_prev",
+   "date_lanc_reel",
+   "date_fin_reel",
+   "duree_tot",
+   "num_ordre",
+   "transformer_of",
+   "couleur",
+   "id"
+  ],
+  "sample": "[{\"Type_doc\":\"OF\",\"Ref_doc\":\"OFA240614\",\"Lib_doc\":\"Ordre de fabrication\",\"Date_doc\":\"2026-06-24 10:27:00\",\"Code_cli\":0,\"Raison_social\":\"\",\"adr_cli\":\"\",\"MF\":\"\",\"Num_Seq\":240614,\"tht_brut\":\"-6201.976000\",\"tot_remise\":\"0.000000\",\"tht_net\":\"6201.976000\",\"tot_tva\":\"1107.769000\",\"timbre\":\"0.000000\",\"totfodec\":\"0.494000\",\"ttc_net\":\"7310.238000\",\"enlettre\":\"\",\"Utilisateur\":\"\",\"Code_mag\":1,\"ModePay\":null,\"commentpayement\":null,\"exo\":0,\"assuj\":0,\"nonsoumi\":0,\"Solde_doc\":\"-11786.115000\",\"generer\":0,\"Facturer\":0,\"Raison_social_com\":null,\"Cara_doc\":\"OFA\",\"Redevance\":null,\"chauffeur\":null,\"matricule\":null,\"conditions\":\"\",\"ID_journee\":null,\"cloturer\":null,\"Taux_change\":null,\"tot_dt\":null,\"consult_num\":null,\"poids\":null,\"colis\":null,\"km\":null,\"panne\":null,\"Etat_av\":\"\",\"sortie_le\":null,\"shipping\":null,\"ID_prj\":null,\"ID_pc\":null,\"debut_prevu\":null,\"fin_prevu\":null,\"fin_reel\":null,\"debut_reel\":null,\"dayID\""
+ },
+ {
+  "endpoint": "POST documents-ventes/filter-groups",
+  "keys": [
+   "types",
+   "clients"
+  ],
+  "sample": "{\"types\":[{\"Type_doc\":\"AV\",\"Carc_doc\":\"AVC\",\"Lib_doc\":\"Avoir\",\"compteur\":\"220001\",\"timbre\":\"0.000000\",\"T_stock\":\"E\",\"T_Solde\":\"C\",\"Nature_Doc\":\"Vente\",\"order_commercial\":2,\"couleur\":\"#e17440\",\"conditions\":\"\",\"modele_impression\":0,\"conditions_height\":0,\"souche\":0,\"id\":1,\"actif_endist\":0,\"avec_reg\":0,\"plafonner\":0,\"signature\":0},{\"Type_doc\":\"BR\",\"Carc_doc\":\"RRA\",\"Lib_doc\":\"Bon de retour\",\"compteur\":\"24001\",\"timbre\":\"0.000000\",\"T_stock\":\"E\",\"T_Solde\":\"C\",\"Nature_Doc\":\"Vente\",\"order_commercial\":2,\"couleur\":\"#e668b0\",\"conditions\":\"\",\"modele_impression\":0,\"conditions_height\":0,\"souche\":0,\"id\":4,\"actif_endist\":0,\"avec_reg\":0,\"plafonner\":0,\"signature\":0},{\"Type_doc\":\"OF\",\"Carc_doc\":\"OFA\",\"Lib_doc\":\"Ordre de fabrication\",\"compteur\":\"240001\",\"timbre\":\"0.000000\",\"T_stock\":\"E\",\"T_Solde\":\"N\",\"Nature_Doc\":\"Vente\",\"order_commercial\":0,\"couleur\":\"#916969\",\"conditions\":\"\",\"modele_impression\":0,\"condition"
+ },
+ {
+  "endpoint": "POST sous-familles-fournisseurs/",
+  "count": 22,
+  "keys": [
+   "sous_fam_cli"
+  ],
+  "sample": "[{\"sous_fam_cli\":\"Ardoise\"}]"
+ },
+ {
+  "endpoint": "POST fournisseurs/get-filtred-frs",
+  "keys": [
+   "fournisseurs",
+   "nbPages",
+   "nbrFrs"
+  ],
+  "sample": "{\"fournisseurs\":[{\"Code_cli\":40100001,\"Raison_social\":\"saber baklouti\",\"adr_cli\":\"\",\"codetva\":\"\",\"cletva\":\"\",\"categorietva\":\"\",\"etablisstva\":\"\",\"cin\":null,\"date_naiss\":null,\"solde_ini\":\"0.000000\",\"debit\":\"50648.433594\",\"credit\":\"48617.394531\",\"solde_fin\":\"-2031.039063\",\"Remise_def\":0,\"bloq\":null,\"plafond_encour\":null,\"par_def\":null,\"Sous_fam_cli\":\"Ardoise\",\"Fam_cli\":\"ardoise plastique\",\"registre_com\":null,\"exo\":null,\"assuj\":1,\"nonsoumi\":null,\"exploi\":1,\"Charge\":null,\"personnel\":null,\"site_web\":\"\",\"is_employe\":0,\"ville\":\"\",\"tel\":\"\",\"fax\":\"\",\"email\":\"\",\"archiver\":0,\"date_creation\":\"2025-01-20 11:56:41\",\"date_achat\":\"2026-04-24 10:38:00\",\"ref_achat\":\"BAO230444\",\"valeur_achat\":294,\"lib_doc\":\"Bon de reçeption\",\"type_doc\":\"BRE\",\"cara_doc\":\"BAO\",\"nbr_jours\":0,\"impayer\":0,\"encours\":5846.04,\"risque_total\":3626},{\"Code_cli\":40100002,\"Raison_social\":\"next\",\"adr_cli\":\"ben arousse\",\"codetva\":\"\",\"clet"
+ },
+ {
+  "endpoint": "POST familles-fournisseurs/",
+  "count": 27,
+  "keys": [
+   "fam_cli"
+  ],
+  "sample": "[{\"fam_cli\":\"ardoise\"}]"
+ },
+ {
+  "endpoint": "POST maj_prix_via_achat/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST type-documents-achat//get-one",
+  "keys": [
+   "Type_doc",
+   "Carc_doc",
+   "Lib_doc",
+   "compteur",
+   "timbre",
+   "T_stock",
+   "T_Solde",
+   "Nature_Doc",
+   "order_commercial",
+   "couleur",
+   "conditions",
+   "id",
+   "souche_ach",
+   "mvt",
+   "T_mvt",
+   "type_tourner",
+   "doc_stk"
+  ],
+  "sample": "{\"Type_doc\":\"DEM\",\"Carc_doc\":\"DEM\",\"Lib_doc\":\"Demande dachat\",\"compteur\":\"220000\",\"timbre\":\"0.000000\",\"T_stock\":\"N\",\"T_Solde\":\"N\",\"Nature_Doc\":\"Achat\",\"order_commercial\":1,\"couleur\":\"#3dbced\",\"conditions\":\"\",\"id\":6,\"souche_ach\":0,\"mvt\":1,\"T_mvt\":\"\",\"type_tourner\":\"\",\"doc_stk\":0}"
+ },
+ {
+  "endpoint": "POST articles/get-by-reference-designation-vente",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST documents-achats/entete/c/false",
+  "keys": [
+   "fournisseurs",
+   "articles"
+  ],
+  "sample": "{\"fournisseurs\":[{\"Code_cli\":40100001,\"Raison_social\":\"saber baklouti\",\"adr_cli\":\"\",\"codetva\":\"\",\"cletva\":\"\",\"categorietva\":\"\",\"etablisstva\":\"\",\"cin\":null,\"date_naiss\":null,\"solde_ini\":\"0.000000\",\"debit\":\"50648.433594\",\"credit\":\"48617.394531\",\"solde_fin\":\"-2031.039063\",\"Remise_def\":0,\"bloq\":null,\"plafond_encour\":null,\"par_def\":null,\"Sous_fam_cli\":\"Ardoise\",\"Fam_cli\":\"ardoise plastique\",\"registre_com\":null,\"exo\":null,\"assuj\":1,\"nonsoumi\":null,\"exploi\":1,\"Charge\":null,\"personnel\":null,\"site_web\":\"\",\"is_employe\":0,\"ville\":\"\",\"tel\":\"\",\"fax\":\"\",\"email\":\"\",\"archiver\":0,\"date_creation\":\"2025-01-20 11:56:41\",\"date_achat\":\"2026-04-24 10:38:00\",\"ref_achat\":\"BAO230444\",\"valeur_achat\":294,\"lib_doc\":\"Bon de reçeption\",\"type_doc\":\"BRE\",\"cara_doc\":\"BAO\",\"nbr_jours\":0,\"impayer\":0,\"encours\":5846.04,\"risque_total\":3626},{\"Code_cli\":40100002,\"Raison_social\":\"next\",\"adr_cli\":\"ben arousse\",\"codetva\":\"\",\"clet"
+ },
+ {
+  "endpoint": "POST familles-clients/",
+  "count": 9,
+  "keys": [
+   "fam_cli",
+   "id_fam"
+  ],
+  "sample": "[{\"fam_cli\":\"vente en gros\",\"id_fam\":5}]"
+ },
+ {
+  "endpoint": "POST sous-familles-clients/",
+  "count": 38,
+  "keys": [
+   "sous_fam_cli",
+   "id_sous_fam_cl"
+  ],
+  "sample": "[{\"sous_fam_cli\":\"Ariana\",\"id_sous_fam_cl\":13}]"
+ },
+ {
+  "endpoint": "POST clients/get-filtred-clients",
+  "keys": [
+   "clients",
+   "nbPages",
+   "nbrClients",
+   "solde"
+  ],
+  "sample": "{\"clients\":[{\"sousFam\":null,\"famClient\":null,\"date\":\"0000-00-00 00:00:00\",\"montant\":0,\"Lib_doc\":\"undefined\",\"qte\":0,\"Type_doc\":\"und\",\"Cara_doc\":\"und\",\"num_doc\":\"undefined\",\"nbr_jours\":0,\"date_reclamation\":\"0000-00-00 00:00:00\",\"nbr_jours_reclamation\":0,\"reclamation\":\"undefined\",\"nbr_jours_final\":0,\"Code_cli\":0,\"tel\":\"\",\"Raison_social\":\"passager\",\"adr_cli\":\"\",\"codetva\":\"167\",\"cletva\":\"\",\"categorietva\":\"\",\"etablisstva\":\"\",\"cin\":null,\"date_naiss\":null,\"solde_ini\":\"0.000000\",\"debit\":\"1479.166992\",\"credit\":\"1479.166992\",\"solde_fin\":\"0.000000\",\"Remise_def\":0,\"bloq\":0,\"plafond_encour\":\"0.000000\",\"par_def\":0,\"Sous_fam_cli\":null,\"Fam_cli\":\"passager\",\"registre_com\":\"\",\"MF\":\"\",\"exo\":0,\"assuj\":1,\"nonsoumi\":0,\"tarif\":1,\"ModePay\":null,\"cd\":null,\"Fodec_type\":1,\"autorisation\":null,\"timbre\":1,\"redevance\":0,\"num_carte\":0,\"wholesaler\":0,\"commercial\":\"\",\"ville\":\"\",\"gouvernorat\":\"NABEUL\",\"longitude\":\"\",\"date"
+ },
+ {
+  "endpoint": "POST users/",
+  "count": 43,
+  "keys": [
+   "utilisateur",
+   "Activer",
+   "Code_mag",
+   "password",
+   "mod_stock",
+   "mod_client",
+   "mod_vente",
+   "mod_frs",
+   "mod_achat",
+   "mod_tresorerie",
+   "mod_compta",
+   "mod_charges",
+   "mod_garage",
+   "mod_paramétrages",
+   "Mod_outil",
+   "mod_impression",
+   "mod_gpao",
+   "password_del",
+   "id",
+   "souche",
+   "caisse",
+   "souche_ach",
+   "commercial",
+   "application",
+   "Code_cli",
+   "bloquer",
+   "tokenFireBase"
+  ],
+  "sample": "[{\"utilisateur\":\"Admin\",\"Activer\":null,\"Code_mag\":1,\"password\":\"0502765210\",\"mod_stock\":null,\"mod_client\":null,\"mod_vente\":null,\"mod_frs\":null,\"mod_achat\":null,\"mod_tresorerie\":null,\"mod_compta\":null,\"mod_charges\":null,\"mod_garage\":null,\"mod_paramétrages\":null,\"Mod_outil\":null,\"mod_impression\":null,\"mod_gpao\":null,\"password_del\":\"\",\"id\":1,\"souche\":0,\"caisse\":0,\"souche_ach\":0,\"commercial\":\"sky edition \",\"application\":\"manager\",\"Code_cli\":0,\"bloquer\":0,\"tokenFireBase\":\"\"}]"
+ },
+ {
+  "endpoint": "POST opportunite_produit/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST opportunites/get-all-opportunite-article",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST pipeline/",
+  "keys": [
+   "code",
+   "errno",
+   "sqlState",
+   "sqlMessage",
+   "sql"
+  ],
+  "sample": "{\"code\":\"ER_NO_SUCH_TABLE\",\"errno\":1146,\"sqlState\":\"42S02\",\"sqlMessage\":\"Table 'bis.pipeline' doesn't exist\",\"sql\":\"SELECT * FROM pipeline\"}"
+ },
+ {
+  "endpoint": "POST clients/get-filtred-clients-contact",
+  "keys": [
+   "clients",
+   "nbPages",
+   "nbrClients",
+   "solde"
+  ],
+  "sample": "{\"clients\":[{\"Code_cli\":0,\"type\":\"Client\",\"Raison_social\":\"passager\",\"adr_cli\":\"\",\"codetva\":\"167\",\"cletva\":\"\",\"categorietva\":\"\",\"etablisstva\":\"\",\"cin\":null,\"date_naiss\":null,\"solde_ini\":\"0.000000\",\"debit\":\"1479.166992\",\"credit\":\"1479.166992\",\"solde_fin\":\"0.000000\",\"Remise_def\":0,\"bloq\":0,\"plafond_encour\":\"0.000000\",\"par_def\":0,\"Sous_fam_cli\":null,\"Fam_cli\":\"passager\",\"registre_com\":\"\",\"exo\":0,\"assuj\":1,\"nonsoumi\":0,\"tarif\":1,\"ModePay\":null,\"cd\":null,\"Fodec_type\":1,\"autorisation\":null,\"num_carte\":0,\"wholesaler\":0,\"commercial\":\"\",\"timbre\":1,\"redevance\":0,\"MF\":\"\",\"site_web\":\"\",\"ville\":\"\",\"tel\":\"\",\"longitude\":\"\",\"latitude\":\"\",\"gouvernorat\":\"NABEUL\",\"date_creation\":\"2024-01-01 23:59:00\",\"traite\":0,\"cheque\":0,\"virement\":0,\"espece\":0,\"login\":\"\",\"password\":\"\",\"slogan\":\"\",\"logo\":\"\",\"aucune_visite\":0,\"vente\":0,\"type_reclamation\":0,\"date\":\"0000-00-00 00:00:00\",\"montant\":0,\"Lib_doc\":\"undefined\",\"qte"
+ },
+ {
+  "endpoint": "POST articles/get-by-reference-designation",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST fournisseurs//get-all-by-attr",
+  "count": 7,
+  "keys": [
+   "Code_cli",
+   "Raison_social",
+   "adr_cli",
+   "codetva",
+   "cletva",
+   "categorietva",
+   "etablisstva",
+   "cin",
+   "date_naiss",
+   "solde_ini",
+   "debit",
+   "credit",
+   "solde_fin",
+   "Remise_def",
+   "bloq",
+   "plafond_encour",
+   "par_def",
+   "Sous_fam_cli",
+   "Fam_cli",
+   "registre_com",
+   "exo",
+   "assuj",
+   "nonsoumi",
+   "exploi",
+   "Charge",
+   "personnel",
+   "site_web",
+   "is_employe",
+   "ville",
+   "tel",
+   "fax",
+   "email",
+   "archiver",
+   "date_creation",
+   "date_achat",
+   "ref_achat",
+   "valeur_achat",
+   "lib_doc",
+   "type_doc",
+   "cara_doc",
+   "nbr_jours",
+   "impayer",
+   "encours",
+   "risque_total"
+  ],
+  "sample": "[{\"Code_cli\":4150001,\"Raison_social\":\"Serine chaari\",\"adr_cli\":\"\",\"codetva\":null,\"cletva\":null,\"categorietva\":null,\"etablisstva\":null,\"cin\":null,\"date_naiss\":\"1997-11-16\",\"solde_ini\":\"0.000000\",\"debit\":\"820.000000\",\"credit\":\"0.000000\",\"solde_fin\":\"-820.000000\",\"Remise_def\":0,\"bloq\":0,\"plafond_encour\":\"0.000000\",\"par_def\":0,\"Sous_fam_cli\":\"\",\"Fam_cli\":\"\",\"registre_com\":\"\",\"exo\":0,\"assuj\":0,\"nonsoumi\":0,\"exploi\":0,\"Charge\":1,\"personnel\":0,\"site_web\":\"\",\"is_employe\":1,\"ville\":\"\",\"tel\":\"\",\"fax\":\"\",\"email\":\"\",\"archiver\":0,\"date_creation\":\"2025-01-20 11:56:41\",\"date_achat\":null,\"ref_achat\":\"\",\"valeur_achat\":0,\"lib_doc\":\"\",\"type_doc\":\"\",\"cara_doc\":\"\",\"nbr_jours\":0,\"impayer\":0,\"encours\":0,\"risque_total\":0}]"
+ },
+ {
+  "endpoint": "POST grh_fonction/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST crm_ticket_support/get-filtered-tickets",
+  "keys": [
+   "data",
+   "total"
+  ],
+  "sample": "{\"data\":[],\"total\":0}"
+ },
+ {
+  "endpoint": "POST type_panne/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST machines/",
+  "count": 0,
+  "sample": "[]"
+ },
+ {
+  "endpoint": "POST gpao_poste_charge/",
+  "count": 0,
+  "sample": "[]"
+ }
+]

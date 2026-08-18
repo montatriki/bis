@@ -1,0 +1,62 @@
+[
+ {
+  "ID_Bord": 4,
+  "Date_bord": "2025-01-04 00:00:00",
+  "Num_compte": "5",
+  "total_bord": "961.500000",
+  "Type_brd": "Chèque",
+  "MT_esp": "0.000000",
+  "Empl_actuel": "4",
+  "utilisateur": "",
+  "compte_du": "ATTIJARI 149 00 55 61 48 79 03",
+  "compte_au": "caisse"
+ },
+ {
+  "ID_Bord": 5,
+  "Date_bord": "2025-01-04 00:00:00",
+  "Num_compte": "5",
+  "total_bord": "773.410000",
+  "Type_brd": "Chèque",
+  "MT_esp": "0.000000",
+  "Empl_actuel": "4",
+  "utilisateur": "",
+  "compte_du": "ATTIJARI 149 00 55 61 48 79 03",
+  "compte_au": "caisse"
+ },
+ {
+  "ID_Bord": 3,
+  "Date_bord": "2024-11-08 00:00:00",
+  "Num_compte": "3",
+  "total_bord": "288.750000",
+  "Type_brd": "Chèque",
+  "MT_esp": "0.000000",
+  "Empl_actuel": "4",
+  "utilisateur": "",
+  "compte_du": "ATTIJARI",
+  "compte_au": "caisse"
+ },
+ {
+  "ID_Bord": 1,
+  "Date_bord": "2024-10-07 00:00:00",
+  "Num_compte": "3",
+  "total_bord": "4631.000000",
+  "Type_brd": "Chèque",
+  "MT_esp": "0.000000",
+  "Empl_actuel": "4",
+  "utilisateur": "",
+  "compte_du": "ATTIJARI",
+  "compte_au": "caisse"
+ },
+ {
+  "ID_Bord": 2,
+  "Date_bord": "2024-10-07 00:00:00",
+  "Num_compte": "4",
+  "total_bord": "8436.000000",
+  "Type_brd": "Chèque",
+  "MT_esp": "0.000000",
+  "Empl_actuel": "4",
+  "utilisateur": "",
+  "compte_du": "caisse",
+  "compte_au": "caisse"
+ }
+]

@@ -1,0 +1,2265 @@
+{
+ "STOCK": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Produits",
+   "MATIERES",
+   "P.SEMI FINI",
+   "LES INVENTAIRES",
+   "Documents de stock",
+   "Mouvement de stock",
+   "Allocation stock",
+   "Transferts",
+   "Dépots",
+   "Rapports",
+   "LIST OFs",
+   "Paramétrages Stock"
+  ],
+  "pages": [
+   {
+    "item": "Produits",
+    "url": "http://41.226.17.73:3001/inventoryModule/products-management",
+    "headers": [
+     "Référence",
+     "Code à barre",
+     "Désignation",
+     "Catalogue",
+     "Famille",
+     "S.Famille",
+     "En stock",
+     "Pu achat.HT",
+     "T1.HT",
+     "T1.TTC",
+     "Dernière ACHAT",
+     "date",
+     "valeur achat",
+     "Nbr jours",
+     "Dernière VENTE",
+     "valeur vente",
+     "​",
+     "libellé\n​\n​",
+     "Nom dépot",
+     "Quantité",
+     "Mouvement d'article",
+     "Maj Stock",
+     "none"
+    ],
+    "buttons": [
+     "INV220201",
+     "341",
+     "NULL",
+     "0",
+     "INV220510",
+     "108",
+     "TIC248413",
+     "111",
+     "INV220507",
+     "BAO230044",
+     "106",
+     "TRD241771",
+     "113",
+     "TIC248401",
+     "INV220493",
+     "116",
+     "BTR242030",
+     "107",
+     "TIC248489",
+     "TIC248140",
+     "128",
+     "FAO230167",
+     "27",
+     "RAO230001",
+     "92",
+     "BTR242094",
+     "98",
+     "TIC248658"
+    ],
+    "api": [
+     "POST articles-groups/",
+     "POST articles/get-filtred-article",
+     "POST articles-groups/createGroup",
+     "POST depots/get-depot-by-ref/undefined",
+     "POST depots/"
+    ]
+   },
+   {
+    "item": "MATIERES",
+    "url": "http://41.226.17.73:3001/inventoryModule/liste-matiere",
+    "headers": [
+     "Référence",
+     "Code à barre",
+     "Désignation",
+     "Catalogue",
+     "Famille",
+     "S.Famille",
+     "En stock",
+     "Pu achat.HT",
+     "T1.HT",
+     "T1.TTC",
+     "Dernière ACHAT",
+     "date",
+     "valeur achat",
+     "Nbr jours",
+     "Dernière VENTE",
+     "valeur vente",
+     "​",
+     "libellé\n​\n​",
+     "Nom dépot",
+     "Quantité",
+     "Mouvement d'article",
+     "Maj Stock",
+     "none"
+    ],
+    "buttons": [
+     "INV220625",
+     "4",
+     "NULL",
+     "0",
+     "INV220623",
+     "33",
+     "FAO230164",
+     "114",
+     "BAO230484",
+     "8",
+     "111",
+     "INV220453",
+     "160",
+     "FAO230071",
+     "342",
+     "INV220610",
+     "INV220127",
+     "339",
+     "INV220630",
+     "BAO230455",
+     "31",
+     "INV220552",
+     "65",
+     "BAO230408",
+     "38",
+     "INV220464",
+     "144",
+     "BAO230208",
+     "305",
+     "43",
+     "FAO230145",
+     "116",
+     "INV220614",
+     "77",
+     "BAO230402"
+    ],
+    "api": [
+     "POST articles-groups/",
+     "POST articles/get-filtred-article"
+    ]
+   },
+   {
+    "item": "P.SEMI FINI",
+    "url": "http://41.226.17.73:3001/inventoryModule/liste-semi-fini",
+    "headers": [
+     "Référence",
+     "Code à barre",
+     "Désignation",
+     "Catalogue",
+     "Famille",
+     "S.Famille",
+     "En stock",
+     "Pu achat.HT",
+     "T1.HT",
+     "T1.TTC",
+     "Dernière ACHAT",
+     "date",
+     "valeur achat",
+     "Nbr jours",
+     "Dernière VENTE",
+     "valeur vente",
+     "​",
+     "libellé\n​\n​",
+     "Nom dépot",
+     "Quantité",
+     "Mouvement d'article",
+     "Maj Stock",
+     "none"
+    ],
+    "buttons": [
+     "FAO230041",
+     "365",
+     "NULL",
+     "0"
+    ],
+    "api": [
+     "POST articles/get-filtred-article",
+     "POST articles-groups/"
+    ]
+   },
+   {
+    "item": "LES INVENTAIRES",
+    "url": "http://41.226.17.73:3001/inventoryModule/liste-documents-inventaires",
+    "headers": [
+     "#",
+     "Libéllé",
+     "Date"
+    ],
+    "buttons": [],
+    "api": [
+     "POST documents-achats/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "Documents de stock",
+    "url": "http://41.226.17.73:3001/inventoryModule/liste-doc-stock",
+    "headers": [
+     "#",
+     "Libéllé",
+     "Date"
+    ],
+    "buttons": [],
+    "api": [
+     "POST documents-achats/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "Mouvement de stock",
+    "url": "http://41.226.17.73:3001/inventoryModule/mouvements-article-all",
+    "headers": [],
+    "buttons": [
+     "AFFICHER",
+     "IMPRIMER",
+     "EXCEL"
+    ],
+    "api": [
+     "POST depots/"
+    ]
+   },
+   {
+    "item": "Allocation stock",
+    "url": "http://41.226.17.73:3001/inventoryModule/mouvements-article-all",
+    "headers": [],
+    "buttons": [
+     "+",
+     "AFFICHER",
+     "IMPRIMER",
+     "EXCEL"
+    ],
+    "api": []
+   },
+   {
+    "item": "Transferts",
+    "url": "http://41.226.17.73:3001/inventoryModule/liste-transfer",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "Timbre: 0.000",
+     "Nombre de lignes : 50"
+    ],
+    "buttons": [
+     "1"
+    ],
+    "api": [
+     "POST commerciaux/",
+     "POST vehicules/",
+     "POST depots/",
+     "POST documents-achats/get-sum-documents",
+     "POST documents-achats/filter-groups",
+     "POST documents-achats/get-filtered-documents",
+     "POST ordre_mission/"
+    ]
+   },
+   {
+    "item": "Dépots",
+    "url": "http://41.226.17.73:3001/inventoryModule/gestion-depots",
+    "headers": [
+     "#",
+     "Libellé",
+     "Matricule",
+     "Type(fixe/mobile)",
+     "Actions"
+    ],
+    "buttons": [
+     "AJOUTER"
+    ],
+    "api": [
+     "POST vehicules/",
+     "POST depots/"
+    ]
+   },
+   {
+    "item": "Rapports",
+    "url": "http://41.226.17.73:3001/impressions-module/etat-stock",
+    "headers": [
+     "RÉF",
+     "DÉSIGNATION",
+     "QTE",
+     "Nombre de ligne : 0"
+    ],
+    "buttons": [
+     "RÉSULTAT",
+     "EXCEL"
+    ],
+    "api": [
+     "POST depots/",
+     "POST articles-groups/"
+    ]
+   },
+   {
+    "item": "LIST OFs",
+    "url": "http://41.226.17.73:3001/inventoryModule/liste-orders-fabrications",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "TCL: 1223.978 Timbre: 0.000",
+     "Nombre de lignes : 50"
+    ],
+    "buttons": [
+     "1"
+    ],
+    "api": [
+     "POST commerciaux/",
+     "POST motifs_annulation/",
+     "POST documents-ventes/get-nomenclature-for-documents",
+     "POST documents-ventes/get-sum-documents",
+     "POST documents-ventes/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "Paramétrages Stock",
+    "url": "http://41.226.17.73:3001/inventoryModule/parametrages/stkSetting",
+    "headers": [],
+    "buttons": [],
+    "api": [
+     "POST documents-ventes/filter-groups"
+    ]
+   }
+  ]
+ },
+ "ACHAT": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Fournisseurs",
+   "Documents Frs",
+   "Demande de devis",
+   "Devis",
+   "B.Commande",
+   "Importation",
+   "B.Réçeption",
+   "B.Retour",
+   "Facture",
+   "Avoir",
+   "Rapport",
+   "Paramétrages achat"
+  ],
+  "pages": [
+   {
+    "item": "Fournisseurs",
+    "url": "http://41.226.17.73:3001/buys-module/gestion-fournisseur",
+    "headers": [
+     "N°",
+     "Code",
+     "Raison social",
+     "Solde initial",
+     "Débit",
+     "Crédit",
+     "Solde",
+     "Famille",
+     "Sous famille",
+     "Archiver",
+     "Dernière ACHAT",
+     "Date",
+     "montant",
+     "Nbr jours",
+     "​",
+     "libellé\n​\n​",
+     "initial",
+     "Nombre de ligne : 20"
+    ],
+    "buttons": [
+     "-2031.039",
+     "BAO230444",
+     "0",
+     "0.000",
+     "FAO230070",
+     "399",
+     "1723.274",
+     "BAO230475",
+     "39285.734",
+     "BAO230473",
+     "45",
+     "116166.974",
+     "BAO230468",
+     "6",
+     "FAO230009",
+     "615",
+     "BAO230141",
+     "330",
+     "-0.003",
+     "FAO230175",
+     "-0.016",
+     "BAO230352",
+     "2",
+     "29.690",
+     "BAO230436",
+     "1",
+     "4292.539",
+     "BAO230447",
+     "266.216",
+     "BAO230477",
+     "BAO230200",
+     "229",
+     "68325.758",
+     "BAO230390",
+     "3472.851",
+     "FAO230173",
+     "29",
+     "BAO230127",
+     "355",
+     "27526.672",
+     "FAO230166",
+     "41",
+     "62820.688",
+     "BAO230476"
+    ],
+    "api": [
+     "POST sous-familles-fournisseurs/",
+     "POST fournisseurs/get-filtred-frs",
+     "POST familles-fournisseurs/"
+    ]
+   },
+   {
+    "item": "Documents Frs",
+    "url": "http://41.226.17.73:3001/buys-module/list-document-buys",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "Timbre: 0.000",
+     "Nombre de lignes : 0"
+    ],
+    "buttons": [],
+    "api": [
+     "POST commerciaux/",
+     "POST vehicules/",
+     "POST depots/",
+     "POST documents-achats/get-sum-documents",
+     "POST documents-achats/filter-groups",
+     "POST documents-achats/get-filtered-documents",
+     "POST ordre_mission/"
+    ]
+   },
+   {
+    "item": "Demande de devis",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/DEM",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": [
+     "POST vehicules/",
+     "POST depots/",
+     "POST maj_prix_via_achat/",
+     "POST type-documents-achat//get-one",
+     "POST articles/get-by-reference-designation-vente",
+     "POST documents-achats/entete/c/false"
+    ]
+   },
+   {
+    "item": "Devis",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/DEV",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": [
+     "POST type-documents-achat//get-one",
+     "POST documents-achats/entete/c/false"
+    ]
+   },
+   {
+    "item": "B.Commande",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/CAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": [
+     "POST type-documents-achat//get-one",
+     "POST documents-achats/entete/c/false"
+    ]
+   },
+   {
+    "item": "Importation",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/IMP",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": [
+     "POST type-documents-achat//get-one",
+     "POST documents-achats/entete/c/false"
+    ]
+   },
+   {
+    "item": "B.Réçeption",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/IMP",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": []
+   },
+   {
+    "item": "B.Retour",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/RAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": [
+     "POST type-documents-achat//get-one",
+     "POST documents-achats/entete/c/false"
+    ]
+   },
+   {
+    "item": "Facture",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/FAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": [
+     "POST type-documents-achat//get-one"
+    ]
+   },
+   {
+    "item": "Avoir",
+    "url": "http://41.226.17.73:3001/buys-module/create-devis/FAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Charges"
+    ],
+    "api": []
+   },
+   {
+    "item": "Rapport",
+    "url": "http://41.226.17.73:3001/buys-module/RapportAchat",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   },
+   {
+    "item": "Paramétrages achat",
+    "url": "http://41.226.17.73:3001/buys-module/parametrage",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   }
+  ]
+ },
+ "CRM": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Contacts",
+   "opportunités",
+   "Mailing",
+   "Gestion des tickets SAV",
+   "Paramétrages CRM"
+  ],
+  "pages": [
+   {
+    "item": "Contacts",
+    "url": "http://41.226.17.73:3001/crm-module/liste-des-clients",
+    "headers": [
+     "Raison social",
+     "initial",
+     "Débit",
+     "Crédit",
+     "Solde",
+     "Nombre de ligne : 0"
+    ],
+    "buttons": [],
+    "api": [
+     "POST familles-clients/",
+     "POST sous-familles-clients/",
+     "POST clients/get-filtred-clients"
+    ]
+   },
+   {
+    "item": "opportunités",
+    "url": "http://41.226.17.73:3001/CRMmodule/pipeline",
+    "headers": [],
+    "buttons": [
+     "PIPELINE",
+     "RECHERCHER DES PROSPECTS EN LIGE",
+     "OPPORTUNITÉ",
+     "AFFICHER TOUT"
+    ],
+    "api": [
+     "POST users/",
+     "POST opportunite_produit/",
+     "POST opportunites/get-all-opportunite-article",
+     "POST pipeline/"
+    ]
+   },
+   {
+    "item": "Mailing",
+    "url": "http://41.226.17.73:3001/crm-module/mailing",
+    "headers": [
+     "Raison social",
+     "initial",
+     "Débit",
+     "Crédit",
+     "Solde",
+     "Nombre de ligne : 0"
+    ],
+    "buttons": [
+     "SEND EMAIL"
+    ],
+    "api": [
+     "POST familles-clients/",
+     "POST sous-familles-clients/",
+     "POST clients/get-filtred-clients-contact"
+    ]
+   },
+   {
+    "item": "Gestion des tickets SAV",
+    "url": "http://41.226.17.73:3001/crm-module/ticketSav",
+    "headers": [
+     "Client",
+     "Date de réclamation",
+     "Réclamation",
+     "Etat",
+     "Intervenant",
+     "Date Intervention",
+     "Machine",
+     "Num série"
+    ],
+    "buttons": [
+     "TICKET SAV",
+     "TRANSFORMER"
+    ],
+    "api": [
+     "POST type-documents-vente/",
+     "POST articles/get-by-reference-designation",
+     "POST fournisseurs//get-all-by-attr",
+     "POST grh_fonction/",
+     "POST crm_ticket_support/get-filtered-tickets",
+     "POST type_panne/"
+    ]
+   },
+   {
+    "item": "Paramétrages CRM",
+    "url": "http://41.226.17.73:3001/crm-module/parametrage-crm",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   }
+  ]
+ },
+ "VENTE": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Clients",
+   "Documents client",
+   "Suivie commande",
+   "Cloturer caisse",
+   "Dem.devis",
+   "devis",
+   "B.Commande",
+   "B.Livraison",
+   "B.Sortie",
+   "B.Retour",
+   "Facture",
+   "Avoir",
+   "Rapports",
+   "Gestion des commerciaux",
+   "Suivi des numéros de série",
+   "Paramétrages"
+  ],
+  "pages": [
+   {
+    "item": "Clients",
+    "url": "http://41.226.17.73:3001/vente-module/liste-des-clients",
+    "headers": [
+     "Nbr clients:\n4429",
+     "Raison social",
+     "Distance",
+     "Date de création",
+     "Tél",
+     "Commercial",
+     "Adresse",
+     "Solde",
+     "Famille",
+     "Gouvernorat",
+     "Ville",
+     "Dernière visite",
+     "montant",
+     "date",
+     "Nbr jours",
+     "​",
+     "zone de départ\nzone de départ",
+     "FILTRER",
+     "Sélectionner commercial\nSélectionner commercial",
+     "Gouvernorat\nGouvernorat",
+     "ville\nville",
+     "libellé\n​\n​",
+     "initial",
+     "Débit",
+     "Crédit",
+     "Nombre de ligne : 0"
+    ],
+    "buttons": [
+     "FILTRER",
+     "0.000",
+     "UNDEFINED",
+     "TIC246815",
+     "TIC251846",
+     "RECLAMATION",
+     "TIC243262",
+     "-1.119",
+     "TIC252735",
+     "TIC240578",
+     "TIC252147",
+     "TIC243548",
+     "TIC253260",
+     "-0.995",
+     "TIC253396",
+     "1584.098",
+     "TIC252844",
+     "TIC242941",
+     "TIC241488",
+     "TIC253068",
+     "TIC240611",
+     "TIC240260",
+     "TIC252498"
+    ],
+    "api": [
+     "POST vehicules/",
+     "POST commerciaux/",
+     "POST familles-clients/",
+     "POST sous-familles-clients/",
+     "POST zone_depart/",
+     "POST ordre_mission/",
+     "POST clients/get-filtred-clients"
+    ]
+   },
+   {
+    "item": "Documents client",
+    "url": "http://41.226.17.73:3001/vente-module/liste-documents-vente",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "TCL: 1538.846 Timbre: 0.000",
+     "Nombre de lignes : 50"
+    ],
+    "buttons": [
+     "1"
+    ],
+    "api": [
+     "POST commerciaux/",
+     "POST documents-ventes/get-nomenclature-for-documents",
+     "POST motifs_annulation/",
+     "POST documents-ventes/get-sum-documents",
+     "POST documents-ventes/get-filtered-documents",
+     "POST documents-ventes/filter-groups"
+    ]
+   },
+   {
+    "item": "Suivie commande",
+    "url": "http://41.226.17.73:3001/vente-module/suivie-cmd",
+    "headers": [],
+    "buttons": [
+     "Commander 0",
+     "Réçeption 0",
+     "Payement",
+     "Livrer"
+    ],
+    "api": [
+     "POST type-documents-achat//get-all-by-attr",
+     "POST documents-ventes/get-suivie-documents-nbr",
+     "POST documents-ventes/get-suivie-documents"
+    ]
+   },
+   {
+    "item": "Cloturer caisse",
+    "url": "http://41.226.17.73:3001/vente-module/cloturer-caisse-bis",
+    "headers": [
+     "Date",
+     "Document",
+     "Client",
+     "Valeur TTC",
+     "Réglé",
+     "Solde"
+    ],
+    "buttons": [],
+    "api": [
+     "POST type-documents-achat//get-all-by-attr",
+     "POST documents-ventes/get-documents-caisse",
+     "POST reglements-clients/get-reglements-caisse",
+     "POST documents-ventes/filter-groups",
+     "POST documents-ventes/get-depense-caisse",
+     "POST documents-ventes/get-fond-caisse"
+    ]
+   },
+   {
+    "item": "Dem.devis",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/DEM",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST clients//get-one",
+     "POST depots/",
+     "POST documents-ventes/get-article-historique",
+     "POST vente_achat_compta/",
+     "POST type-documents-vente//get-one",
+     "POST articles/get-by-reference-designation-vente"
+    ]
+   },
+   {
+    "item": "devis",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/DAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST documents-ventes/filter-groups",
+     "POST type-documents-vente//get-one"
+    ]
+   },
+   {
+    "item": "B.Commande",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/DAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST documents-ventes/entete/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpcF9hZHJlc3MiOiI6OmZmZmY6MTAyLjEwNy4xOTYuMyIsImxvZ2luIjoiYWRtaW4iLCJwYXNzd29yZCI6IjA1MDI3NjUyMTAiLCJkYiI6ImJpcyIsImlhdCI6MTc4MjMwODg2MH0.QpJPj-Uf-IRHy6uQ0RJnM9au_D8VdH1eCJbMIx5TNYE"
+    ]
+   },
+   {
+    "item": "B.Livraison",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/BAO",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST type-documents-vente//get-one"
+    ]
+   },
+   {
+    "item": "B.Sortie",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis",
+    "headers": [],
+    "buttons": [],
+    "api": [
+     "POST documents-ventes/entete/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpcF9hZHJlc3MiOiI6OmZmZmY6MTAyLjEwNy4xOTYuMyIsImxvZ2luIjoiYWRtaW4iLCJwYXNzd29yZCI6IjA1MDI3NjUyMTAiLCJkYiI6ImJpcyIsImlhdCI6MTc4MjMwODg2MH0.QpJPj-Uf-IRHy6uQ0RJnM9au_D8VdH1eCJbMIx5TNYE"
+    ]
+   },
+   {
+    "item": "B.Retour",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/RRA",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST clients//get-one",
+     "POST depots/",
+     "POST documents-ventes/get-article-historique",
+     "POST vente_achat_compta/",
+     "POST type-documents-vente//get-one",
+     "POST articles/get-by-reference-designation-vente"
+    ]
+   },
+   {
+    "item": "Facture",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/FRA",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST type-documents-vente//get-one"
+    ]
+   },
+   {
+    "item": "Avoir",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/AVC",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST type-documents-vente//get-one",
+     "POST documents-ventes/entete/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpcF9hZHJlc3MiOiI6OmZmZmY6MTAyLjEwNy4xOTYuMyIsImxvZ2luIjoiYWRtaW4iLCJwYXNzd29yZCI6IjA1MDI3NjUyMTAiLCJkYiI6ImJpcyIsImlhdCI6MTc4MjMwODg2MH0.QpJPj-Uf-IRHy6uQ0RJnM9au_D8VdH1eCJbMIx5TNYE"
+    ]
+   },
+   {
+    "item": "Rapports",
+    "url": "http://41.226.17.73:3001/vente-module/create-devis/AVC",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd",
+     "Code",
+     "Raison social",
+     "Adresse",
+     "Solde",
+     "En cours",
+     "impayé",
+     "Risque total"
+    ],
+    "buttons": [
+     "Entete document",
+     "Autres détails",
+     "Historique article",
+     "Dossier Technique",
+     "Payement",
+     "Historique",
+     "AnnulerCTRL+Z",
+     "RétablirCTRL+Y / CTRL+SHIFT+Z",
+     "PolicePolice",
+     "TailleTaille",
+     "FormatsFormats",
+     "GrasCTRL+B",
+     "SoulignéCTRL+U",
+     "ItaliqueCTRL+I",
+     "BarréCTRL+SHIFT+S",
+     "Indice",
+     "Exposant",
+     "Éffacer  le Formatage",
+     "Couleur du texte",
+     "Couleur en arrière plan",
+     "DésindenterCTRL+[",
+     "IndenterCTRL+]",
+     "Alignement",
+     "Ligne horizontale",
+     "Liste",
+     "Table",
+     "Lien",
+     "Image",
+     "Video",
+     "Plein écran",
+     "Voir les blocs",
+     "Voir le code",
+     "Previsualiser",
+     "Imprimer",
+     "SauvegarderCTRL+S",
+     "Template",
+     "À gauche",
+     "Centré",
+     "À droite",
+     "Justifié",
+     "(Défaut)",
+     "Arial",
+     "Comic Sans MS",
+     "Courier New",
+     "Impact",
+     "Georgia",
+     "tahoma",
+     "Trebuchet MS",
+     "Verdana",
+     "8"
+    ],
+    "api": [
+     "POST documents-ventes/filter-groups"
+    ]
+   },
+   {
+    "item": "Gestion des commerciaux",
+    "url": "http://41.226.17.73:3001/vente-module/gestion-commerciaux",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   },
+   {
+    "item": "Suivi des numéros de série",
+    "url": "http://41.226.17.73:3001/vente-module/suivi-num-series",
+    "headers": [
+     "Date",
+     "Ref Document",
+     "Document",
+     "Fournisseur",
+     "Client",
+     "Date Réclamation",
+     "Réclamation"
+    ],
+    "buttons": [
+     "HISTORIQUE NUMÉRO DE SÉRIE"
+    ],
+    "api": [
+     "POST documents-ventes/entete/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpcF9hZHJlc3MiOiI6OmZmZmY6MTAyLjEwNy4xOTYuMyIsImxvZ2luIjoiYWRtaW4iLCJwYXNzd29yZCI6IjA1MDI3NjUyMTAiLCJkYiI6ImJpcyIsImlhdCI6MTc4MjMwODg2MH0.QpJPj-Uf-IRHy6uQ0RJnM9au_D8VdH1eCJbMIx5TNYE",
+     "POST entete_achat_articles_serie/get-filtered-series"
+    ]
+   },
+   {
+    "item": "Paramétrages",
+    "url": "http://41.226.17.73:3001/vente-module/parametrage",
+    "headers": [],
+    "buttons": [],
+    "api": [
+     "POST entete_achat_articles_serie/get-filtered-series",
+     "POST zone_depart/"
+    ]
+   }
+  ]
+ },
+ "GESTION TOURNER": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Gestion des ordres missions",
+   "Transferts",
+   "Créer bon de sortie",
+   "Créer bon de transfert",
+   "Créer bon de transfert entre véhicules",
+   "Créer bon de retour",
+   "Gestion des commerciaux",
+   "Rapports"
+  ],
+  "pages": [
+   {
+    "item": "Gestion des ordres missions",
+    "url": "http://41.226.17.73:3001/gestion-tourner/gestion-ordres_missions",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   },
+   {
+    "item": "Transferts",
+    "url": "http://41.226.17.73:3001/gestion-tourner/liste-transfer",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "Timbre: 0.000",
+     "Nombre de lignes : 0"
+    ],
+    "buttons": [],
+    "api": []
+   },
+   {
+    "item": "Créer bon de sortie",
+    "url": "http://41.226.17.73:3001/inventoryModule/create-transfer/BTR",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "VIDER"
+    ],
+    "api": [
+     "POST vehicules/",
+     "POST commerciaux/",
+     "POST depots/",
+     "POST documents-achats/get-filtered-documents",
+     "POST documents-achats/get-sum-documents"
+    ]
+   },
+   {
+    "item": "Créer bon de transfert",
+    "url": "http://41.226.17.73:3001/inventoryModule/create-transfer/BTRS",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "VIDER"
+    ],
+    "api": [
+     "POST depots/",
+     "POST vehicules/",
+     "POST articles/get-by-reference-designation",
+     "POST commerciaux/",
+     "POST documents-achats/filter-groups"
+    ]
+   },
+   {
+    "item": "Créer bon de transfert entre véhicules",
+    "url": "http://41.226.17.73:3001/inventoryModule/create-transfer/TRT",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "VIDER"
+    ],
+    "api": [
+     "POST depots//get-one",
+     "POST depots/get-articles-by-depot/0",
+     "POST depots/get-articles-by-depot-positive/0",
+     "POST type-documents-achat//get-one",
+     "POST ordre_mission/"
+    ]
+   },
+   {
+    "item": "Créer bon de retour",
+    "url": "http://41.226.17.73:3001/inventoryModule/create-transfer/BRT",
+    "headers": [
+     "Référence",
+     "Désignation",
+     "Empl.",
+     "Qté en stock",
+     "Stock min",
+     "t1 ht",
+     "qte en cmd",
+     "date cmd"
+    ],
+    "buttons": [
+     "VIDER"
+    ],
+    "api": [
+     "POST type-documents-achat//get-one",
+     "POST users//get-one"
+    ]
+   },
+   {
+    "item": "Gestion des commerciaux",
+    "url": "http://41.226.17.73:3001/vente-module/gestion-commerciaux",
+    "headers": [],
+    "buttons": [],
+    "api": [
+     "POST users//get-one"
+    ]
+   },
+   {
+    "item": "Rapports",
+    "url": "http://41.226.17.73:3001/vente-module/gestion-commerciaux",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   }
+  ]
+ },
+ "CHARGE": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Documents charge",
+   "Les Charges",
+   "Tiers",
+   "Rapports"
+  ],
+  "pages": [
+   {
+    "item": "Documents charge",
+    "url": "http://41.226.17.73:3001/charges-module/liste-documents-charges",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "Timbre: 0.000",
+     "Nombre de lignes : 0"
+    ],
+    "buttons": [],
+    "api": [
+     "POST commerciaux/",
+     "POST vehicules/",
+     "POST depots/",
+     "POST documents-achats/filter-groups",
+     "POST ordre_mission/",
+     "POST documents-achats/get-sum-documents",
+     "POST documents-achats/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "Les Charges",
+    "url": "http://41.226.17.73:3001/charges-module/liste-charges",
+    "headers": [
+     "Référence",
+     "Code à barre",
+     "Désignation",
+     "Catalogue",
+     "Famille",
+     "S.Famille",
+     "En stock",
+     "Pu achat.HT",
+     "T1.HT",
+     "T1.TTC",
+     "Dernière ACHAT",
+     "date",
+     "valeur achat",
+     "Nbr jours",
+     "Dernière VENTE",
+     "valeur vente",
+     "​",
+     "libellé\n​\n​",
+     "none"
+    ],
+    "buttons": [
+     "INV220201",
+     "341",
+     "NULL",
+     "0",
+     "INV220510",
+     "108",
+     "TIC248413",
+     "111",
+     "INV220507",
+     "BAO230044",
+     "106",
+     "TRD241771",
+     "113",
+     "TIC248401",
+     "INV220493",
+     "116",
+     "BTR242030",
+     "107",
+     "TIC248489",
+     "TIC248140",
+     "128",
+     "FAO230167",
+     "27",
+     "RAO230001",
+     "92",
+     "BTR242094",
+     "98",
+     "TIC248658"
+    ],
+    "api": [
+     "POST depots/",
+     "POST articles-groups/createGroup",
+     "POST depots/get-depot-by-ref/undefined",
+     "POST articles-groups/",
+     "POST articles/get-filtred-article"
+    ]
+   },
+   {
+    "item": "Tiers",
+    "url": "http://41.226.17.73:3001/charges-module/liste-tiers",
+    "headers": [
+     "N°",
+     "Code",
+     "Raison social",
+     "Solde initial",
+     "Débit",
+     "Crédit",
+     "Solde",
+     "Famille",
+     "Sous famille",
+     "Archiver",
+     "Dernière ACHAT",
+     "Date",
+     "montant",
+     "Nbr jours",
+     "​",
+     "libellé\n​\n​",
+     "initial",
+     "Nombre de ligne : 1"
+    ],
+    "buttons": [
+     "0.000",
+     "FCH220003",
+     "298"
+    ],
+    "api": [
+     "POST fournisseurs/get-filtred-frs",
+     "POST sous-familles-fournisseurs/",
+     "POST familles-fournisseurs/"
+    ]
+   },
+   {
+    "item": "Rapports",
+    "url": "http://41.226.17.73:3001/charges-module/rapport",
+    "headers": [
+     "Dépenses",
+     "Jan",
+     "Fév",
+     "Mar",
+     "Avr",
+     "Mai",
+     "Juin",
+     "Juil",
+     "Août",
+     "Sep",
+     "Oct",
+     "Nov",
+     "Déc",
+     "Total"
+    ],
+    "buttons": [],
+    "api": [
+     "POST articles//get-all-by-attr"
+    ]
+   }
+  ]
+ },
+ "GRH": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "STOCK",
+   "ACHAT",
+   "CRM",
+   "VENTE",
+   "GESTION TOURNER",
+   "CHARGE",
+   "GRH",
+   "GMAO",
+   "GPAO",
+   "TRESORERIE",
+   "PARC ROULANT"
+  ]
+ },
+ "GMAO": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Machines"
+  ],
+  "pages": [
+   {
+    "item": "Machines",
+    "url": "http://41.226.17.73:3001/gmao-module/machines",
+    "headers": [
+     "Num Série",
+     "Machine",
+     "Poste de charge",
+     "état",
+     "date mise en marche",
+     "valeur d'aquisition",
+     "cout horaire",
+     "capacité horaire",
+     "Actions"
+    ],
+    "buttons": [
+     "AJOUTER"
+    ],
+    "api": [
+     "POST machines/",
+     "POST gpao_poste_charge/"
+    ]
+   }
+  ]
+ },
+ "GPAO": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Données TECHNIQUES",
+   "LIST OFs",
+   "CALCUL BESOIN NET",
+   "ORDONNANCEMENT",
+   "PLANIFICATION",
+   "Paramétrages GPAO"
+  ],
+  "pages": [
+   {
+    "item": "Données TECHNIQUES",
+    "url": "http://41.226.17.73:3001/gpao-module/dossier-technique",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   },
+   {
+    "item": "LIST OFs",
+    "url": "http://41.226.17.73:3001/gpao-module/liste-orders-fabrications",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "TCL: 1226.953 Timbre: 0.000",
+     "Nombre de lignes : 50"
+    ],
+    "buttons": [
+     "1"
+    ],
+    "api": [
+     "POST motifs_annulation/",
+     "POST documents-ventes/get-nomenclature-for-documents",
+     "POST commerciaux/",
+     "POST documents-ventes/get-sum-documents",
+     "POST documents-ventes/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "CALCUL BESOIN NET",
+    "url": "http://41.226.17.73:3001/gpao-module/cbn",
+    "headers": [
+     "Ref.",
+     "Date",
+     "Code",
+     "Raison social",
+     "Total.HT",
+     "Tva",
+     "Total.TTC",
+     "TCL: 1538.846 Timbre: 0.000",
+     "Nombre de lignes : 50"
+    ],
+    "buttons": [
+     "1"
+    ],
+    "api": [
+     "POST documents-ventes/filter-groups",
+     "POST motifs_annulation/",
+     "POST commerciaux/",
+     "POST documents-ventes/get-nomenclature-for-documents",
+     "POST documents-ventes/get-sum-documents",
+     "POST documents-ventes/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "ORDONNANCEMENT",
+    "url": "http://41.226.17.73:3001/gpao-module/ordonnancement",
+    "headers": [
+     "Num Ordre",
+     "Document",
+     "Libellé",
+     "Date",
+     "Date Lancement Prévu",
+     "Client",
+     "Valeur HT",
+     "Valeur TTC"
+    ],
+    "buttons": [
+     "TRANSFORMER EN OF",
+     "BON DE COMMANDE",
+     "ORDRE DE FABRICATION"
+    ],
+    "api": [
+     "POST documents-ventes/get-filtered-documents"
+    ]
+   },
+   {
+    "item": "PLANIFICATION",
+    "url": "http://41.226.17.73:3001/gpao-module/plannification",
+    "headers": [
+     "Resources",
+     "06 h\n\t\n07 h\n\t\n08 h\n\t\n09 h\n\t\n10 h\n\t\n11 h\n\t\n12 h\n\t\n13 h\n\t\n14 h\n\t\n15 h\n\t\n16 h\n\t\n17 h\n\t\n18 h\n\t\n19 h",
+     "06 h",
+     "07 h",
+     "08 h",
+     "09 h",
+     "10 h",
+     "11 h",
+     "12 h",
+     "13 h",
+     "14 h",
+     "15 h",
+     "16 h",
+     "17 h",
+     "18 h",
+     "19 h"
+    ],
+    "buttons": [
+     "RÉSULTAT",
+     "today",
+     "day"
+    ],
+    "api": []
+   },
+   {
+    "item": "Paramétrages GPAO",
+    "url": "http://41.226.17.73:3001/gpao-module/parametrage",
+    "headers": [],
+    "buttons": [],
+    "api": []
+   }
+  ]
+ },
+ "TRESORERIE": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Réglements Clients",
+   "Décaissements Frs",
+   "Gestion chéquiers",
+   "Comptes banquaires",
+   "Mouvements compte",
+   "Extrait compte",
+   "BORDERAUX",
+   "DECAISSEMENTS TIER",
+   "Balance globale de trésorerie"
+  ],
+  "pages": [
+   {
+    "item": "Réglements Clients",
+    "url": "http://41.226.17.73:3001/treasury/liste-reglements-clients",
+    "headers": [
+     "Date",
+     "client",
+     "Mode",
+     "N°",
+     "Montant",
+     "Échéance",
+     "Etat"
+    ],
+    "buttons": [
+     "AFFICHER",
+     "IMPRIMER"
+    ],
+    "api": [
+     "POST societe/societe",
+     "POST empla_tresor/",
+     "POST users/",
+     "POST reglements-fournisseurs/reglements/info-client-to-print/undefined",
+     "POST reglements-clients/get-filtered-reglements-sum",
+     "POST reglements-clients/get-filtered-reglements"
+    ]
+   },
+   {
+    "item": "Décaissements Frs",
+    "url": "http://41.226.17.73:3001/treasury/list-providers-regulations",
+    "headers": [
+     "Date",
+     "fournisseur",
+     "Mode",
+     "N°",
+     "Montant",
+     "Échéance",
+     "Etat"
+    ],
+    "buttons": [
+     "AFFICHER",
+     "IMPRIMER"
+    ],
+    "api": [
+     "POST societe/societe",
+     "POST empla_tresor/",
+     "POST reglements-fournisseurs/get-filtered-reglements-sum",
+     "POST reglements-fournisseurs/get-filtered-reglements",
+     "POST reglements-fournisseurs/reglements/info-frs-to-print/undefined"
+    ]
+   },
+   {
+    "item": "Gestion chéquiers",
+    "url": "http://41.226.17.73:3001/treasury/chequiers",
+    "headers": [],
+    "buttons": [
+     "AFFICHER",
+     "CRÉER UN NOUVEAU CHEQUIER",
+     "IMPRIMER"
+    ],
+    "api": [
+     "POST accounts/",
+     "POST chequiers/all-cheque-etat"
+    ]
+   },
+   {
+    "item": "Comptes banquaires",
+    "url": "http://41.226.17.73:3001/treasury/accounts-management",
+    "headers": [],
+    "buttons": [],
+    "api": [
+     "POST accounts/"
+    ]
+   },
+   {
+    "item": "Mouvements compte",
+    "url": "http://41.226.17.73:3001/treasury/accounts-mouvements",
+    "headers": [
+     "#",
+     "Type",
+     "Date",
+     "Libellé",
+     "Compte",
+     "Montant",
+     "Famille"
+    ],
+    "buttons": [],
+    "api": [
+     "POST mvt-emp/get-filtered-mvts"
+    ]
+   },
+   {
+    "item": "Extrait compte",
+    "url": "http://41.226.17.73:3001/treasury/extrait-compte",
+    "headers": [],
+    "buttons": [],
+    "api": [
+     "POST accounts/"
+    ]
+   },
+   {
+    "item": "BORDERAUX",
+    "url": "http://41.226.17.73:3001/treasury/list-borderaux",
+    "headers": [],
+    "buttons": [
+     "FERMER"
+    ],
+    "api": [
+     "POST borderaux/all",
+     "POST reglements-clients/banques"
+    ]
+   },
+   {
+    "item": "DECAISSEMENTS TIER",
+    "url": "http://41.226.17.73:3001/treasury/liste-reglements-tiers",
+    "headers": [
+     "Date",
+     "fournisseur",
+     "Mode",
+     "N°",
+     "Montant",
+     "Échéance",
+     "Etat"
+    ],
+    "buttons": [
+     "AFFICHER",
+     "IMPRIMER"
+    ],
+    "api": [
+     "POST societe/societe",
+     "POST reglements-fournisseurs/reglements/info-frs-to-print/undefined",
+     "POST empla_tresor/",
+     "POST reglements-fournisseurs/get-filtered-reglements",
+     "POST reglements-fournisseurs/get-filtered-reglements-sum"
+    ]
+   },
+   {
+    "item": "Balance globale de trésorerie",
+    "url": "http://41.226.17.73:3001/treasury/global-balance",
+    "headers": [],
+    "buttons": [
+     "RESULTAT",
+     "IMPRIMER"
+    ],
+    "api": [
+     "POST reglements-fournisseurs/reglements-fournisseur-encours",
+     "POST reglements-clients/reglements-Clients-encours"
+    ]
+   }
+  ]
+ },
+ "PARC ROULANT": {
+  "opened": true,
+  "items": [
+   "Masquer les modules",
+   "Gestion des véhicules"
+  ],
+  "pages": [
+   {
+    "item": "Gestion des véhicules",
+    "url": "http://41.226.17.73:3001/parc-roulant-module/liste-vehicules",
+    "headers": [
+     "Matricule",
+     "Marque",
+     "Année Model",
+     "Date Fin Assurance",
+     "Date Fin Visite",
+     "Date Pay Taxe",
+     "Détails Réparation et entretien",
+     "Charges véhicule",
+     "Chiffre d'affaire véhicule",
+     "Kilométrage"
+    ],
+    "buttons": [],
+    "api": [
+     "POST vehicules/",
+     "POST documents-ventes/get-stat-documents"
+    ]
+   }
+  ]
+ }
+}

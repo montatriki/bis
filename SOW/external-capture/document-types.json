@@ -1,0 +1,52 @@
+{
+ "vente": {
+  "endpoint": "POST type-documents-vente/",
+  "count": 10,
+  "keys": [
+   "Type_doc",
+   "Carc_doc",
+   "Lib_doc",
+   "compteur",
+   "timbre",
+   "T_stock",
+   "T_Solde",
+   "Nature_Doc",
+   "order_commercial",
+   "couleur",
+   "conditions",
+   "modele_impression",
+   "conditions_height",
+   "souche",
+   "id",
+   "actif_endist",
+   "avec_reg",
+   "plafonner",
+   "signature"
+  ],
+  "sample": "[{\"Type_doc\":\"AV\",\"Carc_doc\":\"AVC\",\"Lib_doc\":\"Avoir\",\"compteur\":\"220001\",\"timbre\":\"0.000000\",\"T_stock\":\"E\",\"T_Solde\":\"C\",\"Nature_Doc\":\"Vente\",\"order_commercial\":2,\"couleur\":\"#e17440\",\"conditions\":\"\",\"modele_impression\":0,\"conditions_height\":0,\"souche\":0,\"id\":1,\"actif_endist\":0,\"avec_reg\":0,\"plafonner\":0,\"signature\":0}]"
+ },
+ "achat": {
+  "endpoint": "POST type-documents-achat/",
+  "count": 21,
+  "keys": [
+   "Type_doc",
+   "Carc_doc",
+   "Lib_doc",
+   "compteur",
+   "timbre",
+   "T_stock",
+   "T_Solde",
+   "Nature_Doc",
+   "order_commercial",
+   "couleur",
+   "conditions",
+   "id",
+   "souche_ach",
+   "mvt",
+   "T_mvt",
+   "type_tourner",
+   "doc_stk"
+  ],
+  "sample": "[{\"Type_doc\":\"AV\",\"Carc_doc\":\"ARA\",\"Lib_doc\":\"Avoir\",\"compteur\":\"230001\",\"timbre\":\"0.000000\",\"T_stock\":\"N\",\"T_Solde\":\"D\",\"Nature_Doc\":\"Achat\",\"order_commercial\":2,\"couleur\":\"#e63c6f\",\"conditions\":\"\",\"id\":1,\"souche_ach\":1,\"mvt\":1,\"T_mvt\":\"T\",\"type_tourner\":\"document stock\",\"doc_stk\":0}]"
+ }
+}

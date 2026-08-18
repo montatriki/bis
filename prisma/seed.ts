@@ -223,6 +223,33 @@ async function main() {
     }
   }
 
+  // ===== Sales documents (Vente) =====
+  const clientsForDocs = await prisma.client.findMany({ take: 6 });
+  const salesDocs = [
+    { type: "BL" as const, reference: "BL-2026-0087", totalHT: 2004.62, totalTVA: 380.88, totalTTC: 2385.5, status: "PAID" },
+    { type: "BL" as const, reference: "BL-2026-0086", totalHT: 1554.62, totalTVA: 295.37, totalTTC: 1849.99, status: "PENDING" },
+    { type: "FAC" as const, reference: "FAC-2026-042", totalHT: 2004.62, totalTVA: 380.88, totalTTC: 2385.5, status: "PAID" },
+    { type: "BL" as const, reference: "BL-2026-0085", totalHT: 2857.31, totalTVA: 542.89, totalTTC: 3400.2, status: "PARTIAL" },
+    { type: "BC" as const, reference: "BC-2026-0089", totalHT: 362.18, totalTVA: 68.81, totalTTC: 430.99, status: "PENDING" },
+    { type: "AV" as const, reference: "AV-2026-008", totalHT: -201.68, totalTVA: -38.32, totalTTC: -240.0, status: "VALIDATED" },
+    { type: "DEV" as const, reference: "DEV-2026-015", totalHT: 1680.0, totalTVA: 319.2, totalTTC: 1999.2, status: "PENDING" },
+  ];
+  if (clientsForDocs.length && commercial) {
+    for (let i = 0; i < salesDocs.length; i++) {
+      const d = salesDocs[i];
+      const cl = clientsForDocs[i % clientsForDocs.length];
+      await prisma.document.upsert({
+        where: { reference: d.reference },
+        update: {},
+        create: {
+          type: d.type, reference: d.reference, clientId: cl.id, commercialId: commercial.id,
+          totalHT: d.totalHT, totalTVA: d.totalTVA, totalTTC: d.totalTTC,
+          status: d.status, isValidated: d.status !== "PENDING",
+        },
+      });
+    }
+  }
+
   // GPS positions
   const gpsPoints = [
     { lat: 36.7257, lng: 9.1817, speed: 0 },
@@ -235,16 +262,15 @@ async function main() {
     });
   }
 
-  // Notifications
-  const notifs = [
-    { userId: adminUser.id, title: "Stock minimum atteint", message: "2 articles sous le seuil minimum", type: "STOCK" },
-    { userId: adminUser.id, title: "Chèque échu", message: "1 chèque de 2500 TND arrivé à échéance", type: "FINANCE" },
-    { userId: adminUser.id, title: "Véhicule hors ligne", message: "238TU1019 — HICHEM — hors ligne depuis 2h", type: "GPS" },
-    { userId: managerUser.id, title: "Document à valider", message: "3 bons de commande en attente", type: "VALIDATION" },
-  ];
-  for (const n of notifs) {
-    await prisma.notification.create({ data: n });
-  }
+  // Pas de notifications en dur : `/api/notifications` recalcule les alertes
+  // système (ruptures, échéances véhicules, impayés, documents à valider) à
+  // partir des données réelles à chaque appel. Des lignes semées faisaient
+  // double emploi avec ces alertes et affichaient des chiffres faux — « 3 bons
+  // de commande en attente » quand la base en comptait 1 015, « 1 chèque de
+  // 2500 TND » quand aucun n'était échu.
+  //
+  // La table `notifications` reste alimentée à l'exécution, pour les messages
+  // adressés à un utilisateur précis.
 
   // Visit
   if (clientRecord) {
@@ -261,6 +287,170 @@ async function main() {
       },
     });
   }
+
+  // ===== Depots =====
+  const depotPrincipal = await prisma.depot.upsert({
+    where: { code: "DEP01" },
+    update: {},
+    create: { code: "DEP01", name: "Dépôt Principal", address: "Z.I. Béja", isMain: true },
+  });
+  const depotVehicule = await prisma.depot.upsert({
+    where: { code: "DEP02" },
+    update: {},
+    create: { code: "DEP02", name: "Stock Véhicule 206TU7140", address: "Mobile" },
+  });
+
+  // ===== Suppliers =====
+  const suppliersData = [
+    { code: "FRS001", name: "SOUHA SA", contact: "Mehdi Ben Salah", phone: "+216 71 000 111", city: "Tunis", taxId: "0011222Z/A/M/000", balance: 12450.5, category: "Local" },
+    { code: "FRS002", name: "JOUETS IMPORT TUNISIE", contact: "Sami Khelifi", phone: "+216 74 555 222", city: "Sfax", taxId: "0034567Z/A/M/000", balance: 8300.0, category: "Import" },
+    { code: "FRS003", name: "PAPETERIE DU SUD", contact: "Olfa Trabelsi", phone: "+216 73 333 444", city: "Sousse", balance: 0, category: "Local" },
+    { code: "FRS004", name: "GLOBAL TOYS LTD", contact: "Import Dept", phone: "+86 755 0000", city: "Shenzhen", balance: 45200.75, category: "Import" },
+  ];
+  const supplierMap: Record<string, string> = {};
+  for (const s of suppliersData) {
+    const sup = await prisma.supplier.upsert({ where: { code: s.code }, update: {}, create: s });
+    supplierMap[s.code] = sup.id;
+  }
+
+  // Attach products to main depot + a supplier
+  const allProducts = await prisma.product.findMany();
+  for (const p of allProducts) {
+    await prisma.product.update({
+      where: { id: p.id },
+      data: {
+        depotId: depotPrincipal.id,
+        supplierId: supplierMap["FRS001"],
+        minStock: 5,
+        purchasePrice: Number((p.price * 0.7).toFixed(3)),
+      },
+    });
+  }
+
+  // ===== Stock movements =====
+  let mvtN = 1;
+  for (const p of allProducts.slice(0, 8)) {
+    const inQty = 50;
+    await prisma.stockMovement.upsert({
+      where: { reference: `MVT${String(mvtN).padStart(4, "0")}` },
+      update: {},
+      create: {
+        reference: `MVT${String(mvtN++).padStart(4, "0")}`,
+        type: "IN", productId: p.id, depotId: depotPrincipal.id,
+        qty: inQty, qtyBefore: p.stock, qtyAfter: p.stock + inQty,
+        unitCost: Number((p.price * 0.7).toFixed(3)), reason: "Réception fournisseur SOUHA SA", documentRef: "BC-2026-0080",
+      },
+    });
+  }
+
+  // ===== Purchase documents =====
+  const purchasesData = [
+    { type: "BC" as const, reference: "BC-2026-0080", supplierId: supplierMap["FRS001"], totalHT: 4200, totalTVA: 798, totalTTC: 4998, paid: 4998, status: "PAID" },
+    { type: "FAC" as const, reference: "FACA-2026-031", supplierId: supplierMap["FRS002"], totalHT: 8300, totalTVA: 1577, totalTTC: 9877, paid: 5000, status: "PARTIAL" },
+    { type: "BC" as const, reference: "BC-2026-0081", supplierId: supplierMap["FRS004"], totalHT: 45200.75, totalTVA: 0, totalTTC: 45200.75, paid: 0, status: "PENDING", notes: "Import - hors TVA" },
+  ];
+  for (const pd of purchasesData) {
+    await prisma.purchaseDocument.upsert({ where: { reference: pd.reference }, update: {}, create: pd });
+  }
+
+  // ===== Plan comptable (Tunisian standard, simplified) =====
+  const accountsData = [
+    { number: "1011", label: "Capital social", class: "CLASSE_1" as const },
+    { number: "2154", label: "Matériel industriel", class: "CLASSE_2" as const },
+    { number: "3111", label: "Marchandises", class: "CLASSE_3" as const },
+    { number: "4011", label: "Fournisseurs", class: "CLASSE_4" as const },
+    { number: "4111", label: "Clients", class: "CLASSE_4" as const },
+    { number: "43666", label: "TVA collectée", class: "CLASSE_4" as const },
+    { number: "43667", label: "TVA déductible", class: "CLASSE_4" as const },
+    { number: "532", label: "Caisse", class: "CLASSE_5" as const },
+    { number: "5321", label: "Banque BIAT", class: "CLASSE_5" as const },
+    { number: "607", label: "Achats de marchandises", class: "CLASSE_6" as const },
+    { number: "626", label: "Frais postaux et télécom", class: "CLASSE_6" as const },
+    { number: "707", label: "Ventes de marchandises", class: "CLASSE_7" as const },
+  ];
+  const accountMap: Record<string, string> = {};
+  for (const a of accountsData) {
+    const acc = await prisma.account.upsert({ where: { number: a.number }, update: {}, create: { ...a, isStandard: true } });
+    accountMap[a.number] = acc.id;
+  }
+
+  // ===== Journal entries (écritures) =====
+  const je1 = await prisma.journalEntry.upsert({
+    where: { reference: "OD-2026-001" },
+    update: {},
+    create: {
+      reference: "OD-2026-001", journal: "VT", label: "Facture vente FAC-2026-042 AGIL BEJA SUD",
+      totalDebit: 2385.5, totalCredit: 2385.5,
+      lines: {
+        create: [
+          { accountId: accountMap["4111"], label: "AGIL BEJA SUD", debit: 2385.5, credit: 0 },
+          { accountId: accountMap["707"], label: "Vente marchandises", debit: 0, credit: 2004.62 },
+          { accountId: accountMap["43666"], label: "TVA 19%", debit: 0, credit: 380.88 },
+        ],
+      },
+    },
+  });
+  void je1;
+  const je2 = await prisma.journalEntry.upsert({
+    where: { reference: "OD-2026-002" },
+    update: {},
+    create: {
+      reference: "OD-2026-002", journal: "AC", label: "Achat marchandises BC-2026-0080 SOUHA SA",
+      totalDebit: 4998, totalCredit: 4998,
+      lines: {
+        create: [
+          { accountId: accountMap["607"], label: "Achat marchandises", debit: 4200, credit: 0 },
+          { accountId: accountMap["43667"], label: "TVA déductible", debit: 798, credit: 0 },
+          { accountId: accountMap["4011"], label: "SOUHA SA", debit: 0, credit: 4998 },
+        ],
+      },
+    },
+  });
+  void je2;
+
+  // ===== Bank accounts =====
+  const banque = await prisma.bankAccount.upsert({
+    where: { code: "BNK01" },
+    update: {},
+    create: { code: "BNK01", bank: "BIAT", label: "Compte courant BIAT", rib: "08 123 0001234567890 12", balance: 84200.5, type: "BANQUE" },
+  });
+  const caisse = await prisma.bankAccount.upsert({
+    where: { code: "CAI01" },
+    update: {},
+    create: { code: "CAI01", bank: "Caisse", label: "Caisse principale", balance: 3506.0, type: "CAISSE" },
+  });
+
+  // ===== Reglements =====
+  const firstClient = await prisma.client.findFirst({ where: { balance: { gt: 0 } } });
+  if (firstClient) {
+    await prisma.reglement.upsert({
+      where: { reference: "REG-CLI-001" },
+      update: {},
+      create: {
+        reference: "REG-CLI-001", sens: "CLIENT", mode: "CHEQUE", amount: 2385.5,
+        clientId: firstClient.id, bankAccountId: banque.id, chequeNumber: "5847123", status: "ENCAISSE",
+        notes: "Règlement FAC-2026-042",
+      },
+    });
+    await prisma.reglement.upsert({
+      where: { reference: "REG-CLI-002" },
+      update: {},
+      create: {
+        reference: "REG-CLI-002", sens: "CLIENT", mode: "ESPECES", amount: 1000,
+        clientId: firstClient.id, bankAccountId: caisse.id, status: "ENCAISSE",
+        notes: "Acompte BL-2026-0085",
+      },
+    });
+  }
+  await prisma.reglement.upsert({
+    where: { reference: "REG-FRS-001" },
+    update: {},
+    create: {
+      reference: "REG-FRS-001", sens: "FOURNISSEUR", mode: "VIREMENT", amount: 4998,
+      supplierId: supplierMap["FRS001"], bankAccountId: banque.id, status: "PAYE",
+      notes: "Règlement BC-2026-0080",
+    },
+  });
 
   console.log("✅ Seed complete!");
   console.log("\n📋 Demo login credentials:");

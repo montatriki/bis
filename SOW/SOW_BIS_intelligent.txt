@@ -1,5 +1,5 @@
 ================================================================================
-SOW — B.I.S INTELLIGENT ERP SYSTEM
+SOW — S.K.Y INTELLIGENT ERP SYSTEM
 Statement of Work — Système de Gestion Intelligent & Connecté
 Version: 2.0 — Édition Intelligence Artificielle
 Date: 2026-05-17
@@ -7,7 +7,7 @@ Date: 2026-05-17
 
 VISION DU PROJET
 ─────────────────────────────────────────────────────────────────────────────
-Transformer B.I.S. d'un ERP classique en une plateforme intelligente,
+Transformer S.K.Y. d'un ERP classique en une plateforme intelligente,
 connectée et prédictive — où chaque décision est guidée par la donnée,
 chaque déplacement est optimisé, et chaque interaction est tracée.
 
@@ -986,5 +986,5 @@ PHASE 4 — Optimisation avancée (Mois 7–8)
   ✅ Notifications push SMS/Web (A.4)
 
 ================================================================================
-FIN DU DOCUMENT — SOW B.I.S INTELLIGENT v2.0
+FIN DU DOCUMENT — SOW S.K.Y INTELLIGENT v2.0
 ================================================================================

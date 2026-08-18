@@ -1,0 +1,38 @@
+[
+ {
+  "fam_cli": "vente en gros",
+  "id_fam": 5
+ },
+ {
+  "fam_cli": "librairie",
+  "id_fam": 26
+ },
+ {
+  "fam_cli": "shop",
+  "id_fam": 27
+ },
+ {
+  "fam_cli": "superette",
+  "id_fam": 28
+ },
+ {
+  "fam_cli": "gms",
+  "id_fam": 29
+ },
+ {
+  "fam_cli": "gros alimentaire",
+  "id_fam": 30
+ },
+ {
+  "fam_cli": "magasin jouer",
+  "id_fam": 31
+ },
+ {
+  "fam_cli": "ECOLE",
+  "id_fam": 32
+ },
+ {
+  "fam_cli": "PARK JOUETS",
+  "id_fam": 33
+ }
+]

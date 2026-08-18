@@ -1,136 +1,296 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, TrendingUp, Users, Package, Wallet, Truck, Download, Printer, Calendar } from "lucide-react";
-import { CAAreaChart, CommercialBarChart } from "@/components/charts/CAChart";
-import { MONTHLY_CA, COMMERCIAL_PERFORMANCE } from "@/lib/dummy-data";
+import { TrendingUp, Users, Package, Download, Printer, Loader2, Map, AlertCircle } from "lucide-react";
 
-const REPORTS = [
-  { id: "ca_mensuel", title: "CA Mensuel Global", icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200", desc: "Évolution du chiffre d'affaires sur 12 mois" },
-  { id: "soldes_clients", title: "État des soldes clients", icon: Users, color: "text-red-600", bg: "bg-red-50", border: "border-red-200", desc: "Créances par client, ancienneté, risque" },
-  { id: "stock_rapport", title: "Valorisation du stock", icon: Package, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200", desc: "Valeur totale par dépôt et famille" },
-  { id: "tresorerie_rapport", title: "Balance de trésorerie", icon: Wallet, color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200", desc: "Entrées/sorties/soldes tous comptes" },
-  { id: "perf_commerciaux", title: "Performance commerciaux", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", desc: "CA, visites, recouvrement par commercial" },
-  { id: "parc_km", title: "Kilométrage & charges véhicules", icon: Truck, color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200", desc: "Coûts et performance de la flotte" },
-];
+// Rapports de direction — alimentés par les API réelles :
+//   /api/dashboard (CA, stock, créances) et /api/rapports-vente (axes détaillés).
 
-const CHARGES_ANNUELLES = [
-  { cat: "Accompte sur salaire", vals: [0,0,0,0,820,0,0,0,0,0,0,0], total: 820 },
-  { cat: "Charge de bureau", vals: [0,0,0,0,0,0,0,0,0,0,0,0], total: 0 },
-  { cat: "TRANSPORT", vals: [0,0,0,0,0,0,0,0,0,0,0,0], total: 0 },
-  { cat: "BON DIESEL", vals: [1200,980,1450,1100,1380,0,0,0,0,0,0,0], total: 6110 },
-  { cat: "Fournisseur", vals: [33329,92414,276533,104910,5617,0,0,0,0,0,0,0], total: 512803 },
-];
+type Ligne = { cle: string; libelle: string; qte: number; ht: number; ttc: number; docs: number };
+type Resultat = { rows: Ligne[]; total: number; totalHT: number; totalTTC: number; totalDocs: number };
+type Dash = {
+  kpis: { ca: number; nbDocs: number; valeurStock: number; creances: number; encaissements: number;
+    nbClients: number; nbArticles: number; ruptures: number; sousMini: number; tauxRupture: number };
+  serie: { mois: string; ca: number; docs: number }[];
+  topRuptures?: { refArt: string; designation: string; enStock: number; stMin: number }[];
+};
+
+const RAPPORTS = [
+  { id: "ca_mensuel", axe: null, title: "CA mensuel global", icon: TrendingUp, color: "#2563eb", desc: "Évolution du chiffre d'affaires sur 12 mois" },
+  { id: "soldes_clients", axe: "creances", title: "État des créances", icon: AlertCircle, color: "#dc2626", desc: "Balance âgée par ancienneté" },
+  { id: "stock_rapport", axe: null, title: "Valorisation du stock", icon: Package, color: "#16a34a", desc: "Valeur, ruptures et articles sous minimum" },
+  { id: "perf_commerciaux", axe: "commercial", title: "Performance commerciaux", icon: Users, color: "#f59e0b", desc: "CA et documents par vendeur" },
+  { id: "ventes_region", axe: "gouvernorat", title: "Ventes par région", icon: Map, color: "#7c3aed", desc: "Répartition géographique du CA" },
+] as const;
+
+const fmt = (v: unknown) =>
+  new Intl.NumberFormat("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(v) || 0);
+const fmt0 = (v: unknown) => new Intl.NumberFormat("fr-TN", { maximumFractionDigits: 0 }).format(Number(v) || 0);
 
 export default function RapportsAdminPage() {
-  const [activeReport, setActiveReport] = useState("ca_mensuel");
-  const [year, setYear] = useState("2026");
+  const [active, setActive] = useState<string>("ca_mensuel");
+  const [dash, setDash] = useState<Dash | null>(null);
+  const [detail, setDetail] = useState<Resultat | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const rapport = RAPPORTS.find((r) => r.id === active)!;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/dashboard?scope=admin")
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) { setDash(d); setLoading(false); } })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!rapport.axe) return;
+    let cancelled = false;
+    fetch(`/api/rapports-vente?axe=${rapport.axe}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setDetail(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [rapport.axe]);
+
+  function selectRapport(id: string) {
+    setActive(id);
+    setDetail(null);
+  }
+
+  function exportCsv() {
+    let head = "";
+    let lines: string[] = [];
+    if (rapport.id === "ca_mensuel" && dash) {
+      head = ["Mois", "CA", "Documents"].join(";");
+      lines = dash.serie.map((m) => [m.mois, m.ca, m.docs].join(";"));
+    } else if (rapport.id === "stock_rapport" && dash) {
+      head = ["Référence", "Désignation", "Stock", "Stock mini"].join(";");
+      lines = (dash.topRuptures ?? []).map((a) => [a.refArt, a.designation.replace(/;/g, ","), a.enStock, a.stMin].join(";"));
+    } else if (detail) {
+      head = ["Code", "Libellé", "Documents", "Montant"].join(";");
+      lines = detail.rows.map((r) => [r.cle, r.libelle.replace(/;/g, ","), r.docs, r.ttc].join(";"));
+    }
+    if (!head) return;
+    const csv = "﻿" + [head, ...lines].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `${rapport.id}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (loading) {
+    return <div className="py-24 text-center text-[var(--text-secondary)]"><Loader2 className="animate-spin mx-auto mb-3" size={26} /> Chargement…</div>;
+  }
+
+  const k = dash?.kpis;
+  const maxSerie = Math.max(1, ...(dash?.serie ?? []).map((x) => Math.abs(x.ca)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Rapports & Analyses</h1>
-          <p className="text-slate-500 text-sm">Statistiques globales — exercice {year}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Rapports &amp; analyses</h1>
+          <p className="text-[var(--text-secondary)] text-sm">Synthèse calculée sur les données réelles de l&apos;ERP</p>
         </div>
-        <div className="flex items-center gap-2">
-          <select value={year} onChange={e => setYear(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white">
-            {["2026","2025","2024"].map(y => <option key={y}>{y}</option>)}
-          </select>
-          <button className="flex items-center gap-1.5 border border-slate-200 text-slate-600 px-3 py-2 rounded-xl text-sm hover:bg-slate-50 transition"><Printer size={14} /> Imprimer</button>
-          <button className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-emerald-500 transition"><Download size={14} /> Excel</button>
+        <div className="flex gap-2">
+          <button onClick={exportCsv}
+            className="flex items-center gap-1.5 border border-[var(--border-primary)] text-emerald-600 px-3 py-2 rounded-xl text-sm">
+            <Download size={15} /> Excel
+          </button>
+          <button onClick={() => window.print()}
+            className="flex items-center gap-1.5 border border-[var(--border-primary)] text-[var(--text-secondary)] px-3 py-2 rounded-xl text-sm">
+            <Printer size={15} /> Imprimer
+          </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-4 gap-6">
-        {/* Report list */}
-        <div className="space-y-2">
-          {REPORTS.map(r => (
-            <button key={r.id} onClick={() => setActiveReport(r.id)}
-              className={`w-full text-left p-3 rounded-xl border-2 transition ${activeReport === r.id ? `${r.border} bg-white shadow-sm` : "border-transparent hover:border-slate-200 hover:bg-white"}`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 ${r.bg} rounded-lg flex items-center justify-center flex-shrink-0`}><r.icon size={15} className={r.color} /></div>
-                <div><div className="font-semibold text-slate-800 text-sm leading-tight">{r.title}</div><div className="text-slate-400 text-xs mt-0.5 leading-tight">{r.desc}</div></div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Kpi label="Chiffre d'affaires" value={`${fmt0(k?.ca)} TND`} sub={`${fmt0(k?.nbDocs)} documents`} color="#2563eb" icon={TrendingUp} />
+        <Kpi label="Créances clients" value={`${fmt0(k?.creances)} TND`} sub={`${fmt0(k?.nbClients)} clients`} color="#dc2626" icon={AlertCircle} />
+        <Kpi label="Valeur du stock" value={`${fmt0(k?.valeurStock)} TND`} sub={`${fmt0(k?.nbArticles)} articles`} color="#16a34a" icon={Package} />
+        <Kpi label="Encaissements" value={`${fmt0(k?.encaissements)} TND`} sub="Règlements clients" color="#7c3aed" icon={Users} />
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {RAPPORTS.map((r) => {
+          const on = active === r.id;
+          return (
+            <button key={r.id} onClick={() => selectRapport(r.id)}
+              className={`text-left p-4 rounded-2xl border transition ${
+                on ? "border-transparent shadow-md text-white" : "bg-[var(--bg-card)] border-[var(--border-primary)] hover:shadow-sm"
+              }`}
+              style={on ? { background: r.color } : undefined}>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${on ? "bg-white/20" : ""}`}
+                style={on ? undefined : { background: r.color + "18", color: r.color }}>
+                <r.icon size={17} />
               </div>
+              <div className="font-bold text-sm">{r.title}</div>
+              <div className={`text-xs mt-0.5 leading-snug ${on ? "opacity-80" : "text-[var(--text-secondary)]"}`}>{r.desc}</div>
             </button>
-          ))}
+          );
+        })}
+      </div>
+
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border-primary)] flex items-center gap-2">
+          <rapport.icon size={16} style={{ color: rapport.color }} />
+          <span className="font-bold text-[var(--text-primary)] text-sm">{rapport.title}</span>
         </div>
 
-        {/* Report content */}
-        <div className="lg:col-span-3 space-y-4">
-          {activeReport === "ca_mensuel" && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">Évolution CA mensuel — {year}</h3>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">12 mois</span>
-              </div>
-              <CAAreaChart />
-              <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100">
-                {[["CA Total","339 400 TND","text-blue-700"],["Encaissements","283 500 TND","text-emerald-700"],["Objectif","326 000 TND","text-slate-600"]].map(([l,v,c]) => (
-                  <div key={l} className="bg-slate-50 rounded-xl p-3"><div className={`font-black ${c}`}>{v}</div><div className="text-slate-400 text-xs">{l}</div></div>
+        {rapport.id === "ca_mensuel" && (
+          <div className="p-5">
+            <div className="flex items-end gap-1.5 h-48 overflow-x-auto mb-4">
+              {(dash?.serie ?? []).map((m) => (
+                <div key={m.mois} className="flex-1 min-w-[42px] flex flex-col items-center gap-1 group">
+                  <span className="text-[9px] text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition tabular-nums">
+                    {fmt0(m.ca)}
+                  </span>
+                  <motion.div className="w-full rounded-t-md" style={{ background: rapport.color, opacity: 0.85 }}
+                    initial={{ height: 0 }} animate={{ height: `${Math.max(2, (Math.abs(m.ca) / maxSerie) * 100)}%` }}
+                    transition={{ duration: 0.6 }} title={`${m.mois} : ${fmt(m.ca)} TND`} />
+                  <span className="text-[9px] text-[var(--text-secondary)] whitespace-nowrap">{m.mois}</span>
+                </div>
+              ))}
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--bg-primary)] border-y border-[var(--border-primary)]">
+                <tr className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
+                  <th className="px-4 py-2 text-left font-semibold">Mois</th>
+                  <th className="px-4 py-2 text-right font-semibold">Documents</th>
+                  <th className="px-4 py-2 text-right font-semibold">Chiffre d&apos;affaires</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(dash?.serie ?? []).map((m) => (
+                  <tr key={m.mois} className="border-b border-[var(--border-primary)]/60">
+                    <td className="px-4 py-2 font-medium text-[var(--text-primary)]">{m.mois}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-[var(--text-secondary)]">{m.docs}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmt(m.ca)}</td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-          {activeReport === "perf_commerciaux" && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-              <h3 className="font-bold text-slate-800">Performance commerciaux — Mai {year}</h3>
-              <CommercialBarChart />
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b border-slate-100">{["Commercial","CA","Objectif","Taux","Clients","Visites"].map(h => <th key={h} className="text-left py-2 px-2 text-xs font-semibold text-slate-500 uppercase">{h}</th>)}</tr></thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {COMMERCIAL_PERFORMANCE.map(c => (
-                      <tr key={c.name} className="hover:bg-slate-50 transition">
-                        <td className="py-3 px-2 font-semibold text-slate-800">{c.name}</td>
-                        <td className="py-3 px-2 font-bold text-blue-700">{c.ca.toLocaleString()} TND</td>
-                        <td className="py-3 px-2 text-slate-500">{c.objectif.toLocaleString()}</td>
-                        <td className="py-3 px-2"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.taux >= 100 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{c.taux}%</span></td>
-                        <td className="py-3 px-2 text-slate-600">{c.clients}</td>
-                        <td className="py-3 px-2 text-slate-600">{c.visites}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        {rapport.id === "stock_rapport" && (
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Tile label="Valeur totale" value={`${fmt0(k?.valeurStock)} TND`} color={rapport.color} strong />
+              <Tile label="Articles" value={fmt0(k?.nbArticles)} color={rapport.color} />
+              <Tile label="Ruptures" value={fmt0(k?.ruptures)} color="#dc2626" />
+              <Tile label="Taux de rupture" value={`${k?.tauxRupture ?? 0} %`} color="#dc2626" />
             </div>
-          )}
+            <div>
+              <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">
+                Articles en rupture
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--bg-primary)] border-y border-[var(--border-primary)]">
+                  <tr className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
+                    <th className="px-4 py-2 text-left font-semibold">Référence</th>
+                    <th className="px-4 py-2 text-left font-semibold">Désignation</th>
+                    <th className="px-4 py-2 text-right font-semibold">Stock</th>
+                    <th className="px-4 py-2 text-right font-semibold">Minimum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(dash?.topRuptures ?? []).length === 0 && (
+                    <tr><td colSpan={4} className="py-8 text-center text-sm text-[var(--text-secondary)]">Aucune rupture.</td></tr>
+                  )}
+                  {(dash?.topRuptures ?? []).map((a) => (
+                    <tr key={a.refArt} className="border-b border-[var(--border-primary)]/60">
+                      <td className="px-4 py-2 font-mono text-xs">{a.refArt}</td>
+                      <td className="px-4 py-2 text-[var(--text-primary)]">{a.designation}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-red-600 font-semibold">{a.enStock}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-[var(--text-secondary)]">{a.stMin}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-          {activeReport === "stock_rapport" && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">Dépenses de l'année {year}</h3>
-                <span className="text-xs text-slate-500">Statistiques des charges</span>
-              </div>
-              <div className="overflow-x-auto rounded-xl border border-slate-100">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr><th className="text-left px-3 py-2 font-semibold text-slate-500">Dépenses</th>{["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc","Total"].map(m => <th key={m} className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">{m}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {CHARGES_ANNUELLES.map(row => (
-                      <tr key={row.cat} className="hover:bg-slate-50 transition">
-                        <td className="px-3 py-2 font-medium text-slate-700 whitespace-nowrap">{row.cat}</td>
-                        {row.vals.map((v, i) => <td key={i} className="px-2 py-2 text-right text-slate-600">{v > 0 ? v.toLocaleString() : "0"}</td>)}
-                        <td className="px-2 py-2 text-right font-bold text-slate-800">{row.total.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+        {rapport.axe && (
+          <div className="overflow-auto max-h-[55vh]">
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--bg-primary)] border-b border-[var(--border-primary)] sticky top-0">
+                <tr className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
+                  <th className="px-4 py-2.5 text-left font-semibold">Libellé</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Documents</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Montant</th>
+                  <th className="px-4 py-2.5 w-32 font-semibold">Part</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!detail && (
+                  <tr><td colSpan={4} className="py-12 text-center text-[var(--text-secondary)]">
+                    <Loader2 className="animate-spin inline mr-2" size={18} /> Génération…
+                  </td></tr>
+                )}
+                {detail?.rows.length === 0 && (
+                  <tr><td colSpan={4} className="py-12 text-center text-sm text-[var(--text-secondary)]">Aucune donnée.</td></tr>
+                )}
+                {detail?.rows.map((r) => {
+                  const max = Math.max(1, ...detail.rows.map((x) => Math.abs(x.ttc)));
+                  return (
+                    <tr key={r.cle} className="border-b border-[var(--border-primary)]/60 hover:bg-[var(--accent-light)]">
+                      <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">{r.libelle}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--text-secondary)]">{r.docs}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{fmt(r.ttc)}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="h-1.5 rounded-full bg-[var(--bg-primary)] overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${(Math.abs(r.ttc) / max) * 100}%`, background: rapport.color }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {detail && detail.rows.length > 0 && (
+                <tfoot className="bg-[var(--bg-primary)] border-t-2 border-[var(--border-primary)]">
+                  <tr>
+                    <td className="px-4 py-2.5 font-bold text-xs uppercase tracking-wide">Total</td>
+                    <td className="px-4 py-2.5 text-right font-bold tabular-nums">{detail.totalDocs}</td>
+                    <td className="px-4 py-2.5 text-right font-black tabular-nums" style={{ color: rapport.color }}>
+                      {fmt(detail.totalTTC)}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-          {!["ca_mensuel","perf_commerciaux","stock_rapport"].includes(activeReport) && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center text-slate-400">
-              <BarChart3 size={40} className="mx-auto mb-3 opacity-20" />
-              <div className="font-semibold text-slate-600">{REPORTS.find(r => r.id === activeReport)?.title}</div>
-              <p className="text-sm mt-1 mb-4">Rapport disponible — cliquez pour générer</p>
-              <button className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-blue-500 transition text-sm">Générer le rapport</button>
-            </div>
-          )}
-        </div>
+function Kpi({ label, value, sub, color, icon: Icon }: {
+  label: string; value: string; sub: string; color: string; icon: React.ElementType;
+}) {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm p-5">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: color + "18", color }}>
+        <Icon size={18} />
+      </div>
+      <div className="text-xl font-bold" style={{ color }}>{value}</div>
+      <div className="text-[var(--text-secondary)] text-sm mt-1">{label}</div>
+      <div className="text-[var(--text-secondary)] opacity-70 text-xs mt-0.5">{sub}</div>
+    </div>
+  );
+}
+
+function Tile({ label, value, color, strong }: { label: string; value: string; color: string; strong?: boolean }) {
+  return (
+    <div className="rounded-xl border border-[var(--border-primary)] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] font-semibold">{label}</div>
+      <div className={`tabular-nums ${strong ? "text-lg font-extrabold" : "text-base font-bold"}`} style={strong ? { color } : undefined}>
+        {value}
       </div>
     </div>
   );

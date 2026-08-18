@@ -57,7 +57,12 @@ export default function SupervisionPage() {
                   </div>
                   <div className="bg-slate-50 rounded-lg p-2 text-center">
                     <div className="text-xs text-slate-400">CA</div>
-                    <div className="font-bold text-sm text-slate-800">{a.ca.toLocaleString()}</div>
+                    {/* Locale explicite : sans elle, le serveur et le
+                        navigateur formatent différemment et React signale une
+                        erreur d'hydratation. */}
+                    <div className="font-bold text-sm text-slate-800">
+                      {a.ca.toLocaleString("fr-FR")}
+                    </div>
                   </div>
                   <div className="bg-slate-50 rounded-lg p-2 text-center">
                     <div className="text-xs text-slate-400">Vitesse</div>

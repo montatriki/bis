@@ -35,91 +35,132 @@ enum DocumentType {
   AV
   BR
   FAC
+  DEV
+  BC
+  BCC
+  BLC
+  AVC
+}
+
+enum MovementType {
+  IN
+  OUT
+  TRANSFER
+  INVENTORY
+  RETURN
+}
+
+enum AccountClass {
+  CLASSE_1
+  CLASSE_2
+  CLASSE_3
+  CLASSE_4
+  CLASSE_5
+  CLASSE_6
+  CLASSE_7
+}
+
+enum ReglementMode {
+  ESPECES
+  CHEQUE
+  VIREMENT
+  TRAITE
+  CARTE
+}
+
+enum ReglementSens {
+  CLIENT
+  FOURNISSEUR
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  login       String   @unique
-  password    String
-  role        Role
-  avatar      String?
-  phone       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  login     String   @unique
+  password  String
+  role      Role
+  avatar    String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  commercial  Commercial?
-  client      Client?
-  manager     Manager?
+  // Rattachement au tiers ERP (`Partner.id`) : permet à un utilisateur CLIENT
+  // de ne voir que ses propres documents, et à un COMMERCIAL son portefeuille.
+  codeTiers Int?
+
+  commercial Commercial?
+  client     Client?
+  manager    Manager?
 
   @@map("users")
 }
 
 model Manager {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id])
-  department  String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id])
+  department String?
+  createdAt  DateTime @default(now())
 
   @@map("managers")
 }
 
 model Commercial {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id])
-  vehicleId       String?  @unique
-  vehicle         Vehicle? @relation(fields: [vehicleId], references: [id])
-  zone            String?
-  targetCA        Float    @default(5000)
-  missionCode     String?
-  currentLat      Float?
-  currentLng      Float?
-  lastGpsUpdate   DateTime?
-  createdAt       DateTime @default(now())
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+  vehicleId     String?   @unique
+  vehicle       Vehicle?  @relation(fields: [vehicleId], references: [id])
+  zone          String?
+  targetCA      Float     @default(5000)
+  missionCode   String?
+  currentLat    Float?
+  currentLng    Float?
+  lastGpsUpdate DateTime?
+  createdAt     DateTime  @default(now())
 
-  clients         Client[]
-  visits          Visit[]
-  documents       Document[]
-  gpsPositions    GpsPosition[]
-  recordings      Recording[]
+  clients      Client[]
+  visits       Visit[]
+  documents    Document[]
+  gpsPositions GpsPosition[]
+  recordings   Recording[]
 
   @@map("commercials")
 }
 
 model Client {
-  id              String   @id @default(cuid())
-  userId          String?  @unique
-  user            User?    @relation(fields: [userId], references: [id])
-  commercialId    String?
-  commercial      Commercial? @relation(fields: [commercialId], references: [id])
-  name            String
-  address         String?
-  city            String?
-  governorate     String?
-  phone           String?
-  email           String?
-  taxId           String?
-  rc              String?
-  balance         Float    @default(0)
-  creditLimit     Float    @default(5000)
-  category        String?  @default("Grossiste")
-  familyClient    String?
-  isPlanned       Boolean  @default(false)
-  lat             Float?
-  lng             Float?
-  riskScore       Int      @default(0)
-  potentialScore  Int      @default(50)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String      @id @default(cuid())
+  userId         String?     @unique
+  user           User?       @relation(fields: [userId], references: [id])
+  commercialId   String?
+  commercial     Commercial? @relation(fields: [commercialId], references: [id])
+  name           String
+  address        String?
+  city           String?
+  governorate    String?
+  phone          String?
+  email          String?
+  taxId          String?
+  rc             String?
+  balance        Float       @default(0)
+  creditLimit    Float       @default(5000)
+  category       String?     @default("Grossiste")
+  familyClient   String?
+  isPlanned      Boolean     @default(false)
+  lat            Float?
+  lng            Float?
+  riskScore      Int         @default(0)
+  potentialScore Int         @default(50)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  visits          Visit[]
-  documents       Document[]
-  orders          Order[]
-  claims          Claim[]
+  visits     Visit[]
+  documents  Document[]
+  orders     Order[]
+  claims     Claim[]
+  reglements Reglement[]
 
   @@map("clients")
 }
@@ -139,151 +180,366 @@ model Vehicle {
   lastUpdate      DateTime?
   createdAt       DateTime      @default(now())
 
-  commercial      Commercial?
-  gpsPositions    GpsPosition[]
+  // Champs repris de la table `vehicules` de l'ERP d'origine.
+  chassis          String? // NChassis
+  typeVehicule     String? // Type
+  couleur          String? // Couleur
+  assureur         String? // compagnie d'assurance
+  insuranceStart   DateTime? // date_debut_assurance
+  controlStart     DateTime? // date_liv_visite
+  taxPaidAt        DateTime? // date_pay_taxe
+  kmMoyen          Int? // MoyKM
+  consoMoyenneJour Float? // consom_moy_j
+  consoCarburant   Float? // consom_carbur — L/100 km
+
+  // Compteur kilométrique courant : sert d'échéance aux opérations
+  // périodiques (une vidange se déclenche aux km autant qu'à la date).
+  kilometrage Int?
+
+  commercial   Commercial?
+  gpsPositions GpsPosition[]
+  operations   VehiculeOperation[]
 
   @@map("vehicles")
 }
 
+/// Opération périodique d'entretien (vidange, courroie, plaquettes…).
+/// Reprend `vehicules_opérations` de l'ERP d'origine : une opération est due
+/// soit après `intervalleKm` kilomètres, soit après `intervalleJours` jours,
+/// au premier des deux atteint.
+model VehiculeOperation {
+  id        Int     @id @default(autoincrement())
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  libelle String // LibOpération : « Vidange moteur », « Courroie »…
+
+  intervalleKm    Int? // Parcour : périodicité en kilomètres
+  intervalleJours Int? // NBJperemp : périodicité en jours
+
+  // Dernière exécution constatée : point de départ du prochain calcul.
+  dernierKm   Int?
+  derniereDate DateTime?
+
+  // Prochaine échéance (datePRCRDV). Recalculée à chaque exécution.
+  prochaineDate DateTime?
+  prochainKm    Int?
+
+  actif Boolean @default(true)
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId])
+  @@index([prochaineDate])
+  @@map("vehicules_operations")
+}
+
 model GpsPosition {
-  id            String   @id @default(cuid())
-  commercialId  String?
-  commercial    Commercial? @relation(fields: [commercialId], references: [id])
-  vehicleId     String?
-  vehicle       Vehicle?    @relation(fields: [vehicleId], references: [id])
-  lat           Float
-  lng           Float
-  speed         Float    @default(0)
-  timestamp     DateTime @default(now())
+  id           String      @id @default(cuid())
+  commercialId String?
+  commercial   Commercial? @relation(fields: [commercialId], references: [id])
+  vehicleId    String?
+  vehicle      Vehicle?    @relation(fields: [vehicleId], references: [id])
+  lat          Float
+  lng          Float
+  speed        Float       @default(0)
+  timestamp    DateTime    @default(now())
 
   @@map("gps_positions")
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  reference   String   @unique
-  barcode     String?
-  name        String
-  family      String?
-  subFamily   String?
-  stock       Int      @default(0)
-  price       Float    @default(0)
-  priceTTC    Float    @default(0)
-  purchasePrice Float  @default(0)
-  imageUrl    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  reference     String   @unique
+  barcode       String?
+  name          String
+  family        String?
+  subFamily     String?
+  stock         Int      @default(0)
+  price         Float    @default(0)
+  priceTTC      Float    @default(0)
+  purchasePrice Float    @default(0)
+  imageUrl      String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  minStock   Int       @default(5)
+  unit       String    @default("U")
+  tvaRate    Float     @default(19)
+  depotId    String?
+  depot      Depot?    @relation(fields: [depotId], references: [id])
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
   orderLines    OrderLine[]
   documentLines DocumentLine[]
+  movements     StockMovement[]
 
   @@map("products")
 }
 
-model Document {
-  id            String       @id @default(cuid())
-  type          DocumentType
-  reference     String       @unique
-  clientId      String
-  client        Client       @relation(fields: [clientId], references: [id])
-  commercialId  String?
-  commercial    Commercial?  @relation(fields: [commercialId], references: [id])
-  totalHT       Float        @default(0)
-  totalTTC      Float        @default(0)
-  totalTVA      Float        @default(0)
-  discount      Float        @default(0)
-  status        String       @default("PENDING")
-  isValidated   Boolean      @default(false)
-  notes         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+model Supplier {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  contact   String?
+  phone     String?
+  email     String?
+  address   String?
+  city      String?
+  taxId     String?
+  balance   Float    @default(0)
+  category  String?  @default("Local")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  lines         DocumentLine[]
+  products   Product[]
+  documents  PurchaseDocument[]
+  reglements Reglement[]
+
+  @@map("suppliers")
+}
+
+model Depot {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  address   String?
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  products  Product[]
+  movements StockMovement[]
+
+  @@map("depots")
+}
+
+model StockMovement {
+  id          String       @id @default(cuid())
+  reference   String       @unique
+  type        MovementType
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id])
+  depotId     String?
+  depot       Depot?       @relation(fields: [depotId], references: [id])
+  qty         Float
+  qtyBefore   Float        @default(0)
+  qtyAfter    Float        @default(0)
+  unitCost    Float        @default(0)
+  reason      String?
+  documentRef String?
+  createdAt   DateTime     @default(now())
+
+  @@map("stock_movements")
+}
+
+model PurchaseDocument {
+  id         String       @id @default(cuid())
+  type       DocumentType
+  reference  String       @unique
+  supplierId String
+  supplier   Supplier     @relation(fields: [supplierId], references: [id])
+  totalHT    Float        @default(0)
+  totalTTC   Float        @default(0)
+  totalTVA   Float        @default(0)
+  discount   Float        @default(0)
+  paid       Float        @default(0)
+  status     String       @default("PENDING")
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@map("purchase_documents")
+}
+
+model Account {
+  id         String       @id @default(cuid())
+  number     String       @unique
+  label      String
+  class      AccountClass
+  parentId   String?
+  isStandard Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+
+  entries AccountEntry[]
+
+  @@map("accounts")
+}
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  reference   String   @unique
+  journal     String   @default("OD")
+  date        DateTime @default(now())
+  label       String
+  totalDebit  Float    @default(0)
+  totalCredit Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  lines AccountEntry[]
+
+  @@map("journal_entries")
+}
+
+model AccountEntry {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id])
+  label          String?
+  debit          Float        @default(0)
+  credit         Float        @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@map("account_entries")
+}
+
+model BankAccount {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  bank      String
+  rib       String?
+  iban      String?
+  label     String
+  balance   Float    @default(0)
+  type      String   @default("BANQUE")
+  createdAt DateTime @default(now())
+
+  reglements Reglement[]
+
+  @@map("bank_accounts")
+}
+
+model Reglement {
+  id            String        @id @default(cuid())
+  reference     String        @unique
+  sens          ReglementSens
+  mode          ReglementMode
+  amount        Float
+  date          DateTime      @default(now())
+  dueDate       DateTime?
+  clientId      String?
+  client        Client?       @relation(fields: [clientId], references: [id])
+  supplierId    String?
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id])
+  bankAccountId String?
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  chequeNumber  String?
+  status        String        @default("ENCAISSE")
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  @@map("reglements")
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  type         DocumentType
+  reference    String       @unique
+  clientId     String
+  client       Client       @relation(fields: [clientId], references: [id])
+  commercialId String?
+  commercial   Commercial?  @relation(fields: [commercialId], references: [id])
+  totalHT      Float        @default(0)
+  totalTTC     Float        @default(0)
+  totalTVA     Float        @default(0)
+  discount     Float        @default(0)
+  status       String       @default("PENDING")
+  isValidated  Boolean      @default(false)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  lines DocumentLine[]
 
   @@map("documents")
 }
 
 model DocumentLine {
-  id          String   @id @default(cuid())
-  documentId  String
-  document    Document @relation(fields: [documentId], references: [id])
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  qty         Float
-  unitPrice   Float
-  discount    Float    @default(0)
-  totalHT     Float
-  totalTTC    Float
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  qty        Float
+  unitPrice  Float
+  discount   Float    @default(0)
+  totalHT    Float
+  totalTTC   Float
+  createdAt  DateTime @default(now())
 
   @@map("document_lines")
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  reference     String      @unique
-  clientId      String
-  client        Client      @relation(fields: [clientId], references: [id])
-  status        OrderStatus @default(PENDING)
-  totalTTC      Float       @default(0)
-  deliveryDate  DateTime?
-  notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  reference    String      @unique
+  clientId     String
+  client       Client      @relation(fields: [clientId], references: [id])
+  status       OrderStatus @default(PENDING)
+  totalTTC     Float       @default(0)
+  deliveryDate DateTime?
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  lines         OrderLine[]
+  lines OrderLine[]
 
   @@map("orders")
 }
 
 model OrderLine {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id])
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  qty         Int
-  unitPrice   Float
-  totalTTC    Float
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  qty       Int
+  unitPrice Float
+  totalTTC  Float
+  createdAt DateTime @default(now())
 
   @@map("order_lines")
 }
 
 model Visit {
-  id            String   @id @default(cuid())
-  commercialId  String
-  commercial    Commercial @relation(fields: [commercialId], references: [id])
-  clientId      String
-  client        Client   @relation(fields: [clientId], references: [id])
-  checkedIn     Boolean  @default(false)
-  checkInTime   DateTime?
-  checkOutTime  DateTime?
-  duration      Int?
-  notes         String?
-  tags          String[]
-  caVisit       Float    @default(0)
-  createdAt     DateTime @default(now())
+  id           String     @id @default(cuid())
+  commercialId String
+  commercial   Commercial @relation(fields: [commercialId], references: [id])
+  clientId     String
+  client       Client     @relation(fields: [clientId], references: [id])
+  checkedIn    Boolean    @default(false)
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+  duration     Int?
+  notes        String?
+  tags         String[]
+  caVisit      Float      @default(0)
+  createdAt    DateTime   @default(now())
 
-  recordings    Recording[]
+  recordings Recording[]
 
   @@map("visits")
 }
 
 model Recording {
-  id            String   @id @default(cuid())
-  visitId       String
-  visit         Visit    @relation(fields: [visitId], references: [id])
-  commercialId  String
-  commercial    Commercial @relation(fields: [commercialId], references: [id])
-  duration      Int?
-  fileUrl       String?
-  transcript    String?
-  summary       String?
-  sentiment     String?
-  keywords      String[]
-  createdAt     DateTime @default(now())
+  id           String     @id @default(cuid())
+  visitId      String
+  visit        Visit      @relation(fields: [visitId], references: [id])
+  commercialId String
+  commercial   Commercial @relation(fields: [commercialId], references: [id])
+  duration     Int?
+  fileUrl      String?
+  transcript   String?
+  summary      String?
+  sentiment    String?
+  keywords     String[]
+  createdAt    DateTime   @default(now())
 
   @@map("recordings")
 }
@@ -302,13 +558,2030 @@ model Claim {
 }
 
 model Notification {
-  id          String   @id @default(cuid())
-  userId      String
-  title       String
-  message     String
-  type        String
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@map("notifications")
+}
+
+/// Alerte système masquée par un utilisateur.
+///
+/// Les alertes de stock, d'impayés ou d'échéance véhicule ne sont pas stockées :
+/// elles se recalculent à chaque appel. « Tout lire » ne pouvait donc rien
+/// faire — le compteur revenait aussitôt. On mémorise ici l'acquittement, par
+/// utilisateur et par alerte, avec la date : une alerte réapparaît si la
+/// situation évolue (nouveau montant, nouvelle échéance).
+model AlerteAcquittee {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  /// Identifiant stable de l'alerte système (`sys-ruptures`, `sys-impaye-…`).
+  cle       String
+  /// Empreinte du contenu : si elle change, l'alerte est de nouveau pertinente.
+  empreinte String
+  acquitteA DateTime @default(now())
+
+  @@unique([userId, cle])
+  @@index([userId])
+  @@map("alertes_acquittees")
+}
+
+// ============================================================
+// EXTERNAL MIRROR MODELS — faithful copy of the S.K.Y ERP data
+// (clients/fournisseurs/tiers, articles, documents vente/achat)
+// ============================================================
+
+model Partner {
+  id           Int       @id // = Code_cli from source
+  nature       String // C=client, F=fournisseur, T=tiers/charge
+  raisonSocial String
+  adresse      String?
+  tel          String?
+  fax          String?
+  email        String?
+  ville        String?
+  gouvernorat  String?
+  codeTva      String?
+  cletva       String?
+  categorieTva String?
+  matriculeF   String? // MF
+  famille      String? // Fam_cli
+  sousFamille  String? // Sous_fam_cli
+  soldeIni     Float     @default(0)
+  debit        Float     @default(0)
+  credit       Float     @default(0)
+  soldeFin     Float     @default(0)
+  plafond      Float?
+  remiseDef    Float     @default(0)
+  commercial   String?
+  longitude    Float?
+  latitude     Float?
+  archiver     Int       @default(0)
+  exo          Int?
+  assuj        Int?
+  isEmploye    Int       @default(0)
+
+  // Tiers de charge : l'ERP d'origine distingue « liste des tiers » des
+  // fournisseurs par ce seul indicateur (`row.Charge === 1`), et non par la
+  // nature du compte. VIVO ENERGY est ainsi à la fois fournisseur et tiers de
+  // charge — le filtrer sur `nature = "T"` l'excluait de la liste.
+  charge       Int       @default(0)
+  registreCom  String?
+  dateCreation DateTime?
+
+  // Photo du point de vente, prise par le commercial lors de la création du
+  // client sur le terrain. Stockée en data URL (JPEG redimensionné côté client)
+  // : l'application n'a pas de stockage de fichiers dédié.
+  photo        String?
+  // Trace de la création terrain : qui a saisi le client, et depuis où.
+  creePar      String?
+
+  // Unicité client (téléphone, matricule fiscal) : assurée par deux index
+  // UNIQUE **partiels** créés dans la migration
+  // `20260805200000_client_obligatoire_unique`. Ils portent sur une expression
+  // (téléphone réduit à ses chiffres, matricule en majuscules) et ne couvrent
+  // que les valeurs renseignées — Prisma ne sait pas décrire cela, d'où le SQL
+  // manuel. Ne pas régénérer ce modèle avec `db push`, qui les supprimerait.
+  @@index([nature])
+  @@index([raisonSocial])
+  @@map("partners")
+}
+
+model Article {
+  refArt        String  @id // ref_art
+  codeBarre     String?
+  designation   String
+  caract        String?
+  catalogue     String?
+  codeCatalogue Int     @default(0)
+  famille       Int? // Code_fam
+  sousFamille   Int? // Code_sou_fam
+  unite         String?
+  puAchat       Float   @default(0)
+  puAchatTtc    Float   @default(0)
+  pmp           Float   @default(0)
+  dpa           Float   @default(0)
+  puInv         Float   @default(0)
+  tarif1Ht      Float   @default(0)
+  tarif2Ht      Float   @default(0)
+  tarif3Ht      Float   @default(0)
+  maTarif1      Float   @default(0)
+  tauxTva       Float   @default(0)
+  tauxFodec     Float   @default(0)
+  stockIni      Float   @default(0)
+  entrer        Float   @default(0)
+  sortie        Float   @default(0)
+  enStock       Float   @default(0)
+  vendable      Int     @default(1)
+  achetable     Int     @default(1)
+  service       Int     @default(0)
+  archiver      Int     @default(0)
+  refOrigine    String?
+  kind          String  @default("P") // P=produit fini, MP=matiere, SF=semi-fini, CH=charge
+
+  // Fiche article — extended fields
+  fab           String?
+  uniteEntree   String?
+  conversion    Float   @default(1)
+  marque        String?
+  sousCategorie String?
+  fodecAchat    Float   @default(0)
+  fodecVente    Float   @default(0)
+  margePct      Float   @default(0)
+  stMin         Float   @default(0)
+  stMax         Float   @default(0)
+  remiseMax     Float   @default(0)
+  commission    Float   @default(0)
+  remiseParQte  Int     @default(0)
+  fifo          Int     @default(0)
+  lifo          Int     @default(0)
+  gerSerie      Int     @default(0)
+  gesLot        Int     @default(0)
+  cmpteVente    String?
+  cmpteVenteExp String?
+  cmpteVenteExo String?
+  cmpteAchatLoc String?
+  cmpteAchatImp String?
+
+  @@index([designation])
+  @@index([famille])
+  @@index([kind])
+  @@map("articles_ext")
+}
+
+model ErpDocument {
+  refDoc       String    @id // Ref_doc
+  nature       String // Vente | Achat | Stock
+  typeDoc      String // Type_doc (BL, FAC, AV, COM, BRE...)
+  caraDoc      String? // Cara_doc
+  libDoc       String?
+  dateDoc      DateTime?
+  codeCli      Int?
+  raisonSocial String?
+  adrCli       String?
+  mf           String?
+  numSeq       String?
+  thtBrut      Float     @default(0)
+  totRemise    Float     @default(0)
+  thtNet       Float     @default(0)
+  totTva       Float     @default(0)
+  timbre       Float     @default(0)
+  totFodec     Float     @default(0)
+  ttcNet       Float     @default(0)
+  soldeDoc     Float     @default(0)
+  totalRegle   Float     @default(0)
+  etat         String?
+  modePayement String?
+  codeMag      Int?
+
+  // Document de charge : `tiers` porte le compte de charge rattaché. C'est ce
+  // champ — et non le type de document — qui définit une charge dans l'ERP
+  // d'origine (`WHERE E.tiers IS NOT NULL`) : une facture FAO imputée à un
+  // tiers est une charge au même titre qu'un FCH.
+  tiers        String?
+
+  // Transfert de stock (`Type_doc = TR`) : dépôt d'origine et de destination.
+  // Repris de `transfer_from` / `transfer_to` de l'ERP d'origine, où l'écran
+  // « Liste des transferts » réutilise la liste des documents d'achat filtrée
+  // sur ce type.
+  transferFrom String?
+  transferTo   String?
+
+  // Suivi du cycle, affiché en cases à cocher dans la liste d'origine.
+  generer      Boolean @default(false)
+  facturer     Boolean @default(false)
+  comptabiliser Boolean @default(false)
+  utilisateur  String?
+  vehicule     String?
+  commercial   String?
+  // `dayID` dans A : rattache le document à la tournée qui l'a produit.
+  // Sans lui, impossible de réconcilier une journée de vente ambulante.
+  dayId        Int?
+  mission      ErpMission? @relation(fields: [dayId], references: [id], onDelete: SetNull)
+  echeance     DateTime?
+  couleur      String?
+
+  // Validation : tant que false, le document n'a impacté ni le stock ni le solde.
+  // Empêche d'appliquer deux fois les mouvements (cf. ErpStockMovement).
+  valide     Boolean   @default(false)
+  dateValide DateTime?
+
+  // Transformation : références des documents sources (Devis → BL → Facture).
+  docSource   String? // référence(s) d'origine, séparées par ";"
+  transformeEn String? // document cible issu de celui-ci
+
+  lignes     ErpDocumentLine[]
+  mouvements ErpStockMovement[]
+
+  @@index([nature, typeDoc])
+  @@index([codeCli])
+  @@index([dateDoc])
+  @@map("documents_ext")
+}
+
+// Journal des mouvements de stock au niveau article — reproduit l'effet de
+// `updateStockArticleByMvt` de l'ERP source, avec traçabilité avant/après.
+model ErpStockMovement {
+  id       Int          @id @default(autoincrement())
+  refDoc   String?
+  document ErpDocument? @relation(fields: [refDoc], references: [refDoc], onDelete: SetNull)
+
+  refArt String
+  sens   String // E = entrée, S = sortie
+  qte    Float  @default(0)
+
+  stockAvant Float @default(0)
+  stockApres Float @default(0)
+  puHt       Float @default(0)
+
+  typeDoc   String?
+  codeMag   Int? // dépôt / magasin
+  motif     String?
+  createdAt DateTime @default(now())
+
+  @@index([refDoc])
+  @@index([refArt])
+  @@index([createdAt])
+  @@map("stock_movements_ext")
+}
+
+// Lignes d'un document — mirrors `entete_vente_articles` in the source ERP.
+// The header carries only totals; the lines are what is actually sold.
+model ErpDocumentLine {
+  id       Int         @id @default(autoincrement())
+  refDoc   String
+  document ErpDocument @relation(fields: [refDoc], references: [refDoc], onDelete: Cascade)
+
+  refArt      String
+  designation String
+  unite       String?
+
+  qte       Float @default(0)
+  puHt      Float @default(0) // prix unitaire HT avant remise
+  remise    Float @default(0) // % de remise ligne
+  tauxTva   Float @default(0)
+  tauxFodec Float @default(0)
+
+  thtBrut Float @default(0) // qte * puHt
+  thtNet  Float @default(0) // après remise
+  totTva  Float @default(0)
+  ttcNet  Float @default(0)
+
+  ordre     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  // Quote-part de charges fixes ventilée sur cette ligne (colonne `charge` de
+  // `entete_vente_articles` dans A). Permet la marge nette réelle par article.
+  charge Float @default(0)
+
+  // Traçabilité de transformation : document source dont cette ligne provient
+  // (équivalent de `Doc_liee` dans l'ERP source).
+  docLiee String?
+
+  @@index([refDoc])
+  @@index([refArt])
+  @@map("document_lines_ext")
+}
+
+model RefTable {
+  id    Int     @id @default(autoincrement())
+  kind  String // famille-frs, sousfamille-frs, famille-cli, sousfamille-cli, depot, commercial, vehicule, doctype-vente, doctype-achat
+  code  String?
+  label String
+  data  Json?
+
+  @@index([kind])
+  @@map("ref_tables")
+}
+
+// ============================================================
+// TREASURY MIRROR — règlements clients/fournisseurs, comptes, borderaux
+// ============================================================
+
+model ErpReglement {
+  // `reglements_clients` et `reglements_fournisseurs` sont deux tables MySQL
+  // distinctes, chacune avec son propre auto-increment : 651 `ID_reg` existent
+  // des deux côtés en désignant des règlements différents. `id` est donc une
+  // clé de substitution — les fournisseurs sont décalés au-dessus de la plage
+  // clients — et `idSource` conserve l'identifiant d'origine, seul valable pour
+  // se rapprocher de la production (à lire avec `sens`).
+  id          Int      @id
+  idSource    Int?                     // ID_reg d'origine
+  sens        String                   // C=client, F=fournisseur
+  datePay     DateTime?
+  montant     Float    @default(0)
+  echeance    String?
+  numPiece    String?
+  numDoc      String?
+  etat        String?                  // Etat_Rég (Encaissé, en cours...)
+  modePay     String?                  // Espèce, Chèque, Virement, Traite
+  tiersCode   Int?                     // Code_cli
+  tiersNom    String?                  // client / fournisseur name
+  utilisateur String?
+  banque      String?
+  idEmplac    Int?
+  commentaire String?
+
+  // `dayID` dans A : l'encaissement est rattaché à la tournée qui l'a collecté.
+  // C'est ce qui permet de dire ce qu'un commercial doit rendre en fin de journée.
+  dayId       Int?
+  mission     ErpMission? @relation(fields: [dayId], references: [id], onDelete: SetNull)
+
+  // Bordereau de remise en banque (`ID_Bord`) : nul tant que le règlement n'a
+  // pas été déposé.
+  borderauId  Int?
+  borderau    ErpBorderau? @relation(fields: [borderauId], references: [id], onDelete: SetNull)
+  lettrage    String?
+
+  @@unique([sens, idSource])
+  @@index([borderauId])
+  @@index([sens])
+  @@index([datePay])
+  @@index([dayId])
+  @@map("erp_reglements")
+}
+
+model ErpAccount {
+  id           Int      @id           // Id_emplac
+  type         String?                 // Type_emp
+  rib          String?
+  libelle      String?                 // Lib_Cpte
+  banque       String?
+  agence       String?
+  nature       String?
+  codeJournal  String?
+  planComptable String?
+
+  @@map("erp_accounts")
+}
+
+model ErpBorderau {
+  id          Int      @id            // ID_Bord
+  dateBord    DateTime?
+  numCompte   String?
+  total       Float    @default(0)
+  type        String?                  // Type_brd
+  mtEsp       Float    @default(0)
+  utilisateur String?
+
+  // Un bordereau de remise est un regroupement de règlements déposés ensemble
+  // en banque : sans ce lien l'écran ne peut ni détailler son contenu, ni
+  // justifier son total.
+  reglements  ErpReglement[]
+
+  @@map("erp_borderaux")
+}
+
+// Ordres de mission (Gestion Tourner) — fleet missions
+model ErpMission {
+  id          Int      @id            // id_day
+  utilisateur String?
+  commercial  String?
+  vehicule    String?
+  dateOrdre   DateTime?
+  kmDepart    Float    @default(0)
+  kmArrive    Float    @default(0)
+  etat        String?
+  du          DateTime?
+  au          DateTime?
+
+  // Objectif de chiffre pour la tournée, saisi par le manager.
+  objectifCA  Float    @default(0)
+
+  createdAt   DateTime @default(now())
+  // `@default(now())` et non `@updatedAt` seul : les 2 509 tournées déjà
+  // importées n'ont pas de valeur, la migration échouerait sans défaut.
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  lignes      LigneMission[]
+  documents   ErpDocument[]
+  reglements  ErpReglement[]
+  reclamations Reclamation[]
+  frais       FraisMission[]
+
+  @@index([commercial])
+  @@index([etat])
+  @@index([dateOrdre])
+  @@map("erp_missions")
+}
+
+// Ligne de mission : un client à visiter dans la tournée (table `ligne_mission`).
+// C'est le planning réel du commercial, en remplacement des visites inventées.
+model LigneMission {
+  id        Int        @id @default(autoincrement())
+  dayId     Int
+  mission   ErpMission @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  codeCli   Int?
+  clientNom String?
+  motif     String?
+  objectif  Float      @default(0)
+  numOrdre  Int        @default(0)
+
+  // Suivi de la visite — absent de A, qui ne stockait que le planning.
+  // Sans état, on ne peut pas distinguer « à visiter » de « visité ».
+  etat        String    @default("À visiter") // À visiter | Visité | Reporté | Absent
+  heurePrevue String?
+  dateVisite  DateTime?
+  // Géolocalisation du passage, quand le terminal la fournit.
+  latitude    Float?
+  longitude   Float?
+  commentaire String?
+
+  // Enregistrements vocaux capturés pendant la visite.
+  enregistrements EnregistrementVisite[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dayId])
+  @@index([codeCli])
+  @@index([etat])
+  @@map("ligne_mission")
+}
+
+// Réclamation client saisie en tournée (table `reclamation_client`).
+// Rattachée aux **tiers réels** (`Partner.id`), pas au modèle démo `Client`.
+model Reclamation {
+  id        Int         @id @default(autoincrement())
+  dayId     Int?
+  mission   ErpMission? @relation(fields: [dayId], references: [id], onDelete: SetNull)
+
+  codeCli   Int?
+  clientNom String?
+
+  type        String  @default("Autre")
+  reclamation String
+  // Ouverte | En cours | Résolue | Rejetée
+  etat        String  @default("Ouverte")
+  reponse     String?
+
+  utilisateur String?
+  latitude    Float?
+  longitude   Float?
+
+  dateReclam  DateTime  @default(now())
+  dateReponse DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([codeCli])
+  @@index([etat])
+  @@index([dayId])
+  @@map("reclamation_client")
+}
+
+// ============================================================
+// GRH — gestion des ressources humaines
+// Reprend la structure de `grh_personnel` et de ses tables de référence
+// dans l'ERP source (grh_fonction, grh_grade, grh_service, grh_categorie,
+// grh_echelon, grh_pointage, grh_conge, grh_session, grh_bulletin_paie).
+// ============================================================
+
+model GrhFonction {
+  id        Int            @id @default(autoincrement())
+  libelle   String
+  code      String?
+  personnel GrhPersonnel[]
+
+  @@map("grh_fonction")
+}
+
+model GrhGrade {
+  id        Int            @id @default(autoincrement())
+  libelle   String
+  code      String?
+  personnel GrhPersonnel[]
+
+  @@map("grh_grade")
+}
+
+model GrhService {
+  id        Int            @id @default(autoincrement())
+  libelle   String
+  code      String?
+  personnel GrhPersonnel[]
+
+  @@map("grh_service")
+}
+
+model GrhCategorie {
+  id        Int            @id @default(autoincrement())
+  libelle   String
+  code      String?
+  personnel GrhPersonnel[]
+
+  @@map("grh_categorie")
+}
+
+model GrhEchelon {
+  id        Int            @id @default(autoincrement())
+  libelle   String
+  code      String?
+  personnel GrhPersonnel[]
+
+  @@map("grh_echelon")
+}
+
+// Sessions de paie (mois de traitement)
+model GrhSession {
+  id       Int       @id @default(autoincrement())
+  libelle  String
+  mois     Int?
+  annee    Int?
+  nHeures  Float     @default(0)
+  nJours   Float     @default(26)
+  cloturee Boolean   @default(false)
+  dateDeb  DateTime?
+  dateFin  DateTime?
+
+  pointages GrhPointage[]
+  conges    GrhConge[]
+  bulletins GrhBulletin[]
+  rubriques GrhRubriqueEmploye[]
+
+  @@map("grh_session")
+}
+
+model GrhPersonnel {
+  id  Int    @id @default(autoincrement())
+  // Matricule employé — `Code_cli` dans l'ERP source.
+  codeEmploye String @unique
+
+  nom     String
+  prenom  String?
+  cin     String?
+  lieuCin String?
+  dateCin DateTime?
+
+  sexe               String? // Homme | Femme
+  dateNaiss          DateTime?
+  lieuNaiss          String?
+  situationFamiliale String? // Célibataire | Marié | Divorcé | Veuf
+  chefFamille        Boolean   @default(false)
+  nbrEnfants         Int       @default(0)
+  nbrHandicape       Int       @default(0)
+
+  adresse String?
+  tel     String?
+  email   String?
+
+  // Contrat
+  numContrat    String?
+  contratDu     DateTime?
+  contratAu     DateTime?
+  dateEmbauche  DateTime?
+  dateDepart    DateTime?
+  titularisation DateTime?
+  partant       Boolean   @default(false)
+
+  // Rémunération
+  traitement String? // M = mensuel, H = horaire
+  salaireBase Float  @default(0)
+  coutHoraire Float  @default(0)
+  njTraitNormal Float @default(26)
+  njMaxMois     Float @default(30)
+  smigar        Boolean @default(false)
+  plafondCredit Float   @default(0)
+
+  // Congés
+  soldeConge Float @default(0)
+  prixConge  Float @default(0)
+
+  // CNSS / assurance
+  numCnss            String?
+  typeCnss           String?
+  pourcentageAssGro  Float @default(0)
+  pourcentageAssAccTra Float @default(0)
+  montExoAss         Float @default(0)
+
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fonctionId  Int?
+  fonction    GrhFonction?  @relation(fields: [fonctionId], references: [id])
+  gradeId     Int?
+  grade       GrhGrade?     @relation(fields: [gradeId], references: [id])
+  serviceId   Int?
+  service     GrhService?   @relation(fields: [serviceId], references: [id])
+  categorieId Int?
+  categorie   GrhCategorie? @relation(fields: [categorieId], references: [id])
+  echelonId   Int?
+  echelon     GrhEchelon?   @relation(fields: [echelonId], references: [id])
+
+  pointages GrhPointage[]
+  conges    GrhConge[]
+  bulletins GrhBulletin[]
+  contrats  GrhContrat[]
+  rubriques GrhRubriqueEmploye[]
+
+  @@index([nom])
+  @@index([actif])
+  @@map("grh_personnel")
+}
+
+// Pointage mensuel. Le régime de l'employé décide des colonnes utilisées :
+// M = mensuel (jours), H = horaire (heures).
+model GrhPointage {
+  id          Int          @id @default(autoincrement())
+  codeEmploye String
+  personnel   GrhPersonnel @relation(fields: [codeEmploye], references: [codeEmploye], onDelete: Cascade)
+  sessionId   Int
+  session     GrhSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  regime String @default("M")
+
+  presenceJ Float @default(0)
+  presenceH Float @default(0)
+  ferieJ    Float @default(0)
+  ferieH    Float @default(0)
+  ferieTrJ  Float @default(0)
+  ferieTrH  Float @default(0)
+  congeJ    Float @default(0)
+  congeH    Float @default(0)
+  absenceJ  Float @default(0)
+  absenceH  Float @default(0)
+  hSupp     Float @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([codeEmploye, sessionId])
+  @@index([sessionId])
+  @@map("grh_pointage")
+}
+
+model GrhConge {
+  id          Int          @id @default(autoincrement())
+  codeEmploye String
+  personnel   GrhPersonnel @relation(fields: [codeEmploye], references: [codeEmploye], onDelete: Cascade)
+  sessionId   Int?
+  session     GrhSession?  @relation(fields: [sessionId], references: [id])
+
+  dateDebut DateTime
+  dateFin   DateTime
+  nbrJours  Float    @default(0)
+  motif     String?
+  statut    String   @default("En attente") // En attente | Approuvé | Refusé
+
+  createdAt DateTime @default(now())
+
+  @@index([codeEmploye])
+  @@index([sessionId])
+  @@map("grh_conge")
+}
+
+// Bulletin de paie — résultat du traitement d'une session pour un employé.
+model GrhBulletin {
+  id          Int          @id @default(autoincrement())
+  codeEmploye String
+  personnel   GrhPersonnel @relation(fields: [codeEmploye], references: [codeEmploye], onDelete: Cascade)
+  sessionId   Int
+  session     GrhSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  salaireBase   Float @default(0)
+  primes        Float @default(0)
+  heuresSupp    Float @default(0)
+  brutImposable Float @default(0)
+  cnss          Float @default(0)
+  irpp          Float @default(0)
+  css           Float @default(0)
+  autresRet     Float @default(0)
+  netAPayer     Float @default(0)
+
+  jourTravailles Float @default(0)
+  createdAt      DateTime @default(now())
+
+  @@unique([codeEmploye, sessionId])
+  @@index([sessionId])
+  @@map("grh_bulletin")
+}
+
+// Objectifs commerciaux mensuels — n'existaient dans B que sous forme de
+// tableau codé en dur. Le réalisé est calculé depuis les documents de vente.
+model Objectif {
+  id         Int      @id @default(autoincrement())
+  // Vendeur : correspond à `ErpDocument.utilisateur` (ou `commercial`).
+  vendeur    String
+  mois       Int
+  annee      Int
+  objectifCA Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([vendeur, mois, annee])
+  @@index([annee, mois])
+  @@map("objectifs")
+}
+
+// ============================================================
+// COMPTABILITÉ — exercices, journaux, paramétrage d'intégration
+// Reprend `exercices_compta`, `journaux_comptable`, `vente_achat_compta`
+// et `ecritures_comptable` de l'ERP source.
+// ============================================================
+
+model ExerciceCompta {
+  id       Int      @id @default(autoincrement())
+  libelle  String
+  annee    Int
+  dateDeb  DateTime
+  dateFin  DateTime
+  cloture  Boolean  @default(false)
+  courant  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  ecritures EcritureCompta[]
+  bilans    BilanComptable[]
+
+  @@unique([annee])
+  @@map("exercices_compta")
+}
+
+model JournalCompta {
+  id      Int     @id @default(autoincrement())
+  code    String  @unique // VE, AC, BQ, CA, OD
+  libelle String
+  type    String  @default("OD") // Vente | Achat | Trésorerie | OD
+
+  ecritures EcritureCompta[]
+
+  @@map("journaux_compta")
+}
+
+// Écriture comptable — une ligne du grand livre.
+// Chaque pièce (`numPiece`) regroupe plusieurs lignes équilibrées.
+model EcritureCompta {
+  id Int @id @default(autoincrement())
+
+  exerciceId Int
+  exercice   ExerciceCompta @relation(fields: [exerciceId], references: [id], onDelete: Cascade)
+
+  codeJournal String
+  journal     JournalCompta @relation(fields: [codeJournal], references: [code])
+
+  numPiece     String // pièce comptable : regroupe les lignes d'une écriture
+  numOrdre     Int    @default(0)
+  numCompte    String
+  libelleCompte String?
+  libelleEcriture String?
+
+  dateEcriture DateTime
+  refDoc       String? // document commercial d'origine
+
+  debit  Float @default(0)
+  credit Float @default(0)
+
+  utilisateur String?
+  createdAt   DateTime @default(now())
+
+  @@index([exerciceId, numCompte])
+  @@index([numPiece])
+  @@index([dateEcriture])
+  @@index([refDoc])
+  @@map("ecritures_compta")
+}
+
+// Plan comptable de l'exercice (mirrors `plan_comptable`).
+model CompteCompta {
+  id        Int     @id @default(autoincrement())
+  numCompte String
+  intitule  String
+  classe    Int     @default(0)
+  soldeIni  Float   @default(0)
+  lettrable Boolean @default(false)
+
+  @@unique([numCompte])
+  @@index([classe])
+  @@map("plan_comptable")
+}
+
+// Paramétrage de l'intégration comptable — quel compte utiliser pour quoi.
+// Équivalent de `vente_achat_compta` dans A.
+model ParamCompta {
+  id           Int    @id @default(autoincrement())
+  cle          String @unique // cptClient, cptFournisseur, cptVente, cptAchat, cptTva, cptFodec, cptTimbre, cptCaisse, cptBanque
+  numCompte    String
+  libelle      String?
+
+  @@map("param_compta")
+}
+
+// ============================================================
+// TRÉSORERIE — chéquiers, lignes de bordereau, mouvements de compte
+// Complète `ErpAccount` / `ErpBorderau` / `ErpReglement` déjà présents.
+// Reprend `chequiers`, `borderaux` et `accounts_mvt` de l'ERP source.
+// ============================================================
+
+model Chequier {
+  id        Int     @id @default(autoincrement())
+  banque    String
+  numCompte String? // compte de trésorerie rattaché (ErpAccount.id)
+  serie     String? // série / libellé du chéquier
+  numDebut  Int
+  numFin    Int
+  suivant   Int     @default(0) // prochain numéro disponible
+  epuise    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  cheques   Cheque[]
+
+  @@index([banque])
+  @@map("chequiers")
+}
+
+model Cheque {
+  id         Int      @id @default(autoincrement())
+  chequierId Int
+  chequier   Chequier @relation(fields: [chequierId], references: [id], onDelete: Cascade)
+
+  numero    Int
+  montant   Float     @default(0)
+  dateEmis  DateTime?
+  echeance  DateTime?
+  // Emis | Remis | Encaissé | Rejeté | Déchiré
+  etat      String    @default("Emis")
+  tiersNom  String?
+  tiersCode Int?
+  refDoc    String?
+  borderauId Int?
+
+  createdAt DateTime @default(now())
+
+  @@unique([chequierId, numero])
+  @@index([etat])
+  @@index([echeance])
+  @@map("cheques")
+}
+
+// Lignes d'un bordereau de remise : quels règlements sont remis en banque.
+model BorderauLigne {
+  id         Int      @id @default(autoincrement())
+  borderauId Int
+  reglementId Int?
+  chequeId    Int?
+
+  numPiece  String?
+  tiersNom  String?
+  montant   Float    @default(0)
+  echeance  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([borderauId])
+  @@map("borderau_lignes")
+}
+
+// Mouvements d'un compte de trésorerie — construit l'extrait de compte.
+model MouvementCompte {
+  id        Int      @id @default(autoincrement())
+  compteId  Int      // ErpAccount.id
+  dateMvt   DateTime
+  libelle   String
+  sens      String   // E = entrée (débit compte), S = sortie (crédit compte)
+  montant   Float    @default(0)
+  soldeApres Float   @default(0)
+
+  reference   String? // n° pièce / chèque
+  refDoc      String?
+  reglementId Int?
+  borderauId  Int?
+  utilisateur String?
+
+  createdAt DateTime @default(now())
+
+  @@index([compteId, dateMvt])
+  @@map("mouvements_compte")
+}
+
+// ============================================================
+// CRM — opportunités et tickets SAV
+// Reprend `opportunites`, `evenement_opportunite`, `crm_pdr` et
+// `crm_intervenants` de l'ERP source. Rattaché aux tiers réels (`Partner`).
+// ============================================================
+
+model Opportunite {
+  id      Int     @id @default(autoincrement())
+  libelle String
+  // Tiers ERP concerné (Partner.id) — pas le modèle démo `Client`.
+  codeCli Int?
+  clientNom String?
+
+  // Prospection | Qualification | Proposition | Négociation | Gagnée | Perdue
+  etape       String   @default("Prospection")
+  montant     Float    @default(0)
+  probabilite Int      @default(50)
+  source      String?
+  suiviPar    String?
+  description String?
+  dateCloture DateTime?
+  archiver    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  evenements EvenementOpportunite[]
+
+  @@index([etape])
+  @@index([codeCli])
+  @@map("opportunites")
+}
+
+// Historique d'une opportunité : appels, visites, relances.
+model EvenementOpportunite {
+  id            Int         @id @default(autoincrement())
+  opportuniteId Int
+  opportunite   Opportunite @relation(fields: [opportuniteId], references: [id], onDelete: Cascade)
+
+  type      String // Appel | Visite | Email | Relance | Note
+  libelle   String
+  dateEvent DateTime @default(now())
+  auteur    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([opportuniteId])
+  @@map("evenements_opportunite")
+}
+
+// Ticket SAV / réclamation (mirrors `crm_pdr`).
+model TicketSav {
+  id        Int     @id @default(autoincrement())
+  reference String  @unique
+  codeCli   Int?
+  clientNom String?
+
+  typePanne   String?
+  description String
+  // Ouvert | En cours | Résolu | Clôturé | Rejeté
+  etat        String  @default("Ouvert")
+  priorite    String  @default("Normale") // Basse | Normale | Haute | Urgente
+  intervenant String?
+  solution    String?
+
+  dateReclamation DateTime  @default(now())
+  dateReparation  DateTime?
+  refDoc          String? // document commercial concerné
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([etat])
+  @@index([codeCli])
+  @@map("tickets_sav")
+}
+
+// ============================================================
+// STOCK PAR EMPLACEMENT — dépôts, magasins, véhicules
+// Comble `updateStockDepotByMvt` de l'ERP source : le stock article global
+// existait déjà, mais rien ne suivait la répartition par emplacement.
+// ============================================================
+
+model StockDepot {
+  id       Int    @id @default(autoincrement())
+  refArt   String
+  // Emplacement : code du dépôt / magasin / véhicule (RefTable kind=depot|vehicule).
+  emplacement String
+  quantite Float  @default(0)
+
+  // Coût moyen pondéré **de cet emplacement**. La marchandise d'un camion peut
+  // avoir été achetée à un autre prix que celle du dépôt : valoriser les deux
+  // au `Article.pmp` global fausse la valeur du stock par emplacement.
+  // Recalculé à chaque entrée (voir `pmpApresEntree` dans lib/tarif-article).
+  pmp      Float  @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([refArt, emplacement])
+  @@index([emplacement])
+  @@map("stock_depots")
+}
+
+// Journal des mouvements entre emplacements (bons de sortie / transfert / retour).
+model MouvementDepot {
+  id     Int     @id @default(autoincrement())
+  refDoc String?
+  typeDoc String?
+
+  refArt      String
+  designation String?
+  quantite    Float   @default(0)
+
+  // Un transfert renseigne les deux ; une sortie n'a que `source`,
+  // une entrée (retour) n'a que `destination`.
+  source      String?
+  destination String?
+
+  utilisateur String?
+  createdAt   DateTime @default(now())
+
+  @@index([refDoc])
+  @@index([refArt])
+  @@map("mouvements_depot")
+}
+
+// ============================================================
+// GMAO — parc machines
+// ============================================================
+
+model GmaoMachine {
+  id        Int    @id @default(autoincrement())
+  numSerie  String?
+  machine   String
+  posteCharge String? // libellé du poste de charge (GPAO, pas encore une entité dédiée)
+  etat      String @default("Fonctionnel") // Fonctionnel | En panne | En réparation
+
+  dateMiseEnMarche DateTime?
+  coutAcquisition  Float     @default(0)
+  capaciteHoraire  Float     @default(0)
+  coutHoraire      Float     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("gmao_machines")
+}
+
+// ============================================================
+// GPAO — données techniques, CBN, planification
+// Reprend gpao_poste_charge, gpao_entete_nomenclature,
+// gpao_ligne_nomenclature, gpao_entete_gammes, gpao_operations,
+// gpao_operations_gamme, ligne_operations_of, gpao_plannification,
+// gpao_jalonnements de l'ERP source.
+// ============================================================
+
+// Poste de charge : machine, main d'œuvre ou sous-traitance.
+model GpaoPosteCharge {
+  id      Int     @id @default(autoincrement())
+  code    String  @unique
+  libelle String
+  centre  String?
+
+  // Nature du poste — un poste peut cumuler machine + main d'œuvre.
+  mainOeuvre    Boolean @default(false)
+  machine       Boolean @default(false)
+  sousTraitance Boolean @default(false)
+
+  // Capacité : nombre de ressources et heures ouvrables par jour.
+  nbRessources Float @default(1)
+  heureDebut   String @default("08:00") // schéma hebdomadaire simplifié
+  heureFin     String @default("17:00")
+  pauseDebut   String @default("12:00")
+  pauseFin     String @default("13:00")
+
+  coutHoraire Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operationsGamme GpaoOperationGamme[]
+  plans           GpaoPlan[]
+
+  @@map("gpao_postes_charge")
+}
+
+// Jalonnement : mode d'enchaînement des opérations d'une gamme.
+model GpaoJalonnement {
+  id      Int    @id @default(autoincrement())
+  code    String @unique
+  libelle String
+
+  createdAt DateTime @default(now())
+
+  @@map("gpao_jalonnements")
+}
+
+// Opération standard réutilisable dans les gammes.
+model GpaoOperation {
+  id      Int    @id @default(autoincrement())
+  code    String @unique
+  libelle String
+
+  typeJalonnement String? // Successif | Chevauchement | Simultané
+  operationSuivante Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operationsGamme GpaoOperationGamme[]
+
+  @@map("gpao_operations")
+}
+
+// En-tête de nomenclature : la composition d'un article fabriqué.
+model GpaoNomenclature {
+  refArt String  @id // article fabriqué (Article.refArt)
+  desArt String?
+  site   String?
+
+  alternative String? // variante de nomenclature
+  versionMaj  String?
+  versionMin  String?
+  uniteStock  String?
+  uniteGes    String?
+  // Quantité de produit fini que les lignes permettent de fabriquer.
+  qteBase     Float   @default(1)
+
+  dateRef      DateTime?
+  dateDebutVal DateTime?
+  dateFinVal   DateTime?
+
+  // Une nomenclature en élaboration n'est pas utilisable par le CBN.
+  elaboration  Boolean @default(true)
+  exploitation Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lignes GpaoNomenclatureLigne[]
+
+  @@map("gpao_nomenclatures")
+}
+
+// Composant d'une nomenclature.
+model GpaoNomenclatureLigne {
+  id     Int              @id @default(autoincrement())
+  refNom String
+  nomenclature GpaoNomenclature @relation(fields: [refNom], references: [refArt], onDelete: Cascade)
+
+  refArt String // composant (Article.refArt)
+  desArt String?
+  // MP = matière première, SF = semi-fini, CH = charge/consommable
+  typeComposant String @default("MP")
+
+  numOrdre    Int   @default(0)
+  numSequence Int   @default(0)
+  qte         Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([refNom])
+  @@index([refArt])
+  @@map("gpao_nomenclature_lignes")
+}
+
+// En-tête de gamme : la suite d'opérations pour fabriquer un article.
+model GpaoGamme {
+  id       Int     @id @default(autoincrement())
+  gamme    String  @unique
+  desGamme String?
+  refArt   String? // article concerné
+  site     String?
+
+  alternative String?
+  versionMaj  String?
+  versionMin  String?
+
+  dateRef      DateTime?
+  dateDebutVal DateTime?
+  dateFinVal   DateTime?
+
+  elaboration  Boolean @default(true)
+  exploitation Boolean @default(false)
+
+  qteMin Float @default(0)
+  qteMax Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operations GpaoOperationGamme[]
+
+  @@index([refArt])
+  @@map("gpao_gammes")
+}
+
+// Opération d'une gamme, avec ses temps et son poste de charge.
+model GpaoOperationGamme {
+  id      Int       @id @default(autoincrement())
+  gammeId Int
+  gamme   GpaoGamme @relation(fields: [gammeId], references: [id], onDelete: Cascade)
+
+  operationId Int?
+  operation   GpaoOperation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+
+  desOperation String
+  numSequence  Int    @default(0)
+
+  posteChargeId Int?
+  posteCharge   GpaoPosteCharge? @relation(fields: [posteChargeId], references: [id], onDelete: SetNull)
+  nbPosteCharge Int  @default(1)
+  posteMo       String?
+  nbPosteMo     Int  @default(0)
+
+  // Les 3 temps de A : réglage, préparation, opératoire (en minutes).
+  tempsReg         Float @default(0)
+  tempsPreparation Float @default(0)
+  tempsOperatoire  Float @default(0)
+  // Temps opératoire exprimé pour `qteBase` unités.
+  qteBase          Float @default(1)
+  coeffCharge      Float @default(1)
+  efficience       Float @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gammeId])
+  @@map("gpao_operations_gamme")
+}
+
+// Opération rattachée à un ordre de fabrication (ligne_operations_of).
+model GpaoOperationOf {
+  id     Int    @id @default(autoincrement())
+  refDoc String // ErpDocument.refDoc de l'OF
+  desArt String?
+
+  operationId  Int?
+  desOperation String
+  numSequence  Int    @default(0)
+
+  posteChargeId Int?
+  posteMo       String?
+
+  tempsReg         Float @default(0)
+  tempsPreparation Float @default(0)
+  tempsOperatoire  Float @default(0)
+  duree            Float @default(0) // total en minutes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([refDoc])
+  @@map("gpao_operations_of")
+}
+
+// Créneau planifié : une tranche de temps sur une ressource.
+model GpaoPlan {
+  id     Int    @id @default(autoincrement())
+  refDoc String // OF planifié
+
+  operationId  Int?
+  desOperation String?
+
+  dateDebut DateTime
+  dateFin   DateTime
+  duree     Float    @default(0) // minutes
+  // Temps réglage | Temps préparation | Temps opératoire
+  typeDuree String   @default("Temps opératoire")
+
+  posteChargeId Int?
+  posteCharge   GpaoPosteCharge? @relation(fields: [posteChargeId], references: [id], onDelete: SetNull)
+  posteMo       String?
+  // false = créneau placé alors que la ressource était déjà occupée.
+  disponibilite Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([refDoc])
+  @@index([dateDebut])
+  @@map("gpao_plannification")
+}
+
+// ============================================================
+// Suivi des numéros de série (entete_vente/achat_articles_serie)
+// ============================================================
+
+model NumeroSerie {
+  id       Int    @id @default(autoincrement())
+  numSerie String
+  refArt   String
+  desArt   String?
+
+  // Vente | Achat — le sens du document qui a bougé le numéro.
+  sens   String @default("Achat")
+  refDoc String?
+  // Ligne de document d'origine, si la saisie vient de l'éditeur de lignes.
+  ligneId Int?
+
+  codeCli   Int?
+  tiersNom  String?
+  dateDoc   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([numSerie])
+  @@index([refArt])
+  @@index([refDoc])
+  @@map("numeros_serie")
+}
+
+// ============================================================
+// Projets (table `projets`)
+// ============================================================
+
+model Projet {
+  id     Int    @id @default(autoincrement())
+  projet String
+
+  codeCli   Int?
+  raisonSoc String?
+
+  respProjet String?
+  famille    String?
+  description String?
+  adresse    String?
+  modePay    String?
+
+  dateAccept  DateTime?
+  periodeDu   DateTime?
+  periodeAu   DateTime?
+  dateLiv     DateTime?
+  dateFinReel DateTime?
+
+  // En attente | En cours | Terminé | Livré | Annulé
+  etat String @default("En attente")
+  // Avancement saisi (0–100) ; recalculé depuis les jalons quand il y en a.
+  avancement Float @default(0)
+  budget     Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jalons ProjetJalon[]
+
+  @@index([codeCli])
+  @@index([etat])
+  @@map("projets")
+}
+
+// Jalonnement d'un projet — l'état d'avancement de A.
+model ProjetJalon {
+  id       Int    @id @default(autoincrement())
+  projetId Int
+  projet   Projet @relation(fields: [projetId], references: [id], onDelete: Cascade)
+
+  libelle     String
+  numOrdre    Int   @default(0)
+  poids       Float @default(1) // pondération dans l'avancement global
+  avancement  Float @default(0) // 0–100
+
+  datePrevue DateTime?
+  dateReelle DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projetId])
+  @@map("projet_jalons")
+}
+
+// ============================================================
+// GRH — contrats de travail (table `grh_contrats`)
+// ============================================================
+
+model GrhContrat {
+  id          Int          @id @default(autoincrement())
+  personnelId Int
+  personnel   GrhPersonnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  // CDI | CDD | CIVP | SIVP | Stage
+  typeContrat String @default("CDI")
+  reference   String?
+
+  dateDebut DateTime
+  // Un CDI n'a pas de date de fin ; un CDD/CIVP en a une obligatoirement.
+  dateFin   DateTime?
+  // Période d'essai en mois.
+  essaiMois Float @default(0)
+
+  salaireBrut Float  @default(0)
+  poste       String?
+  lieuTravail String?
+  horaire     String?
+  observation String?
+
+  // En cours | Expiré | Rompu | Renouvelé
+  etat String @default("En cours")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personnelId])
+  @@index([etat])
+  @@map("grh_contrats")
+}
+
+// ============================================================
+// Droits d'accès (list_droit_access + component_user_droit)
+// ============================================================
+
+// Catalogue des fonctions protégeables, par composant.
+model DroitFonction {
+  id        Int    @id @default(autoincrement())
+  component String // module / écran (ex. "vente.documents")
+  funcName  String // action (ex. "creat_doc")
+  funcLib   String // libellé affiché
+  typeFn    String @default("action") // action | affichage | acces
+  numOrder  Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  droits DroitUtilisateur[]
+
+  @@unique([component, funcName])
+  @@index([component])
+  @@map("list_droit_access")
+}
+
+// Droit accordé (ou refusé) à un utilisateur sur une fonction.
+model DroitUtilisateur {
+  id     Int    @id @default(autoincrement())
+  login  String // User.login — les droits suivent le login, comme dans A
+  fonctionId Int
+  fonction   DroitFonction @relation(fields: [fonctionId], references: [id], onDelete: Cascade)
+
+  valeur Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([login, fonctionId])
+  @@index([login])
+  @@map("component_user_droit")
+}
+
+// ============================================================
+// GRH — rubriques de paie, grilles de salaire, types CNSS, barème IRPP
+// Reprend rubrique_paie, rubrique_employe, grille_salaire /
+// grh_grillesalaire, grh_typecnss / type_cnss et grh_impo.
+// ============================================================
+
+// Rubrique de paie paramétrable (prime, indemnité, retenue).
+// Les drapeaux décident sur quelles bases la rubrique agit — c'est ce qui
+// distingue une prime imposable d'une indemnité exonérée.
+model GrhRubrique {
+  id      Int    @id @default(autoincrement())
+  code    String @unique
+  libelle String
+
+  // Gain (ajoutée au brut) ou Retenue (soustraite).
+  sens String @default("Gain") // Gain | Retenue
+
+  // Assiettes concernées — repris des colonnes Rub_* de `rubrique_paie`.
+  soumisCnss      Boolean @default(true)
+  soumisIrpp      Boolean @default(true)
+  soumisAccTravail Boolean @default(false)
+  soumisAssGroupe  Boolean @default(false)
+  // Rub_ABSENCES : la rubrique est réduite au prorata des absences.
+  prorataAbsence  Boolean @default(false)
+  // Rub_NOMBRE : montant = quantité × montant unitaire (heures, repas…).
+  parQuantite     Boolean @default(false)
+
+  actif Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lignes GrhRubriqueEmploye[]
+
+  @@map("rubrique_paie")
+}
+
+// Rubrique affectée à un employé, pour une session de paie donnée.
+model GrhRubriqueEmploye {
+  id         Int         @id @default(autoincrement())
+  rubriqueId Int
+  rubrique   GrhRubrique @relation(fields: [rubriqueId], references: [id], onDelete: Cascade)
+
+  codeEmploye String
+  personnel   GrhPersonnel @relation(fields: [codeEmploye], references: [codeEmploye], onDelete: Cascade)
+
+  // Rubrique permanente (toutes sessions) si sessionId est nul.
+  sessionId Int?
+  session   GrhSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  montant  Float @default(0)
+  quantite Float @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([rubriqueId, codeEmploye, sessionId])
+  @@index([codeEmploye])
+  @@index([sessionId])
+  @@map("rubrique_employe")
+}
+
+// Grille de salaire : le salaire de base déduit du régime + catégorie + échelon.
+model GrhGrilleSalaire {
+  id Int @id @default(autoincrement())
+
+  regime    String // M = mensuel, H = horaire
+  categorie String
+  echelon   String
+  // Salaire de base (régime M) ou taux horaire (régime H).
+  salaireBase   Float @default(0)
+  dureeEchelon  Float @default(0) // en mois, avant passage à l'échelon suivant
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([regime, categorie, echelon])
+  @@map("grille_salaire")
+}
+
+// Type CNSS : jeu de taux salariaux et patronaux selon le régime d'affiliation.
+model GrhTypeCnss {
+  id      Int    @id @default(autoincrement())
+  code    String @unique
+  libelle String
+
+  // Retenues salariales et charges patronales, en %.
+  retCnss  Float @default(9.18)
+  chCnss   Float @default(16.57)
+  retCavis Float @default(0)
+  chCavis  Float @default(0)
+  // Un stagiaire peut être affilié sans être imposable.
+  retenuIrpp Boolean @default(true)
+
+  // Un seul type par défaut : appliqué aux employés sans type explicite.
+  parDefaut Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("grh_typecnss")
+}
+
+// Tranche du barème IRPP (table `grh_impo`), pour rendre le barème modifiable
+// sans redéploiement — le moteur `paie-calc.ts` accepte déjà un barème surchargé.
+model GrhTrancheIrpp {
+  id Int @id @default(autoincrement())
+
+  // Bornes annuelles en TND ; `au` nul = dernière tranche (illimitée).
+  du   Float
+  au   Float?
+  taux Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([du])
+  @@map("grh_impo")
+}
+
+// ============================================================
+// Comptabilité — bilan actif/passif paramétrable
+// Reprend parametrage_bilan (les lignes et leurs formules) et
+// bilan_comptable (le bilan calculé et figé pour un exercice).
+// ============================================================
+
+// Ligne de bilan et sa formule de calcul.
+//
+// La formule est une liste de comptes, préfixés + ou −, séparés par des ; :
+//   "+21;+22;-281;-282"   → immobilisations brutes moins amortissements
+// Un préfixe de compte agrège tous ses sous-comptes (21 couvre 2110, 2181…),
+// exactement comme le plan comptable tunisien s'utilise.
+model ParamBilan {
+  id      Int    @id @default(autoincrement())
+  libelle String
+  formule String @default("")
+
+  // ACTIF | PASSIF | (sous-totaux calculés à l'affichage)
+  type     String
+  // Rubrique de regroupement (ex. « Actifs non courants »).
+  rubrique String?
+  numOrdre Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@map("parametrage_bilan")
+}
+
+// Bilan figé pour un exercice — garde la trace du calculé à une date donnée.
+model BilanComptable {
+  id         Int    @id @default(autoincrement())
+  exerciceId Int
+  exercice   ExerciceCompta @relation(fields: [exerciceId], references: [id], onDelete: Cascade)
+
+  libelle  String
+  montant  Float  @default(0)
+  type     String
+  rubrique String?
+  numOrdre Int    @default(0)
+  dateArret DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([exerciceId])
+  @@map("bilan_comptable")
+}
+
+// ============================================================
+// Stock — inventaire physique
+// Reprend la logique d'inventaire de `inventoryModule` : on saisit le
+// comptage réel, on compare au théorique, puis on régularise.
+// ============================================================
+
+model Inventaire {
+  id        Int      @id @default(autoincrement())
+  reference String   @unique
+  libelle   String?
+  // Inventaire d'un emplacement précis, ou global si nul.
+  emplacement String?
+
+  dateInv DateTime @default(now())
+  // Brouillon → Validé. Un inventaire validé a régularisé le stock et
+  // ne peut plus être modifié : c'est la pièce justificative de l'écart.
+  etat    String   @default("Brouillon")
+
+  utilisateur String?
+  observation String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lignes InventaireLigne[]
+
+  @@index([etat])
+  @@map("inventaires")
+}
+
+model InventaireLigne {
+  id           Int        @id @default(autoincrement())
+  inventaireId Int
+  inventaire   Inventaire @relation(fields: [inventaireId], references: [id], onDelete: Cascade)
+
+  refArt      String
+  designation String?
+
+  // Stock théorique figé au moment de la saisie : sans lui, l'écart se
+  // recalculerait après coup et perdrait toute valeur de preuve.
+  qteTheorique Float @default(0)
+  qteComptee   Float @default(0)
+  // qteComptee − qteTheorique, stocké pour l'historique.
+  ecart        Float @default(0)
+  // Valorisation de l'écart au PMP du moment.
+  pmp          Float @default(0)
+  valeurEcart  Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([inventaireId, refArt])
+  @@index([refArt])
+  @@map("inventaire_lignes")
+}
+
+// ============================================================
+// Commercial terrain — panier persistant et bon d'approvisionnement
+// Reprend les tuiles « PANIER DE COMMANDE » et « BON D'APPROVISIONNEMENT »
+// de l'application commerciale de l'ERP source.
+// ============================================================
+
+// Panier de commande en cours d'un commercial.
+//
+// Dans B le panier vivait dans l'état React : il disparaissait au moindre
+// changement d'écran, et le badge du menu ne pouvait rien afficher. Il est
+// désormais persisté, un panier ouvert par commercial.
+model Panier {
+  id          Int    @id @default(autoincrement())
+  utilisateur String
+
+  // Client destinataire, choisi au moment de valider.
+  codeCli   Int?
+  clientNom String?
+
+  // Ouvert | Validé | Abandonné. Un panier validé garde la référence du
+  // document créé, pour retrouver la commande depuis l'historique.
+  etat   String  @default("Ouvert")
+  refDoc String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  lignes PanierLigne[]
+
+  @@index([utilisateur, etat])
+  @@map("paniers")
+}
+
+model PanierLigne {
+  id       Int    @id @default(autoincrement())
+  panierId Int
+  panier   Panier @relation(fields: [panierId], references: [id], onDelete: Cascade)
+
+  refArt      String
+  designation String?
+  unite       String?
+  qte         Float  @default(1)
+  // Prix figé à l'ajout : un tarif modifié en cours de saisie ne doit pas
+  // changer rétroactivement ce que le commercial a annoncé au client.
+  puHt        Float  @default(0)
+  tauxTva     Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([panierId, refArt])
+  @@index([panierId])
+  @@map("panier_lignes")
+}
+
+// Bon d'approvisionnement : demande de réassort du stock camion.
+//
+// Le commercial constate un manque en tournée et demande au dépôt de le
+// recharger. La validation crée un vrai mouvement dépôt → véhicule (BST),
+// donc le stock ne bouge qu'une fois la demande servie.
+model BonApprovisionnement {
+  id        Int    @id @default(autoincrement())
+  reference String @unique
+
+  utilisateur String
+  commercial  String?
+  vehicule    String?
+  // Dépôt sollicité.
+  depot       String?
+  dayId       Int?
+
+  // Demandé | Servi | Refusé
+  etat        String  @default("Demandé")
+  observation String?
+  // Référence du bon de sortie généré à la validation.
+  refMouvement String?
+
+  dateDemande DateTime  @default(now())
+  dateService DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  lignes BonApproLigne[]
+
+  @@index([utilisateur])
+  @@index([etat])
+  @@map("bons_approvisionnement")
+}
+
+model BonApproLigne {
+  id     Int                  @id @default(autoincrement())
+  bonId  Int
+  bon    BonApprovisionnement @relation(fields: [bonId], references: [id], onDelete: Cascade)
+
+  refArt      String
+  designation String?
+  qteDemandee Float  @default(0)
+  // Ce que le dépôt a réellement servi : une demande peut être servie
+  // partiellement, et c'est cette quantité qui bouge le stock.
+  qteServie   Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([bonId, refArt])
+  @@index([bonId])
+  @@map("bon_appro_lignes")
+}
+
+// ============================================================
+// Référentiels articles — familles, sous-familles, unités, catalogue
+// Reprend fam_art, sous_fam_art, unité_art et catalogue de l'ERP source.
+//
+// Constat du §10 : `Article.famille` et `Article.sousFamille` portent des codes
+// numériques (2, 3, 11…) sans aucune table de libellés. Les écrans affichaient
+// donc « 2 » au lieu de « Papeterie ». Ces tables comblent ce manque.
+// ============================================================
+
+model FamilleArticle {
+  code    Int     @id // code_fam
+  libelle String
+  // Une famille de charge ne se vend pas : elle sert la comptabilité analytique.
+  charge  Boolean @default(false)
+  // Lettrage comptable de la famille (fam_lettre_cpt) : permet une ventilation
+  // du chiffre par famille dans le plan comptable.
+  lettreCompta String?
+  image   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("fam_art")
+}
+
+model SousFamilleArticle {
+  code    Int     @id // code_sou_fam
+  libelle String
+  charge  Boolean @default(false)
+  lettreCompta String?
+  image   String?
+
+  // Rattachement à la famille : absent de A (les deux tables y sont
+  // indépendantes), mais sans lui une sous-famille est orpheline et le
+  // filtrage en cascade famille → sous-famille est impossible.
+  codeFamille Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([codeFamille])
+  @@map("sous_fam_art")
+}
+
+model UniteArticle {
+  unite String @id // unité_art n'a que cette colonne dans A
+  // Libellé long optionnel : « PCS » reste cryptique sur un bon de livraison.
+  libelle String?
+
+  createdAt DateTime @default(now())
+
+  @@map("unite_art")
+}
+
+model CatalogueArticle {
+  code    Int     @id
+  libelle String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("catalogue_art")
+}
+
+// ============================================================
+// Charges fixes — répartition analytique sur les lignes de vente
+// Reprend charges_fixes et `calculateCharges` de l'ERP source.
+// ============================================================
+
+model ChargeFixe {
+  id      Int      @id @default(autoincrement())
+  libelle String?
+
+  du  DateTime
+  au  DateTime
+  // Montant total de la charge sur la période, et son équivalent journalier.
+  montant    Float @default(0)
+  montantJr  Float @default(0)
+  nbJour     Int   @default(0)
+
+  // Répartie | Brouillon — une charge répartie a écrit sur les lignes de vente.
+  etat        String @default("Brouillon")
+  dateRepartition DateTime?
+  // Nombre de lignes de document touchées, pour pouvoir annuler.
+  lignesTouchees  Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([etat])
+  @@map("charges_fixes")
+}
+
+// ============================================================
+// Frais de mission — carburant, péage, repas d'une tournée
+// Reprend la table `frais_mission` de l'ERP source.
+// ============================================================
+
+model FraisMission {
+  id     Int         @id @default(autoincrement())
+  dayId  Int
+  mission ErpMission @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  // Article de charge associé, quand le frais correspond à une référence
+  // (carburant suivi en stock par exemple).
+  refArt  String?
+  libelle String?
+  montant Float   @default(0)
+  puAchat Float   @default(0)
+  // Le carburant est isolé : c'est le poste que le gestionnaire suit de près.
+  carburant Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([dayId])
+  @@map("frais_mission")
+}
+
+// ============================================================
+// Plan comptable standard — modèle réutilisable d'un exercice à l'autre
+// Reprend plan_comptable_standard et `insertInexistantPlanActuel` de A.
+// ============================================================
+
+model CompteStandard {
+  id        Int    @id @default(autoincrement())
+  numCompte String @unique
+  intitule  String
+
+  utilisable Boolean @default(true)
+  pointable  Boolean @default(false)
+  lettrable  Boolean @default(false)
+  commentaire String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("plan_comptable_standard")
+}
+
+// ============================================================
+// Traites bancaires (lettres de change / الكمبيالة) — module KEMBYELTY
+// Saisie, historique et réimpression des traites tirées sur les clients.
+// L'impression se fait sur formulaire pré-imprimé : seules les valeurs sortent,
+// positionnées au millimètre (voir src/lib/traite-layout.ts).
+// ============================================================
+
+model Traite {
+  id Int @id @default(autoincrement())
+
+  // Référence interne séquentielle (TR-2026-0001) + n° d'ordre porté sur le papier.
+  reference   String  @unique
+  numeroOrdre String?
+
+  // Tiré : celui qui doit payer. Rattaché au tiers ERP quand il est connu,
+  // mais la saisie libre reste possible (traite sur un tiers hors référentiel).
+  codeTiers   Int?
+  tireNom     String
+  tireAdresse String?
+
+  // Bénéficiaire (« payer à l'ordre de ») — la société par défaut.
+  beneficiaire String
+
+  // RIB du tiré, éclaté comme sur le formulaire : 2 + 3 + 13 + 2 chiffres.
+  ribBanque String?
+  ribAgence String?
+  ribCompte String?
+  ribCle    String?
+
+  domiciliation String?
+  valeurEn      String?
+  nomCedant     String?
+
+  // Montant en dinars, 3 décimales (millimes). Le texte en lettres est
+  // recalculé à l'affichage mais conservé pour tracer ce qui a été imprimé.
+  montant        Decimal @db.Decimal(14, 3)
+  montantLettres String?
+
+  lieuCreation String?
+  dateCreation DateTime  @default(now())
+  echeance     DateTime?
+
+  // Brouillon | Imprimée | Remise | Payée | Impayée | Annulée
+  etat String @default("Brouillon")
+
+  // Traçabilité d'impression : combien de fois et quand.
+  nbImpressions Int       @default(0)
+  derniereImpr  DateTime?
+
+  // Calibrage retenu lors de la dernière impression (décalage mm imprimante).
+  offsetX Float @default(0)
+  offsetY Float @default(0)
+
+  notes       String?
+  utilisateur String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([codeTiers])
+  @@index([etat])
+  @@index([echeance])
+  @@map("traite_bancaire")
+}
+
+// ============================================================
+// Enregistrement vocal d'une visite terrain
+//
+// Déclenché quand le commercial confirme son arrivée (« Je suis chez ce
+// client ») et arrêté quand le GPS constate qu'il s'éloigne. Rattaché à la
+// **ligne de mission** réelle, et non au modèle démo `Visit` qui ne porte que
+// 2 enregistrements de test.
+// ============================================================
+
+model EnregistrementVisite {
+  id     Int          @id @default(autoincrement())
+  ligneId Int
+  ligne  LigneMission @relation(fields: [ligneId], references: [id], onDelete: Cascade)
+
+  commercial String
+  codeCli    Int?
+  clientNom  String?
+
+  // Position au démarrage : sert à détecter l'éloignement (arrêt automatique).
+  latitude   Float?
+  longitude  Float?
+
+  debut   DateTime  @default(now())
+  fin     DateTime?
+  duree   Int       @default(0)  // secondes
+
+  // Audio encodé (data URL) ou chemin de fichier selon le déploiement.
+  audio      String?
+  transcript String?
+
+  // "manuel" | "eloignement" — comment l'enregistrement s'est terminé.
+  motifFin String?
+
+  createdAt DateTime @default(now())
+
+  @@index([ligneId])
+  @@index([commercial])
+  @@map("enregistrements_visite")
 }

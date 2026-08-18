@@ -9,6 +9,8 @@ export type SessionUser = {
   email: string;
   role: string;
   login: string;
+  /** Tiers ERP rattaché (Partner.id) — un CLIENT ne voit que ses documents. */
+  codeTiers?: number | null;
 };
 
 export async function hashPassword(password: string) {
@@ -58,6 +60,7 @@ export async function loginUser(login: string, password: string) {
     email: user.email,
     role: user.role,
     login: user.login,
+    codeTiers: user.codeTiers ?? null,
   };
   await createSession(session);
   return session;
