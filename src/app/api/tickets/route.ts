@@ -113,21 +113,30 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // liste
-  const rows = await prisma.erpDocument.findMany({
-    where: filtre,
-    orderBy: [{ dateDoc: "desc" }, { refDoc: "desc" }],
-    take: 100,
-    select: {
-      refDoc: true, typeDoc: true, dateDoc: true, raisonSocial: true,
-      thtNet: true, totTva: true, ttcNet: true, totalRegle: true,
-      soldeDoc: true, valide: true, utilisateur: true, dayId: true,
-      _count: { select: { lignes: true } },
-    },
-  });
+  // liste — paginée : un commercial cumule plus de 1 500 tickets, une liste
+  // plafonnée en cachait l'essentiel tout en annonçant « 100 » comme total.
+  const PAGE = 100;
+  const page = Math.max(0, Number(sp.get("page")) || 0);
+  const [rows, total] = await Promise.all([
+    prisma.erpDocument.findMany({
+      where: filtre,
+      orderBy: [{ dateDoc: "desc" }, { refDoc: "desc" }],
+      skip: page * PAGE,
+      take: PAGE,
+      select: {
+        refDoc: true, typeDoc: true, dateDoc: true, raisonSocial: true,
+        thtNet: true, totTva: true, ttcNet: true, totalRegle: true,
+        soldeDoc: true, valide: true, utilisateur: true, dayId: true,
+        _count: { select: { lignes: true } },
+      },
+    }),
+    prisma.erpDocument.count({ where: filtre }),
+  ]);
 
   return NextResponse.json({
     rows: rows.map((r) => ({ ...r, nbLignes: r._count.lignes })),
-    total: rows.length,
+    total,
+    page,
+    pages: Math.ceil(total / PAGE),
   });
 }

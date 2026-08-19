@@ -15,6 +15,89 @@ import { cleCommercial } from "@/lib/perimetre-commercial";
 const vendeurDe = (d: { commercial: string | null; utilisateur: string | null }) =>
   d.commercial?.trim() || d.utilisateur?.trim() || "";
 
+/**
+ * Deux noms de famille désignent-ils la même personne mal orthographiée ?
+ *
+ * « cheli » / « chelly » diffèrent d'un caractère : c'est une faute de saisie,
+ * pas deux commerciaux. Au-delà, on considère des personnes différentes.
+ */
+function proches(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 2) return false;
+  // Distance de Levenshtein, bornée : les noms sont courts.
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  );
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+  }
+  // Tolérance proportionnelle à la longueur : « cheli » / « chelly » sont à
+  // distance 2 pour 6 lettres — une même personne saisie de deux façons —
+  // alors que « lajmi » / « rekik » sont à distance 5 : deux personnes.
+  const max = Math.max(a.length, b.length);
+  return d[a.length][b.length] <= Math.max(1, Math.floor(max / 3));
+}
+
+/** Nom complet normalisé : sans accents, sans casse, espaces resserrés. */
+const cleNom = (v: string) =>
+  v.normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Clé de regroupement d'un vendeur.
+ *
+ * Un même commercial est écrit de plusieurs façons dans les documents
+ * (« MOKHTAR », « mokhtar trabelsi », « Mokhtar Trabelsi ») : sans
+ * regroupement, son chiffre d'affaires est réparti sur trois lignes.
+ *
+ * Le rapprochement se fait sur le **prénom**, mais seulement lorsqu'il ne
+ * désigne qu'une personne : « HENI LAJMI » et « heni rekik » sont deux
+ * commerciaux distincts, les fusionner serait pire que de les séparer. Les
+ * prénoms ambigus gardent donc leur nom complet comme clé.
+ */
+function cleVendeur(nom: string, prenomsAmbigus: Set<string>): string {
+  const complet = cleNom(nom);
+  const prenom = complet.split(" ")[0] ?? "";
+  if (!prenom) return complet;
+  return prenomsAmbigus.has(prenom) ? complet : prenom;
+}
+
+/**
+ * Prénoms portés par plusieurs personnes distinctes. Deux graphies d'un même
+ * nom (« aziz cheli » / « aziz chelly ») ne rendent pas le prénom ambigu :
+ * seules comptent les variantes dont le nom de famille diffère vraiment.
+ */
+function prenomsAmbigus(noms: Iterable<string>): Set<string> {
+  const parPrenom = new Map<string, Set<string>>();
+  for (const n of noms) {
+    const complet = cleNom(n);
+    const [prenom, ...reste] = complet.split(" ");
+    if (!prenom) continue;
+    const famille = reste.join(" ");
+    // Un prénom seul (« MOKHTAR ») ne distingue personne : on ne le compte pas.
+    if (!famille) continue;
+    const set = parPrenom.get(prenom) ?? new Set<string>();
+    set.add(famille);
+    parPrenom.set(prenom, set);
+  }
+  const ambigus = new Set<string>();
+  for (const [prenom, familles] of parPrenom) {
+    // Familles proches (« cheli » / « chelly ») : même personne mal saisie.
+    // Un simple préfixe ne suffit pas — la faute peut être au milieu du mot —
+    // d'où la comparaison par distance d'édition.
+    const distinctes = [...familles].filter(
+      (f, i, arr) => !arr.some((g, j) => j < i && proches(f, g)),
+    );
+    if (distinctes.length > 1) ambigus.add(prenom);
+  }
+  return ambigus;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireSession(["ADMIN", "MANAGER"]);
   if (!auth.ok) return auth.res;
@@ -23,32 +106,56 @@ export async function GET(req: NextRequest) {
   const vendeur = sp.get("vendeur")?.trim();
   const { debut, fin } = periode(sp.get("du"), sp.get("au"));
 
-  const docs = await prisma.erpDocument.findMany({
-    where: { nature: "Vente", typeDoc: { in: [...TYPES_CA] }, dateDoc: { gte: debut, lte: fin } },
-    select: {
-      refDoc: true, typeDoc: true, ttcNet: true, thtNet: true, soldeDoc: true,
-      dateDoc: true, commercial: true, utilisateur: true,
-      codeCli: true, raisonSocial: true,
-    },
-  });
+  const [docs, comptes] = await Promise.all([
+    prisma.erpDocument.findMany({
+      where: { nature: "Vente", typeDoc: { in: [...TYPES_CA] }, dateDoc: { gte: debut, lte: fin } },
+      select: {
+        refDoc: true, typeDoc: true, ttcNet: true, thtNet: true, soldeDoc: true,
+        dateDoc: true, commercial: true, utilisateur: true,
+        codeCli: true, raisonSocial: true,
+      },
+    }),
+    // Beaucoup de documents ne portent pas de commercial : le vendeur est
+    // alors l'`utilisateur`, c'est-à-dire un **login** (« heni », « aziz »).
+    // Rapprocher ce login de son compte donne le nom complet, sans quoi
+    // 613 tickets de Heni Rekik restent sous une ligne « heni » séparée.
+    prisma.user.findMany({ select: { login: true, name: true } }),
+  ]);
+
+  const parLogin = new Map(comptes.map((u) => [u.login.trim().toLowerCase(), u.name.trim()]));
+  /** Nom complet du vendeur : le libellé du document, ou le compte derrière le login. */
+  const nomVendeur = (d: { commercial: string | null; utilisateur: string | null }) => {
+    const brut = vendeurDe(d);
+    return brut ? (parLogin.get(brut.toLowerCase()) ?? brut) : "";
+  };
 
   // ---- Liste : un agrégat par vendeur --------------------------------------
   if (!vendeur) {
-    const parVendeur = new Map<string, { ca: number; docs: number; clients: Set<number>; impaye: number }>();
+    // Un même commercial est écrit de plusieurs façons dans les documents
+    // (« MOKHTAR », « mokhtar trabelsi », « Mokhtar Trabelsi ») : regrouper sur
+    // la chaîne brute en faisait trois vendeurs distincts et coupait son
+    // chiffre d'affaires en trois. Le regroupement se fait donc sur la clé
+    // commerciale (prénom normalisé), comme partout ailleurs dans le projet.
+    const ambigus = prenomsAmbigus(docs.map(nomVendeur).filter(Boolean));
+    const parVendeur = new Map<string, { nom: string; ca: number; docs: number; clients: Set<number>; impaye: number }>();
     for (const d of docs) {
-      const v = vendeurDe(d);
+      const v = nomVendeur(d);
       if (!v) continue;
-      const cur = parVendeur.get(v) ?? { ca: 0, docs: 0, clients: new Set<number>(), impaye: 0 };
+      const cle = cleVendeur(v, ambigus);
+      const cur = parVendeur.get(cle) ?? { nom: v, ca: 0, docs: 0, clients: new Set<number>(), impaye: 0 };
+      // Nom affiché : la graphie la plus complète rencontrée (« Mokhtar
+      // Trabelsi » plutôt que « MOKHTAR »).
+      if (v.length > cur.nom.length) cur.nom = v;
       cur.ca += signeCA(d.typeDoc) * d.ttcNet;
       cur.docs += 1;
       cur.impaye += d.soldeDoc > 0 ? d.soldeDoc : 0;
       if (d.codeCli != null) cur.clients.add(d.codeCli);
-      parVendeur.set(v, cur);
+      parVendeur.set(cle, cur);
     }
 
-    const rows = [...parVendeur.entries()]
-      .map(([v, s]) => ({
-        vendeur: v, ca: round3(s.ca), docs: s.docs,
+    const rows = [...parVendeur.values()]
+      .map((s) => ({
+        vendeur: s.nom, ca: round3(s.ca), docs: s.docs,
         clients: s.clients.size, impaye: round3(s.impaye),
       }))
       .sort((a, b) => b.ca - a.ca);
@@ -62,7 +169,15 @@ export async function GET(req: NextRequest) {
   }
 
   // ---- Fiche : activité détaillée d'un vendeur -----------------------------
-  const siens = docs.filter((d) => vendeurDe(d).toLowerCase() === vendeur.toLowerCase());
+  // La fiche rassemble toutes les graphies du même commercial, sinon elle
+  // n'affiche qu'une partie de son activité.
+  const ambigusFiche = prenomsAmbigus(docs.map(nomVendeur).filter(Boolean));
+  // La fiche peut être demandée sous le nom complet comme sous le login.
+  const cleFiche = cleVendeur(parLogin.get(vendeur.toLowerCase()) ?? vendeur, ambigusFiche);
+  const siens = docs.filter((d) => {
+    const v = nomVendeur(d);
+    return v ? cleVendeur(v, ambigusFiche) === cleFiche : false;
+  });
 
   let ca = 0;
   let impaye = 0;

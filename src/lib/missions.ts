@@ -371,7 +371,7 @@ export async function cloturerTournee(
  * S'appuie sur `StockDepot` (§18) : le véhicule est un emplacement comme un
  * autre. C'est ce qui remplace le stock camion inventé de `retour-stock`.
  */
-export async function stockVehicule(vehicule: string) {
+export async function stockVehicule(vehicule: string, options?: { toutVoir?: boolean }) {
   // Les emplacements de stock sont libellés « mokhtar 206TU7140 » : le nom du
   // commercial précède la plaque. L'écran, lui, ne connaît que la plaque
   // (« 206TU7140 ») — une égalité stricte ne trouvait donc jamais rien, et le
@@ -393,7 +393,7 @@ export async function stockVehicule(vehicule: string) {
   const articles = refs.length
     ? await prisma.article.findMany({
         where: { refArt: { in: refs } },
-        select: { refArt: true, designation: true, unite: true, pmp: true, puAchat: true, tarif1Ht: true },
+        select: { refArt: true, designation: true, unite: true, pmp: true, puAchat: true, tarif1Ht: true, kind: true },
       })
     : [];
   const parRef = new Map(articles.map((a) => [a.refArt, a]));
@@ -420,14 +420,39 @@ export async function stockVehicule(vehicule: string) {
       quantite: round3(r.quantite),
       pmp: round3(pmp),
       valeur: round3(r.quantite * pmp),
+      // P = produit fini (`prouit_fini` en source), seul type embarqué à la
+      // vente ; MP / SF / CH ne figurent pas au stock camion.
+      kind: a?.kind ?? "P",
       horsReferentiel: !a,
     };
   });
 
+  // Ce que le camion porte réellement, au sens de l'ERP d'origine : sa requête
+  // filtre `d.en_stock > 0 AND a.prouit_fini = 1`.
+  //
+  // Une quantité négative n'est pas de la marchandise à bord : c'est une sortie
+  // enregistrée sans l'entrée correspondante (un article vendu depuis le camion
+  // sans bon d'approvisionnement). La base de production en contient — dix sur
+  // ce seul véhicule — et les afficher donnait un « stock camion » à moitié
+  // négatif, avec des valeurs comme −626 400 TND, incompréhensible pour le
+  // commercial et jamais montré par l'application d'origine.
+  //
+  // Les anomalies ne sont pas perdues pour autant : elles sont retournées à
+  // part pour que l'administration puisse les régulariser.
+  const embarque = lignes.filter((l) => l.quantite > 0 && l.kind === "P");
+  const anomalies = lignes.filter((l) => l.quantite < 0);
+  // Matières premières et semi-finis à quantité positive : présents en stock
+  // mais hors du catalogue vendable, comme en production.
+  const horsCatalogue = lignes.filter((l) => l.quantite > 0 && l.kind !== "P");
+
   return {
     vehicule,
-    lignes,
-    total: lignes.length,
-    valeurTotale: round3(lignes.reduce((t, l) => t + l.valeur, 0)),
+    lignes: options?.toutVoir ? lignes : embarque,
+    total: options?.toutVoir ? lignes.length : embarque.length,
+    valeurTotale: round3((options?.toutVoir ? lignes : embarque).reduce((t, l) => t + l.valeur, 0)),
+    // Compléments d'information, sans effet sur l'écran du commercial.
+    anomalies: anomalies.map(({ refArt, designation, quantite, valeur }) => ({ refArt, designation, quantite, valeur })),
+    nbAnomalies: anomalies.length,
+    nbHorsCatalogue: horsCatalogue.length,
   };
 }

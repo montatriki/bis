@@ -30,6 +30,10 @@ export default function DernierTicketPage() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [societe, setSociete] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(0);
+  const [pages, setPages] = useState(1);
+  /** Nombre total de tickets, toutes pages confondues. */
+  const [total, setTotal] = useState(0);
   const [historique, setHistorique] = useState<Liste[]>([]);
   const [idx, setIdx] = useState(0);
   const [load, setLoad] = useState(true);
@@ -54,15 +58,34 @@ export default function DernierTicketPage() {
     charger();
     fetch("/api/tickets?vue=liste")
       .then((r) => r.json())
-      .then((d) => setHistorique(d.rows ?? []))
+      .then((d) => { setHistorique(d.rows ?? []); setPages(d.pages ?? 1); setTotal(d.total ?? 0); })
       .catch(() => {});
   }, [charger]);
 
-  const naviguer = (delta: number) => {
+  // L'historique se charge par pages de 100 : un commercial en cumule plus de
+  // 1 500, et la navigation s'arrêtait au centième ticket.
+  const naviguer = async (delta: number) => {
     const suivant = idx + delta;
-    if (suivant < 0 || suivant >= historique.length) return;
+    if (suivant < 0) return;
+
+    let liste = historique;
+    // Fin de la page courante : on va chercher la suivante avant d'avancer.
+    if (suivant >= liste.length) {
+      const suivante = page + 1;
+      if (suivante >= pages) return;
+      const d = await fetch(`/api/tickets?vue=liste&page=${suivante}`)
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!d?.rows?.length) return;
+      liste = [...liste, ...d.rows];
+      setHistorique(liste);
+      setPage(suivante);
+    }
+
+    const cible = liste[suivant];
+    if (!cible) return;
     setIdx(suivant);
-    charger(historique[suivant].refDoc);
+    charger(cible.refDoc);
   };
 
   if (load) {
@@ -84,11 +107,11 @@ export default function DernierTicketPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Dernier ticket</h1>
           <p className="text-slate-500 text-sm">
-            {historique.length > 0 && `Ticket ${idx + 1} sur ${historique.length}`}
+            {historique.length > 0 && `Ticket ${idx + 1} sur ${total || historique.length}`}
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => naviguer(1)} disabled={idx + 1 >= historique.length}
+          <button onClick={() => naviguer(1)} disabled={idx + 1 >= (total || historique.length)}
             className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 disabled:opacity-40 flex items-center gap-1">
             <ChevronLeft size={15} /> Précédent
           </button>

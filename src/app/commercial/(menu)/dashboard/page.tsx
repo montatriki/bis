@@ -45,6 +45,8 @@ const TUILES: Tuile[] = [
 type Tournee = {
   commercial?: string | null;
   mission?: { id: number; vehicule: string | null } | null;
+  /** Véhicule attribué au commercial, indépendant de l'ordre de mission. */
+  vehiculeAffecte?: string | null;
   stats?: { total: number } | null;
 };
 
@@ -157,7 +159,10 @@ export default function CommercialMenuPage() {
             <Ligne icon={ClipboardList} libelle="Code mission"
               valeur={tournee?.mission?.id ? `OM-${tournee.mission.id}` : null} />
             <Ligne icon={UserRound} libelle="Commercial" valeur={tournee?.commercial ?? null} />
-            <Ligne icon={Truck} libelle="Véhicule" valeur={tournee?.mission?.vehicule ?? null} />
+            {/* Les jours sans ordre de mission, le camion attribué reste
+                l'information utile : c'est lui que le commercial conduit. */}
+            <Ligne icon={Truck} libelle="Véhicule"
+              valeur={tournee?.mission?.vehicule || tournee?.vehiculeAffecte || null} />
             <Ligne icon={Users} libelle="Clients planifiés" valeur={String(tournee?.stats?.total ?? 0)} />
           </dl>
         </div>

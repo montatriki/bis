@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
 import { filtrePortefeuille } from "@/lib/perimetre-commercial";
+import { rafraichirStockSiPerime } from "@/lib/sync-production";
 import { appliquerReleveMission, synchroniserKilometrages, vehiculesNonReferences } from "@/lib/kilometrage-vehicules";
 import {
   ETATS_MISSION, ETATS_VISITE, cloturerTournee, creerTournee, estCloturee,
@@ -71,18 +72,28 @@ export async function GET(req: NextRequest) {
         ? { etat }
         : {};
 
-    const rows = await prisma.erpMission.findMany({
-      where: {
-        ...(commercial ? { commercial: { contains: commercial, mode: "insensitive" } } : {}),
-        ...etatFiltre,
-        ...(du || au
-          ? { dateOrdre: { ...(du ? { gte: du } : {}), ...(au ? { lte: au } : {}) } }
-          : {}),
-      },
-      orderBy: { dateOrdre: "desc" },
-      take: 200,
-      include: { _count: { select: { lignes: true, documents: true, reglements: true } } },
-    });
+    const filtreMissions = {
+      ...(commercial ? { commercial: { contains: commercial, mode: "insensitive" as const } } : {}),
+      ...etatFiltre,
+      ...(du || au
+        ? { dateOrdre: { ...(du ? { gte: du } : {}), ...(au ? { lte: au } : {}) } }
+        : {}),
+    };
+
+    // 2 631 tournées en historique : une liste plafonnée à 200 en cachait les
+    // sept huitièmes tout en annonçant « 200 » comme total.
+    const PAGE_MISSIONS = 200;
+    const pageMissions = Math.max(0, int(sp.get("page")) ?? 0);
+    const [rows, totalMissions] = await Promise.all([
+      prisma.erpMission.findMany({
+        where: filtreMissions,
+        orderBy: { dateOrdre: "desc" },
+        skip: pageMissions * PAGE_MISSIONS,
+        take: PAGE_MISSIONS,
+        include: { _count: { select: { lignes: true, documents: true, reglements: true } } },
+      }),
+      prisma.erpMission.count({ where: filtreMissions }),
+    ]);
 
     return NextResponse.json({
       rows: rows.map((m) => ({
@@ -96,7 +107,9 @@ export async function GET(req: NextRequest) {
         nbDocuments: m._count.documents,
         nbReglements: m._count.reglements,
       })),
-      total: rows.length,
+      total: totalMissions,
+      page: pageMissions,
+      pages: Math.ceil(totalMissions / PAGE_MISSIONS),
       etats: ETATS_MISSION,
     });
   }
@@ -111,6 +124,15 @@ export async function GET(req: NextRequest) {
     jour.setHours(0, 0, 0, 0);
     const lendemain = new Date(jour.getTime() + 86_400_000);
 
+    // Véhicule affecté au commercial connecté. La barre de tournée l'affiche
+    // même quand l'ordre de mission ne le porte pas : le camion existe, il
+    // n'a simplement pas été repris sur la pièce.
+    const affectation = await prisma.commercial.findFirst({
+      where: { user: { name: { equals: commercial, mode: "insensitive" } } },
+      select: { vehicle: { select: { plate: true } } },
+    });
+    const plaqueAffectee = affectation?.vehicle?.plate.trim() ?? null;
+
     const mission = await prisma.erpMission.findFirst({
       where: {
         commercial: { contains: commercial, mode: "insensitive" },
@@ -122,7 +144,10 @@ export async function GET(req: NextRequest) {
     });
 
     if (!mission) {
-      return NextResponse.json({ mission: null, visites: [], date: jour, commercial });
+      return NextResponse.json({
+        mission: null, visites: [], date: jour, commercial,
+        vehiculeAffecte: plaqueAffectee,
+      });
     }
 
     // Coordonnées et solde des clients visités, pour la carte et la fiche.
@@ -139,9 +164,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       mission: {
-        id: mission.id, commercial: mission.commercial, vehicule: mission.vehicule,
+        id: mission.id, commercial: mission.commercial,
+        // À défaut sur la pièce, le véhicule affecté au commercial.
+        vehicule: mission.vehicule?.trim() || plaqueAffectee,
         dateOrdre: mission.dateOrdre, etat: mission.etat, objectifCA: mission.objectifCA,
       },
+      vehiculeAffecte: plaqueAffectee,
       visites: mission.lignes.map((l) => {
         const t = l.codeCli != null ? parCode.get(l.codeCli) : undefined;
         return {
@@ -191,6 +219,9 @@ export async function GET(req: NextRequest) {
   if (vue === "stock-vehicule") {
     const vehicule = s(sp.get("vehicule"));
     if (!vehicule) return NextResponse.json({ error: "vehicule requis" }, { status: 400 });
+    // Production vivante : si les données datent, une resynchronisation part
+    // en arrière-plan — cette requête sert l'état connu, la suivante le frais.
+    void rafraichirStockSiPerime();
     return NextResponse.json(await stockVehicule(vehicule));
   }
 

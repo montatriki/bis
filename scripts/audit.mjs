@@ -55,7 +55,11 @@ for (const [role, cfg] of Object.entries(ROLES)) {
       errs.push(`HTTP${res.status()}: ${res.url().replace("http://localhost:3000","")}`); });
     let txt = "";
     try {
-      await p.goto("http://localhost:3000"+path,{waitUntil:"domcontentloaded"});
+      // En développement, la première visite d'une route déclenche sa
+      // compilation : jusqu'à 33 s observées sur /admin/compta, alors que la
+      // même page répond en 0,3 s ensuite. Le délai par défaut (30 s) faisait
+      // remonter cette compilation comme une page vide.
+      await p.goto("http://localhost:3000"+path,{waitUntil:"domcontentloaded",timeout:120000});
       await p.waitForTimeout(3200);
       // Une attente fixe signalait à tort des pages « bloquées en chargement » :
       // en développement, la première visite d'une route déclenche sa

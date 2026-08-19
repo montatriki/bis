@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
+import { rafraichirStockSiPerime } from "@/lib/sync-production";
 
 // État du stock par emplacement (magasin / dépôt).
 //
@@ -37,6 +38,9 @@ type MetaEmplacement = {
 };
 
 export async function GET(req: NextRequest) {
+  // Les chiffres de cet écran n'ont de valeur que frais : déclenche une
+  // resynchronisation en arrière-plan si les données datent.
+  void rafraichirStockSiPerime();
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
 

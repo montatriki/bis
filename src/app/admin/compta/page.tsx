@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, Scale, FileSpreadsheet, Landmark, Search, TrendingUp, TrendingDown } from "lucide-react";
 import IntegrationCompta from "@/components/compta/IntegrationCompta";
@@ -7,10 +7,21 @@ import IntegrationCompta from "@/components/compta/IntegrationCompta";
 const SUB_TABS = ["Intégration", "Plan comptable", "Écritures", "Balance", "État de résultat", "Bilan"];
 const ACCENT = "#6366f1"; // indigo accent for the compta module
 
-type Account = { id: string; number: string; label: string; class: string };
-type Ligne = { id: string; label?: string; debit: number; credit: number; account: { number: string; label: string } };
-type Ecriture = { id: string; reference: string; journal: string; date: string; label: string; totalDebit: number; totalCredit: number; lines: Ligne[] };
-type BalanceRow = { number: string; label: string; class: string; debit: number; credit: number; soldeDebiteur: number; soldeCrediteur: number };
+// Formes servies par `/api/comptabilite`, le module comptable réel (plan,
+// écritures, balance, résultat, bilan de l'ERP). L'écran interrogeait
+// auparavant `/api/compta`, une ébauche branchée sur des tables de
+// démonstration : il affichait 12 comptes et 2 écritures là où l'exercice en
+// compte 10 et 145.
+type Account = { id: number; numCompte: string; intitule: string; classe: number };
+type Ecriture = {
+  id: number; codeJournal: string; numPiece: string; numCompte: string;
+  libelleCompte: string | null; libelleEcriture: string | null;
+  dateEcriture: string; refDoc: string | null; debit: number; credit: number;
+};
+type BalanceRow = {
+  numCompte: string; libelleCompte: string; classe: number;
+  debit: number; credit: number; soldeDebiteur: number; soldeCrediteur: number; nbEcritures: number;
+};
 
 const fmt = (n: number) => new Intl.NumberFormat("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(n ?? 0);
 const fmt0 = (n: number) => new Intl.NumberFormat("fr-TN", { maximumFractionDigits: 0 }).format(n ?? 0);
@@ -36,24 +47,51 @@ export default function ComptaPage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      fetch("/api/compta?resource=plan").then((r) => r.json()),
-      fetch("/api/compta?resource=ecritures").then((r) => r.json()),
-      fetch("/api/compta?resource=balance").then((r) => r.json()),
-      fetch("/api/compta?resource=resultat").then((r) => r.json()),
-      fetch("/api/compta?resource=bilan").then((r) => r.json()),
+      fetch("/api/comptabilite?vue=plan").then((r) => r.json()),
+      fetch("/api/comptabilite?vue=ecritures").then((r) => r.json()),
+      fetch("/api/comptabilite?vue=balance").then((r) => r.json()),
+      fetch("/api/comptabilite?vue=resultat").then((r) => r.json()),
+      fetch("/api/comptabilite?vue=bilan").then((r) => r.json()),
     ]).then(([p, e, b, r, bi]) => {
       if (cancelled) return;
-      setAccounts(p.accounts ?? []);
-      setEcritures(e.ecritures ?? []);
-      setBalance(b.balance ?? []);
+      setAccounts(p.rows ?? []);
+      setEcritures(e.rows ?? []);
+      setBalance(b.rows ?? []);
       setResultat(r);
-      setBilan(bi);
+      // Le bilan est servi par rubriques : l'écran n'en affiche que les totaux.
+      setBilan({ actif: bi.totalActif ?? 0, passif: bi.totalPassif ?? 0, resultat: r?.resultat ?? 0 });
       setLoading(false);
     });
     return () => { cancelled = true; };
   }, []);
 
-  const filteredAccounts = accounts.filter((a) => a.number.includes(search) || a.label.toLowerCase().includes(search.toLowerCase()));
+  // L'API sert les écritures à plat (une ligne par compte mouvementé) ; l'écran
+  // les présente par pièce, comme un journal comptable.
+  const pieces = useMemo(() => {
+    const parPiece = new Map<string, {
+      numPiece: string; codeJournal: string; dateEcriture: string; libelle: string;
+      lignes: Ecriture[]; totalDebit: number; totalCredit: number;
+    }>();
+    for (const e of ecritures) {
+      const cle = `${e.codeJournal}/${e.numPiece}`;
+      const cur = parPiece.get(cle) ?? {
+        numPiece: e.numPiece, codeJournal: e.codeJournal, dateEcriture: e.dateEcriture,
+        libelle: e.libelleEcriture ?? e.refDoc ?? e.numPiece,
+        lignes: [], totalDebit: 0, totalCredit: 0,
+      };
+      cur.lignes.push(e);
+      cur.totalDebit += e.debit;
+      cur.totalCredit += e.credit;
+      parPiece.set(cle, cur);
+    }
+    return [...parPiece.values()].sort(
+      (a, b) => new Date(b.dateEcriture).getTime() - new Date(a.dateEcriture).getTime(),
+    );
+  }, [ecritures]);
+
+  const filteredAccounts = accounts.filter(
+    (a) => a.numCompte.includes(search) || (a.intitule ?? "").toLowerCase().includes(search.toLowerCase()),
+  );
   const totalDebit = balance.reduce((s, b) => s + b.debit, 0);
   const totalCredit = balance.reduce((s, b) => s + b.credit, 0);
 
@@ -70,7 +108,7 @@ export default function ComptaPage() {
             </span>
           </div>
           <p className="text-[var(--text-secondary)] opacity-80 text-xs mt-1">
-            {loading ? "Chargement…" : `${accounts.length} comptes · ${ecritures.length} écritures · ${balance.length} comptes mouvementés`}
+            {loading ? "Chargement…" : `${accounts.length} comptes · ${pieces.length} écritures (${ecritures.length} lignes) · ${balance.length} comptes mouvementés`}
           </p>
         </div>
         {resultat && (
@@ -136,11 +174,11 @@ export default function ComptaPage() {
                 <tbody className="divide-y divide-[var(--border-primary)]">
                   {filteredAccounts.map((a, i) => (
                     <motion.tr key={a.id} className="hover:bg-[var(--accent-light)] transition" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.02, 0.3) }}>
-                      <td className="px-4 py-3 font-mono text-sm font-bold" style={{ color: ACCENT }}>{a.number}</td>
-                      <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{a.label}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-bold" style={{ color: ACCENT }}>{a.numCompte}</td>
+                      <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{a.intitule}</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold" style={{ background: (CLASS_COLOR[a.class] ?? "#64748b") + "1a", color: CLASS_COLOR[a.class] ?? "#64748b" }}>
-                          {CLASS_LABEL[a.class] ?? a.class}
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold" style={{ background: (CLASS_COLOR[String(a.classe)] ?? "#64748b") + "1a", color: CLASS_COLOR[String(a.classe)] ?? "#64748b" }}>
+                          {CLASS_LABEL[String(a.classe)] ?? a.classe}
                         </span>
                       </td>
                     </motion.tr>
@@ -155,26 +193,26 @@ export default function ComptaPage() {
         {/* Écritures */}
         {tab === "Écritures" && (
           <div className="p-4 space-y-3">
-            {ecritures.map((e, idx) => (
-              <motion.div key={e.id} className="rounded-xl border border-[var(--border-primary)] overflow-hidden"
+            {pieces.map((e, idx) => (
+              <motion.div key={`${e.codeJournal}/${e.numPiece}`} className="rounded-xl border border-[var(--border-primary)] overflow-hidden"
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                 <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--bg-primary)] border-b border-[var(--border-primary)]">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: ACCENT + "1a", color: ACCENT }}>{e.journal}</span>
-                    <span className="font-mono text-xs text-[var(--text-secondary)]">{e.reference}</span>
-                    <span className="font-medium text-[var(--text-primary)] text-sm truncate">{e.label}</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: ACCENT + "1a", color: ACCENT }}>{e.codeJournal}</span>
+                    <span className="font-mono text-xs text-[var(--text-secondary)]">{e.numPiece}</span>
+                    <span className="font-medium text-[var(--text-primary)] text-sm truncate">{e.libelle}</span>
                   </div>
-                  <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">{new Date(e.date).toLocaleDateString("fr-FR")}</span>
+                  <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">{new Date(e.dateEcriture).toLocaleDateString("fr-FR")}</span>
                 </div>
                 <table className="w-full text-sm">
                   <thead className="border-b border-[var(--border-primary)]">
                     <tr>{["Compte", "Libellé", "Débit", "Crédit"].map((h) => <th key={h} className={`px-4 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase ${h === "Débit" || h === "Crédit" ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-primary)]">
-                    {e.lines.map((l) => (
+                    {e.lignes.map((l) => (
                       <tr key={l.id}>
-                        <td className="px-4 py-2 font-mono text-xs font-bold" style={{ color: ACCENT }}>{l.account.number}</td>
-                        <td className="px-4 py-2 text-[var(--text-secondary)] text-xs">{l.label ?? l.account.label}</td>
+                        <td className="px-4 py-2 font-mono text-xs font-bold" style={{ color: ACCENT }}>{l.numCompte}</td>
+                        <td className="px-4 py-2 text-[var(--text-secondary)] text-xs">{l.libelleEcriture ?? l.libelleCompte}</td>
                         <td className="px-4 py-2 text-right tabular-nums text-[var(--text-primary)]">{l.debit ? fmt(l.debit) : ""}</td>
                         <td className="px-4 py-2 text-right tabular-nums text-[var(--text-primary)]">{l.credit ? fmt(l.credit) : ""}</td>
                       </tr>
@@ -186,7 +224,7 @@ export default function ComptaPage() {
                 </table>
               </motion.div>
             ))}
-            {!loading && ecritures.length === 0 && <p className="text-slate-400 text-sm text-center py-8">Aucune écriture</p>}
+            {!loading && pieces.length === 0 && <p className="text-slate-400 text-sm text-center py-8">Aucune écriture</p>}
           </div>
         )}
 
@@ -199,9 +237,9 @@ export default function ComptaPage() {
               </thead>
               <tbody className="divide-y divide-[var(--border-primary)]">
                 {balance.map((b) => (
-                  <tr key={b.number} className="hover:bg-[var(--accent-light)] transition">
-                    <td className="px-4 py-3 font-mono text-xs font-bold" style={{ color: ACCENT }}>{b.number}</td>
-                    <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{b.label}</td>
+                  <tr key={b.numCompte} className="hover:bg-[var(--accent-light)] transition">
+                    <td className="px-4 py-3 font-mono text-xs font-bold" style={{ color: ACCENT }}>{b.numCompte}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{b.libelleCompte}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">{fmt(b.debit)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">{fmt(b.credit)}</td>
                     <td className="px-4 py-3 text-right font-bold tabular-nums text-blue-600">{b.soldeDebiteur ? fmt(b.soldeDebiteur) : ""}</td>

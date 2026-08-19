@@ -68,6 +68,9 @@ const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString("fr-FR
 
 export default function GestionMissions({ titre }: { titre: string }) {
   const [rows, setRows] = useState<Mission[]>([]);
+  // L'historique compte 2 631 tournées : la liste est paginée côté serveur.
+  const [page, setPage] = useState(0);
+  const [meta, setMeta] = useState<{ total: number; pages: number }>({ total: 0, pages: 0 });
   const [refs, setRefs] = useState<Referentiels | null>(null);
   const [load, setLoad] = useState(true);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -88,18 +91,23 @@ export default function GestionMissions({ titre }: { titre: string }) {
   }, []);
 
   const charger = useCallback(() => {
-    setLoad(true);
-    const qs = new URLSearchParams({ vue: "liste" });
+    const qs = new URLSearchParams({ vue: "liste", page: String(page) });
     if (fCommercial) qs.set("commercial", fCommercial);
     if (fEtat !== "Tous") qs.set("etat", fEtat);
     if (fDu) qs.set("du", fDu);
     if (fAu) qs.set("au", fAu);
-    fetch(`/api/missions?${qs}`)
-      .then((r) => r.json())
-      .then((d) => setRows(d.rows ?? []))
+    // `setLoad` passe par la chaîne asynchrone : un appel synchrone dans
+    // l'effet déclencherait un rendu en cascade.
+    Promise.resolve()
+      .then(() => setLoad(true))
+      .then(() => fetch(`/api/missions?${qs}`).then((r) => r.json()))
+      .then((d) => {
+        setRows(d.rows ?? []);
+        setMeta({ total: d.total ?? 0, pages: d.pages ?? 1 });
+      })
       .catch(() => flash("Chargement impossible", false))
       .finally(() => setLoad(false));
-  }, [fCommercial, fEtat, fDu, fAu, flash]);
+  }, [fCommercial, fEtat, fDu, fAu, page, flash]);
 
   useEffect(charger, [charger]);
 
@@ -177,25 +185,25 @@ export default function GestionMissions({ titre }: { titre: string }) {
       <div className="flex flex-wrap items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-2xl px-4 py-3">
         <div className="relative flex-1 min-w-[180px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-70" />
-          <input value={fCommercial} onChange={(e) => setFCommercial(e.target.value)}
+          <input value={fCommercial} onChange={(e) => { setFCommercial(e.target.value); setPage(0); }}
             list="ref-commerciaux" placeholder="Filtrer par commercial…"
             className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-emerald-500 text-[var(--text-primary)]" />
           <datalist id="ref-commerciaux">
             {refs?.commerciaux.map((c) => <option key={c} value={c} />)}
           </datalist>
         </div>
-        <select value={fEtat} onChange={(e) => setFEtat(e.target.value)}
+        <select value={fEtat} onChange={(e) => { setFEtat(e.target.value); setPage(0); }}
           className="text-xs bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 focus:outline-none">
           <option>Tous</option>
           {ETATS.map((e) => <option key={e}>{e}</option>)}
         </select>
-        <input type="date" value={fDu} onChange={(e) => setFDu(e.target.value)}
+        <input type="date" value={fDu} onChange={(e) => { setFDu(e.target.value); setPage(0); }}
           className="text-xs bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-2.5 py-2" />
         <span className="text-[10px] text-[var(--text-secondary)]">au</span>
-        <input type="date" value={fAu} onChange={(e) => setFAu(e.target.value)}
+        <input type="date" value={fAu} onChange={(e) => { setFAu(e.target.value); setPage(0); }}
           className="text-xs bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-2.5 py-2" />
         {(fCommercial || fEtat !== "Tous" || fDu || fAu) && (
-          <button onClick={() => { setFCommercial(""); setFEtat("Tous"); setFDu(""); setFAu(""); }}
+          <button onClick={() => { setFCommercial(""); setFEtat("Tous"); setFDu(""); setFAu(""); setPage(0); }}
             className="text-[11px] font-bold text-emerald-600 px-2.5 py-2 rounded-lg hover:bg-emerald-50 transition">
             Réinitialiser
           </button>
@@ -266,6 +274,26 @@ export default function GestionMissions({ titre }: { titre: string }) {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination : 2 631 tournées en historique. */}
+        {!load && meta.pages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-primary)] text-xs text-[var(--text-secondary)]">
+            <span>{meta.total} tournée{meta.total > 1 ? "s" : ""}</span>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="px-2.5 py-1 rounded-lg border border-[var(--border-primary)] disabled:opacity-40 hover:bg-[var(--accent-light)]">
+                Précédent
+              </button>
+              <span>Page {page + 1} / {meta.pages}</span>
+              <button type="button" disabled={page + 1 >= meta.pages}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-2.5 py-1 rounded-lg border border-[var(--border-primary)] disabled:opacity-40 hover:bg-[var(--accent-light)]">
+                Suivant
+              </button>
+            </div>
           </div>
         )}
       </div>

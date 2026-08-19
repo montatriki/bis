@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
 import { creerMouvement, etatParEmplacement, TYPES_MVT, type LigneMvt } from "@/lib/mouvements-depot";
+import { rafraichirStockSiPerime } from "@/lib/sync-production";
 
 // Bons de sortie / transfert / retour (module Gestion Tourner).
 //
@@ -12,6 +13,9 @@ import { creerMouvement, etatParEmplacement, TYPES_MVT, type LigneMvt } from "@/
 const s = (v: unknown) => (v == null ? "" : String(v).trim());
 
 export async function GET(req: NextRequest) {
+  // Les chiffres de cet écran n'ont de valeur que frais : déclenche une
+  // resynchronisation en arrière-plan si les données datent.
+  void rafraichirStockSiPerime();
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
 

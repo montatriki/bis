@@ -189,12 +189,27 @@ export async function GET(req: NextRequest) {
   // doit se rendre.
   const courante = etapes.find((e) => e.etat === "À visiter") ?? null;
 
+  // Véhicule affecté au commercial : la barre de tournée l'affiche même les
+  // jours sans ordre de mission. Sans lui, un commercial qui n'a pas encore
+  // planifié sa journée lisait « Véhicule — » alors qu'un camion lui est
+  // attribué et que son stock embarqué en dépend.
+  const affecte = await prisma.commercial.findFirst({
+    where: { userId: auth.user.id },
+    select: { vehicle: { select: { plate: true } } },
+  });
+  const plaqueAffectee = affecte?.vehicle?.plate.trim() ?? null;
+
   return NextResponse.json({
     date: jour,
     commercial,
     mission: mission
-      ? { id: mission.id, etat: mission.etat, vehicule: mission.vehicule, objectifCA: mission.objectifCA }
+      ? {
+          id: mission.id, etat: mission.etat,
+          vehicule: mission.vehicule?.trim() || plaqueAffectee,
+          objectifCA: mission.objectifCA,
+        }
       : null,
+    vehiculeAffecte: plaqueAffectee,
     depart: origine,
     etapes,
     courante,
@@ -342,10 +357,24 @@ export async function POST(req: NextRequest) {
     orderBy: { id: "desc" },
   });
 
+  // Véhicule du commercial : l'ordre de mission le porte en production, et
+  // c'est lui qu'affichent la barre de tournée et le relevé kilométrique. Une
+  // tournée créée sans véhicule laissait « Véhicule — » à l'écran alors que le
+  // commercial en a bien un affecté.
+  const affectation = await prisma.commercial.findFirst({
+    where: { userId: auth.user.id },
+    select: { vehicle: { select: { plate: true } } },
+  });
+  const plaque = affectation?.vehicle?.plate.trim() || null;
+
   let missionId: number;
   if (existante) {
     missionId = existante.id;
     await prisma.ligneMission.deleteMany({ where: { dayId: missionId } });
+    // Tournée rejouée : on complète le véhicule s'il manquait.
+    if (plaque && !existante.vehicule?.trim()) {
+      await prisma.erpMission.update({ where: { id: missionId }, data: { vehicule: plaque } });
+    }
   } else {
     // `ErpMission.id` reprend `id_day` de l'ERP : pas d'auto-incrément.
     const dernier = await prisma.erpMission.findFirst({ orderBy: { id: "desc" }, select: { id: true } });
@@ -354,6 +383,7 @@ export async function POST(req: NextRequest) {
       data: {
         id: missionId,
         commercial,
+        vehicule: plaque,
         utilisateur: auth.user.login,
         dateOrdre: jour,
         etat: "En cours",

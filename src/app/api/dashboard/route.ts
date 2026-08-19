@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { filtrePortefeuille } from "@/lib/perimetre-commercial";
 import { requireSession } from "@/lib/session";
 import { TYPES_CA, signeCA, periode, MOIS_COURTS, round3 } from "@/lib/vente-stats";
 
@@ -120,7 +121,16 @@ export async function GET(req: NextRequest) {
       where: { sens: "C", datePay: { gte: debut, lte: fin } },
       select: { datePay: true, montant: true },
     }),
-    prisma.partner.count({ where: { nature: "C" } }),
+    // Un commercial compte **ses** clients : afficher les 4 518 du fichier
+    // société lui donnait un portefeuille qui n'est pas le sien.
+    prisma.partner.count({
+      where: {
+        nature: "C",
+        ...(scope === "commercial" && auth.user.role === "COMMERCIAL"
+          ? (filtrePortefeuille(auth.user) ?? {})
+          : {}),
+      },
+    }),
     prisma.partner.count({ where: { nature: "F" } }),
   ]);
 

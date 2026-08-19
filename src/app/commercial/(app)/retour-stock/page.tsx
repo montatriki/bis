@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Package, RotateCcw, ArrowLeftRight, Loader2, Check, AlertTriangle, Truck } from "lucide-react";
+import { Package, RotateCcw, ArrowLeftRight, Loader2, Check, AlertTriangle, Truck, RefreshCw } from "lucide-react";
 
 // Stock camion et retours — sur la base (`StockDepot` + `/api/mouvements-depot`).
 // Remplace un stock véhicule inventé (`Math.random()` sur 8 produits fictifs)
@@ -35,11 +35,35 @@ export default function RetourStockPage() {
   const [destination, setDestination] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  // Fraîcheur des données de production : le stock est resynchronisé
+  // automatiquement côté serveur dès qu'il date, et le bouton force un
+  // réalignement immédiat (lecture seule côté production).
+  const [syncAge, setSyncAge] = useState<number | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
 
   const flash = useCallback((msg: string, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 6000);
   }, []);
+
+  const chargerSync = useCallback(() => {
+    fetch("/api/sync-stock").then((r) => r.json())
+      .then((d) => setSyncAge(typeof d.ageMs === "number" ? d.ageMs : null))
+      .catch(() => {});
+  }, []);
+  useEffect(chargerSync, [chargerSync]);
+
+  const resynchroniser = async () => {
+    setSyncBusy(true);
+    try {
+      const r = await fetch("/api/sync-stock", { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) return flash(d.error ?? "Production injoignable — dernières données conservées", false);
+      flash("Stock réaligné sur la production");
+      charger();
+      chargerSync();
+    } finally { setSyncBusy(false); }
+  };
 
   // Emplacements + véhicule de la tournée du jour, pour pré-sélectionner.
   useEffect(() => {
@@ -118,6 +142,15 @@ export default function RetourStockPage() {
           <p className="text-slate-500 text-sm">
             {lignes.length} article(s) embarqué(s) · valeur {fmt(valeur)} TND
           </p>
+          <button type="button" onClick={resynchroniser} disabled={syncBusy}
+            className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 disabled:opacity-50">
+            <RefreshCw size={12} className={syncBusy ? "animate-spin" : ""} />
+            {syncBusy
+              ? "Synchronisation avec la production…"
+              : syncAge == null
+                ? "Synchroniser avec la production"
+                : `Données production · il y a ${Math.max(1, Math.round(syncAge / 60000))} min`}
+          </button>
         </div>
         <label className="flex items-center gap-2">
           <Truck size={16} className="text-slate-400" />

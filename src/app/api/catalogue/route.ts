@@ -45,7 +45,11 @@ export async function GET(req: NextRequest) {
   if (emplacement) {
     const [enCamion, panier] = await Promise.all([
       prisma.stockDepot.findMany({
-        where: { emplacement },
+        // Seul ce qui est réellement à bord est vendable. Une quantité
+        // négative est une sortie enregistrée sans son entrée : la retenir
+        // ferait apparaître au catalogue un article que le camion n'a pas.
+        // L'ERP d'origine applique le même filtre (`d.en_stock > 0`).
+        where: { emplacement, quantite: { gt: 0 } },
         select: { refArt: true, quantite: true },
       }),
       // Ce qui est déjà dans le panier est réservé : ces unités ne sont plus

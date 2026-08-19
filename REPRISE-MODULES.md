@@ -32,10 +32,10 @@ actions relevées dans le code source `production/BIS/app/src`.
 | ✅ | Creer Bon de retour | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
 | ✅ | Creer Devis | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
 | ✅ | Creer Facture | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
-| ☐ | Suivie commande | `/admin/modules/vente/suivie-commande` | Fermer, Imprimer, Modifier, Ouvrir |  |
+| ✅ | Suivie commande | `/admin/modules/vente/suivie-commande` | Fermer, Imprimer, Modifier, Ouvrir | **3 366 commandes** (3 360 production + 6 saisies dans l'application) |
 | ✅ | Gestion des commerciaux | `/admin/modules/vente/commerciaux` | Ajouter, Annuler, Modifier, New, Supprimer, Valider | **13 = production**, y compris le commercial 711063 au libellé vide (idem en production) |
 | ✅ | Gestion des ordres missions | `/admin/modules/gestion-tourner/ordres-missions` | Ajouter, Annuler, Cloturer, Itinéraire, Modifier, Non, Nouveau, Oui | **2 629 = production** ; les relevés km alimentent le compteur véhicule |
-| ☐ | Statistique de vente | `/admin/modules/vente/rapports` | — |  |
+| ✅ | Statistique de vente | `/admin/modules/vente/rapports` | — | **77 860 lignes de vente importées** (4 articles avant) : les 311 articles vendus et leurs quantités sont **identiques à la production, 0 écart** ; les 166 articles supplémentaires listés par la production ont un net à zéro |
 
 ## GESTION DES ACHATS
 
@@ -44,14 +44,14 @@ actions relevées dans le code source `production/BIS/app/src`.
 | ✅ | creer un fournisseur | `/admin/modules/achat/fournisseurs` | Ajouter, Catalogues fournisseur, Fermer, Modifier, Supprimer | CRUD partagé avec les clients |
 | ✅ | Liste des fournisseurs | `/admin/modules/achat/fournisseurs` | Afficher, Ajouter, Fermer, Imprimer, Liste des réglements, Modifier, Rechercher, Supprimer | **50 = production** (43 avant : 7 tiers de charge rangés sous une nature « T » qui les excluait) |
 | ✅ | Liste documents achat | `/admin/modules/achat/documents` | Ajouter, Annuler, Fermer, Imprimer, Modifier, Ouvrir, Rechercher, Supprimer |  |
-| ☐ | Creer Avoir | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
-| ☐ | Creer Bon de commande | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
+| ✅ | Creer Avoir (achat) | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider | souche AVC vérifiée (création + suppression) |
+| ✅ | Creer Bon de commande (achat) | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider | souche CMI vérifiée |
 | ✅ | Creer Bon de reçeption | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
-| ☐ | Creer Bon de retour | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
+| ✅ | Creer Bon de retour (achat) | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider | souche RRA vérifiée |
 | ✅ | Creer Demande d achat | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
-| ☐ | Creer Devis | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
-| ☐ | Creer Facture | `/admin/modules/vente/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider |  |
-| ☐ | Rapport | `/admin/modules/achat/rapport` | — |  |
+| ✅ | Creer Devis (achat) | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider | souche DAO vérifiée |
+| ✅ | Creer Facture (achat) | `/admin/modules/achat/documents` | Annuler, Enregistrer, Modifier, PDF, Supprimer, Valider | souche FAO vérifiée |
+| ✅ | Rapport | `/admin/modules/achat/rapport` | — | 35 fournisseurs agrégés, règle BRE : 437 réceptions · 1 854 975 TND TTC |
 
 ## GESTION DU STOCK
 
@@ -92,8 +92,8 @@ actions relevées dans le code source `production/BIS/app/src`.
 
 | État | Écran production | Écran S.K.Y | Actions à couvrir | Notes |
 |---|---|---|---|---|
-| ☐ | Creer ordre de fabrication | `/admin/modules/gpao/of` | — |  |
-| ☐ | Liste documents OF | `/admin/modules/gpao/of` | — |  |
+| ✅ | Creer ordre de fabrication | `/admin/modules/gpao/of` | — | formulaire documents type OF |
+| ✅ | Liste documents OF | `/admin/modules/gpao/of` | — | **614 = production** |
 
 ## GRH
 
@@ -104,8 +104,8 @@ actions relevées dans le code source `production/BIS/app/src`.
 | ✅ | Gestion Pointage | `/admin/grh` | Créer une Session, Non, Oui | **12 sessions = production**, 15 pointages |
 | ✅ | Créer un pointage | `/admin/grh` | Valider | Saisie par session, nom d'employé désormais affiché |
 | ✅ | Gestion Crédit | `/admin/grh` | Créer | échéancier 30 j, tiers `isEmploye` |
-| ☐ | Traitements | `/admin/grh` | Clôturer, Consulter |  |
-| ☐ | Paramétrages | `/admin/grh` | Attribuer à tous, Enregistrer, Fermer |  |
+| ✅ | Traitements | `/admin/grh` | Clôturer, Consulter | 0 bulletin de paie en production aussi (`grh_bulletin_paie` vide) — moteur de traitement prêt |
+| ✅ | Paramétrages | `/admin/grh` | Attribuer à tous, Enregistrer, Fermer | 2 grilles salaire reprises (= production) ; le `grh_parametrage_generale` de production est une ligne à zéro, nos écrans rubriques / CNSS / IRPP la couvrent |
 
 ## PARC ROULANT
 
@@ -171,8 +171,22 @@ actions relevées dans le code source `production/BIS/app/src`.
 | ✅ | valorisation du stock | 1 404 TND d'écart résiduel au PMP | la remise à niveau ne comparait que la quantité : quatre articles avaient le bon stock mais un PMP périmé (1,334875 contre 0,909301) — les prix sont désormais comparés eux aussi |
 | ✅ | stock par emplacement (valorisation) | chaque dépôt valorisé au-dessus de la production | l'import stockait le **prix d'achat** en guise de PMP, faute de PMP dans `get-articles-by-depot` : le camion de Mokhtar ressortait à 13 422 TND contre 13 055 — le PMP vient désormais de la fiche article |
 | ✅ | PMP nul traité comme absent | valorisation surévaluée sur les articles à PMP zéro | `pmp \|\| puAchat` confondait « coût nul » (valeur légitime de la production pour un article jamais entré en stock valorisé) et « non renseigné », dans l'import comme dans `stockVehicule()` — les deux distinguent maintenant les deux cas |
+| ✅ | stock — dérive après import | les quantités s'écartaient de la production au fil des ventes (bouteilles 15 chez nous / 13 en production, DouDou 15/14, rolly poly 13/12 sur le camion de Mokhtar) | la production vit pendant la journée : un import ponctuel est juste à l'instant où il tourne, puis dérive. La synchronisation vit désormais **dans l'application** (`src/lib/sync-production.ts`, lecture seule côté production) : les écrans de stock la déclenchent d'eux-mêmes dès que les données datent de plus de 5 min, `/api/sync-stock` + bouton « Synchroniser » sur l'écran commercial pour forcer, `npm run sync:stock` en ligne de commande — vérifié : marqueur vieilli de 20 min, un passage sur l'écran suffit à réaligner (10 s), **551 articles et 10 emplacements identiques à la production, 0 écart** |
+| ✅ | vente/rapports (par article) | 4 articles au lieu de 311 | les 17 900 documents de vente avaient leurs entêtes mais pas leurs lignes : la statistique par article, le top articles du tableau de bord et les marges ne portaient que sur les pièces saisies dans l'application — **77 860 lignes importées**, 0 échec |
+| ✅ | chiffre d'affaires surévalué de 360 601 TND | deux bons de livraison comptés en double | le suffixe `-V` distingue les références présentes dans `entete_achat` **et** `entete_vente` ; deux BL avaient été dédoublés alors que leur jumeau est lui aussi une vente — même pièce enregistrée deux fois (24012025 : 3 122 unités au lieu de 1 561). Copies supprimées : **CA 4 819 861 TND contre 4 821 166 en production** (0,03 %, nos 10 pièces de test et les ventes du jour) |
+| ✅ | lignes de vente — références dédoublées | un même article compté sur deux orthographes | l'import reprenait la graphie de la source, qui diffère parfois du catalogue sur l'espace final (« 1 ere sciences de la vie ») : 32 d'un côté, 3 de l'autre au lieu de 35 — **166 lignes ramenées sur la référence du catalogue** |
+| ⛔ | marge brute | l'écart avec la production n'est pas corrigeable | la statistique de production valorise le coût des ventes au PMP **figé sur chaque ligne** : deux articles y portent un coût négatif (`02012026` : −3 026 229 TND) et 55 un coût nul, d'où une marge annoncée de 118,9 %. Notre calcul s'appuie sur le PMP courant de la fiche article — **60,0 %**, cohérent. Les 5 PMP négatifs de notre base sont ceux de la production (`f32` = −98,07), pour −6 005 TND de valorisation |
+| ⛔ | 216 lignes de document sur article inconnu | fidèle à la production | ces références (« magic bon », « N75 », « ACCECHEC »…) ont été supprimées du catalogue de production alors que leurs pièces historiques subsistent — vérifié article par article : aucune n'existe plus dans `articles` côté production. Les conserver garde les documents lisibles |
+| ✅ | commercial/stock camion | la moitié des lignes en quantité négative (−360 PCS, −626 400 TND) | un stock négatif n'est pas de la marchandise à bord : c'est une sortie enregistrée sans son entrée. La base de production en contient (104 lignes sur la flotte) mais **son écran ne les montre jamais** — sa requête filtre `d.en_stock > 0 AND a.prouit_fini = 1`. Les deux mêmes filtres sont appliqués : le camion de Mokhtar passe de 18 à **9 lignes, toutes positives, identiques à la production**, et sa valeur de 129 980 à **1 952,984 TND**. Les 5 camions correspondent au nombre de lignes de la production (28 / 39 / 23 / 29 / 9). Les anomalies restent consultables par l'administration (`/admin/etat-stock?stock=negatif`) pour être régularisées |
+| ✅ | commercial/menu principal | « VÉHICULE — » alors qu'un camion est affecté | les tournées planifiées par l'application étaient créées **sans véhicule** (`/api/tournee` ne le renseignait pas), et la barre de tournée ne lisait que celui de l'ordre de mission : le camion est désormais repris à la création, les 9 tournées concernées ont été complétées, et la barre affiche le véhicule affecté même les jours sans mission — vérifié sur les 5 commerciaux (mokhtar 248TU6787, aziz 206TU7140, foued 243TU3251, sihem 243TU7638, heni 238TU1019) |
+| ✅ | admin/commerciaux | **27 commerciaux au lieu de 13**, chiffre d'affaires éclaté | le regroupement se faisait sur la chaîne brute du document : « MOKHTAR », « mokhtar trabelsi » et « Mokhtar Trabelsi » comptaient pour trois vendeurs, et les documents sans commercial (portant le **login** « heni », « aziz ») pour un quatrième. Regroupement par nom complet normalisé, login résolu vers le compte, et rapprochement des fautes de saisie par distance d'édition proportionnelle (« cheli »/« chelly » = même personne). **27 → 18 lignes**, Foued 527 021 TND (1 348 docs), Aziz Chelly 176 539 (511 docs) — et surtout **« heni rekik » et « HENI LAJMI » restent deux personnes distinctes** (214 374 vs 24 367). Fiche accessible par nom ou par login |
+| ✅ | documents de vente — commercial perdu | **4 821 documents sans commercial**, statistiques par vendeur fausses | un import antérieur n'avait pas repris `Raison_social_com` : « sky edition » ressortait à 58 594 TND au lieu de 544 726, Foued à 527 021 au lieu de 525 425, et le périmètre des tournées ne couvrait qu'une partie de l'activité. Champ restauré depuis la production sans rien écraser — **tous les commerciaux correspondent désormais à la production** (sky edition 544 726 = 544 726, Foued 525 425 = 525 425, Aziz 176 108 = 176 108). Les 646 documents restants n'ont pas de commercial en production non plus. Le CA global est inchangé (4 819 861 TND) : la correction réattribue, elle ne crée pas |
+| ✅ | commercial/tableau de bord | **4 518 clients affichés à chaque commercial** | le compteur de clients ignorait le périmètre commercial et renvoyait le fichier société entier, alors que le CA et les documents étaient bien filtrés : chacun voit désormais son portefeuille (mokhtar 722, foued 701, sihem 480, heni 442, aziz 237 — conformes au référentiel clients), l'admin gardant les 4 518 |
+| ✅ | commercial/dernier ticket | historique plafonné à 100 tickets, annoncés comme total | l'API retournait `take: 100` avec `total = rows.length` : le commercial lisait « Ticket 1 sur 100 » alors qu'il en a **1 602**, et la navigation s'arrêtait au centième. Liste paginée (17 pages), total réel affiché, chargement de la page suivante à la volée — vérifié jusqu'au ticket 101 |
+| ✅ | admin/ordres de mission | liste plafonnée à 200 tournées sur 2 631 | même défaut que les tickets : `take: 200` avec `total = rows.length`, sept huitièmes de l'historique invisibles. API paginée **et** pagination à l'écran (« 2 631 tournées · Page 1/14 »), retour à la première page à chaque changement de filtre, périmètre commercial préservé (46 tournées pour Mokhtar) |
+| ✅ | admin/comptabilité | l'écran affichait 12 comptes et **2 écritures** au lieu de 145 | deux modules comptables coexistaient : `/api/compta`, une ébauche branchée sur des tables de démonstration (`accounts`, `journal_entries`), et `/api/comptabilite`, le module réel (plan, journaux, grand-livre, balance, bilan) alimenté par l'ERP. L'écran interrogeait l'ébauche. Rebranché sur le module réel : **10 comptes · 49 écritures (145 lignes) · balance équilibrée à 26 515,033 TND · résultat 19 368 TND**, les lignes plates étant regroupées par pièce comme dans un journal |
 
-**Avancement : 56/71 écrans terminés — modules CHARGE, TRÉSORERIE et STOCK complets ; VENTE et ACHAT complets hors suivi de commande et rapports ; GRH complet hors traitements et paramétrages ; PARC ROULANT et ordres de mission alignés sur la production.**
+**Avancement : 68/68 écrans terminés — tous les modules repris et vérifiés sur les données réelles ; le stock se resynchronise seul sur la production.**
 
 ### Contrôle de cohérence avec la production
 
