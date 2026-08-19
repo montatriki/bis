@@ -5,11 +5,11 @@ import {
   CreditCard, Loader2, Package, FileText, MessageCircle,
 } from "lucide-react";
 import { useDashboard, fmtMoney, fmtCompact, fmtInt } from "@/lib/use-dashboard";
-import { useClientActif } from "@/lib/client-actif";
+import { useClientSeul } from "@/lib/client-actif";
 
 export default function CommercialStatistiquesPage() {
   const { data, loading, error } = useDashboard("commercial");
-  const { client: clientActif } = useClientActif();
+  const { client: clientActif } = useClientSeul();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
 

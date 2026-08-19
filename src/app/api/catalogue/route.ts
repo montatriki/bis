@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
         select: {
           refArt: true, codeBarre: true, designation: true, catalogue: true,
           unite: true, enStock: true, stMin: true,
-          tarif1Ht: true, tauxTva: true, puAchat: true, pmp: true,
+          tarif1Ht: true, tauxTva: true, tauxFodec: true, puAchat: true, pmp: true,
         },
       }),
       prisma.article.count({ where: whereCamion }),
@@ -118,7 +118,9 @@ export async function GET(req: NextRequest) {
       // Quantité physiquement chargée, panier compris (borne du sélecteur).
       stockCamion: dansCamion.get(a.refArt) ?? 0,
       stockGlobal: a.enStock,
-      prixTtc: Math.round((a.tarif1Ht * (1 + a.tauxTva / 100) + Number.EPSILON) * 1000) / 1000,
+      // Le FODEC entre dans la base de TVA (règle tunisienne) : sans lui,
+      // KIDS ZONE ressort à 28,586 au lieu des 28,872 de la production.
+      prixTtc: Math.round((a.tarif1Ht * (1 + (a.tauxFodec ?? 0) / 100) * (1 + a.tauxTva / 100) + Number.EPSILON) * 1000) / 1000,
     }));
 
     return NextResponse.json({
@@ -152,7 +154,7 @@ export async function GET(req: NextRequest) {
       select: {
         refArt: true, codeBarre: true, designation: true, catalogue: true,
         unite: true, enStock: true, stMin: true,
-        tarif1Ht: true, tauxTva: true, puAchat: true, pmp: true,
+        tarif1Ht: true, tauxTva: true, tauxFodec: true, puAchat: true, pmp: true,
       },
     }),
     prisma.article.count({ where }),
@@ -162,7 +164,9 @@ export async function GET(req: NextRequest) {
   // Prix TTC calculé depuis le tarif HT et le taux de TVA de l'article.
   const withTtc = rows.map((a) => ({
     ...a,
-    prixTtc: Math.round((a.tarif1Ht * (1 + a.tauxTva / 100) + Number.EPSILON) * 1000) / 1000,
+    // Le FODEC entre dans la base de TVA (règle tunisienne) : sans lui,
+      // KIDS ZONE ressort à 28,586 au lieu des 28,872 de la production.
+      prixTtc: Math.round((a.tarif1Ht * (1 + (a.tauxFodec ?? 0) / 100) * (1 + a.tauxTva / 100) + Number.EPSILON) * 1000) / 1000,
   }));
 
   return NextResponse.json({ rows: withTtc, total, nbEnStock });

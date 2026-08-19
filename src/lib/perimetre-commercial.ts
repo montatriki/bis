@@ -76,16 +76,29 @@ export async function emplacementVehicule(
   const norm = (v: string) =>
     v.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
-  // 1) « mokhtar 206TU7140 » commence par le prénom du commercial.
-  const parNom = cle ? emplacements.find((e) => norm(e).startsWith(cle)) : undefined;
-  if (parNom) return parNom;
+  // 1) La plaque fait foi — celle de la mission du jour, sinon celle du
+  //    véhicule affecté au commercial.
+  //
+  //    Le libellé du dépôt garde souvent le prénom d'un ancien conducteur :
+  //    « mokhtar 206TU7140 » désigne aujourd'hui le camion d'Aziz. S'y fier
+  //    d'abord donnait à Mokhtar le catalogue d'un camion qui n'est plus le
+  //    sien — et un catalogue vide, son vrai véhicule étant le 248TU6787.
+  const affecte = plaque
+    ? plaque
+    : (await prisma.commercial.findFirst({
+        where: { user: { name: { equals: nomCommercial, mode: "insensitive" } } },
+        select: { vehicle: { select: { plate: true } } },
+      }))?.vehicle?.plate ?? null;
 
-  // 2) sinon, l'emplacement portant la plaque de la mission du jour.
-  if (plaque) {
-    const p = norm(plaque);
+  if (affecte) {
+    const p = norm(affecte.trim());
     const parPlaque = emplacements.find((e) => norm(e).includes(p));
     if (parPlaque) return parPlaque;
   }
+
+  // 2) À défaut d'affectation, le libellé qui commence par son prénom.
+  const parNom = cle ? emplacements.find((e) => norm(e).startsWith(cle)) : undefined;
+  if (parNom) return parNom;
 
   return null;
 }

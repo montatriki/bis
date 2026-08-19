@@ -47,7 +47,24 @@ type Etat = {
 };
 
 const CLE = "bis-client-actif";
-const Ctx = createContext<Etat | null>(null);
+
+/**
+ * Le contexte est scindé en deux.
+ *
+ * Le GPS émet un point toutes les 30 s (`maximumAge: 30_000`). Avec un seul
+ * contexte, chaque point changeait la valeur partagée et **re-rendait tout
+ * l'arbre de la tournée** : les écrans qui ne lisent pas la position — stock
+ * camion, journal, panier — refaisaient malgré tout leurs appels réseau, d'où
+ * une salve identique toutes les 31 s dans les journaux du serveur.
+ *
+ * `CtxClient` ne change qu'au changement de client ; `CtxPosition` porte le
+ * GPS et n'est consommé que par les écrans qui s'en servent.
+ */
+type EtatClient = Pick<Etat, "client" | "choisir" | "effacer" | "pret">;
+type EtatPosition = Pick<Etat, "position" | "erreurGps" | "gpsEnCours" | "rafraichirPosition" | "verifierPosition">;
+
+const CtxClient = createContext<EtatClient | null>(null);
+const CtxPosition = createContext<EtatPosition | null>(null);
 
 export function ClientActifProvider({ children }: { children: React.ReactNode }) {
   const [client, setClient] = useState<ClientActif | null>(null);
@@ -184,18 +201,52 @@ export function ClientActifProvider({ children }: { children: React.ReactNode })
     return { statut: proximite(d), distance: Math.round(d) };
   }, [position]);
 
-  const valeur = useMemo<Etat>(() => ({
-    client, choisir, effacer,
+  // Stable tant que le commercial ne change pas de client : un point GPS ne
+  // provoque plus de rendu des écrans de tournée.
+  const valeurClient = useMemo<EtatClient>(
+    () => ({ client, choisir, effacer, pret }),
+    [client, choisir, effacer, pret],
+  );
+
+  const valeurPosition = useMemo<EtatPosition>(() => ({
     position, erreurGps, gpsEnCours,
     rafraichirPosition: demanderPosition,
-    verifierPosition, pret,
-  }), [client, choisir, effacer, position, erreurGps, gpsEnCours, demanderPosition, verifierPosition, pret]);
+    verifierPosition,
+  }), [position, erreurGps, gpsEnCours, demanderPosition, verifierPosition]);
 
-  return <Ctx.Provider value={valeur}>{children}</Ctx.Provider>;
+  return (
+    <CtxClient.Provider value={valeurClient}>
+      <CtxPosition.Provider value={valeurPosition}>{children}</CtxPosition.Provider>
+    </CtxClient.Provider>
+  );
 }
 
+/**
+ * Client en cours et sélection. Ne re-rend pas sur les points GPS — c'est ce
+ * qui évite qu'un écran sans rapport avec la position refasse ses appels
+ * toutes les 30 secondes.
+ */
 export function useClientActif(): Etat {
-  const ctx = useContext(Ctx);
-  if (!ctx) throw new Error("useClientActif doit être utilisé dans <ClientActifProvider>");
-  return ctx;
+  const c = useContext(CtxClient);
+  const p = useContext(CtxPosition);
+  if (!c || !p) throw new Error("useClientActif doit être utilisé dans <ClientActifProvider>");
+  return { ...c, ...p };
+}
+
+/**
+ * Client en cours seul, sans la position : à préférer sur les écrans qui
+ * n'affichent pas de distance. Ils ne se re-rendent alors plus à chaque point
+ * GPS, et ne relancent plus leurs appels réseau toutes les 30 secondes.
+ */
+export function useClientSeul(): EtatClient {
+  const c = useContext(CtxClient);
+  if (!c) throw new Error("useClientSeul doit être utilisé dans <ClientActifProvider>");
+  return c;
+}
+
+/** Position GPS seule, pour les écrans qui n'ont pas besoin du client. */
+export function usePositionGps(): EtatPosition {
+  const p = useContext(CtxPosition);
+  if (!p) throw new Error("usePositionGps doit être utilisé dans <ClientActifProvider>");
+  return p;
 }

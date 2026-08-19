@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Search, X, ShoppingCart, Plus, Minus, Package, Loader2, Check, MapPin, AlertTriangle, Trash2 } from "lucide-react";
-import { useClientActif } from "@/lib/client-actif";
+import { useClientSeul } from "@/lib/client-actif";
 import TicketVente from "@/components/commercial/TicketVente";
 
 type Article = {
@@ -35,7 +35,7 @@ export default function CataloguePage() {
 
   // La commande porte sur le client en cours de visite, choisi une fois pour
   // toutes dans le bandeau : plus de sélection enfouie au moment de valider.
-  const { client: clientActif } = useClientActif();
+  const { client: clientActif } = useClientSeul();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

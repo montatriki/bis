@@ -82,7 +82,7 @@ export async function synchroniserStock(): Promise<ResultatSync> {
   // --- 1. Stock global du catalogue ------------------------------------
   const artsProd = await lire<ArtProd[]>("articles/", token);
   const locaux = await prisma.article.findMany({
-    select: { refArt: true, enStock: true, pmp: true, puAchat: true },
+    select: { refArt: true, enStock: true, pmp: true, puAchat: true, tarif1Ht: true, tauxTva: true, tauxFodec: true },
   });
   // La production stocke certaines références avec un espace final : on
   // indexe les deux formes, la fiche locale faisant foi sur la graphie.
@@ -98,15 +98,22 @@ export async function synchroniserStock(): Promise<ResultatSync> {
     const p = parRef.get(a.refArt) ?? parRef.get(a.refArt.trim());
     if (!p) continue; // article supprimé côté production mais cité par nos documents
     const enStock = n(p.en_stock), pmp = n(p.pmp), puAchat = n(p.pu_achat);
+    // Le prix de vente suit lui aussi la production : c'est lui qui valorise
+    // le stock camion et le catalogue du commercial. Le laisser figé faisait
+    // vendre et valoriser sur des tarifs périmés.
+    const tarif1Ht = n(p.tarif1_ht), tauxTva = n(p.Taux_tva), tauxFodec = n(p.Taux_fodec);
     // La quantité peut être juste alors que la valorisation ne l'est pas :
-    // on compare les trois.
+    // on compare quantité, coûts et prix de vente.
     if (Math.abs(enStock - a.enStock) < 0.001 &&
         Math.abs(pmp - a.pmp) < 0.000001 &&
-        Math.abs(puAchat - a.puAchat) < 0.000001) continue;
+        Math.abs(puAchat - a.puAchat) < 0.000001 &&
+        Math.abs(tarif1Ht - a.tarif1Ht) < 0.000001 &&
+        Math.abs(tauxTva - a.tauxTva) < 0.000001 &&
+        Math.abs(tauxFodec - a.tauxFodec) < 0.000001) continue;
     await prisma.article.update({
       where: { refArt: a.refArt },
       data: {
-        enStock, pmp, puAchat,
+        enStock, pmp, puAchat, tarif1Ht, tauxTva, tauxFodec,
         entrer: n(p.entrer), sortie: n(p.sortie), stockIni: n(p.stock_ini),
       },
     });

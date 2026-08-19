@@ -393,33 +393,45 @@ export async function stockVehicule(vehicule: string, options?: { toutVoir?: boo
   const articles = refs.length
     ? await prisma.article.findMany({
         where: { refArt: { in: refs } },
-        select: { refArt: true, designation: true, unite: true, pmp: true, puAchat: true, tarif1Ht: true, kind: true },
+        select: { refArt: true, designation: true, unite: true, pmp: true, puAchat: true, tarif1Ht: true, tauxTva: true, tauxFodec: true, kind: true },
       })
     : [];
   const parRef = new Map(articles.map((a) => [a.refArt, a]));
 
   const lignes = rows.map((r) => {
     const a = parRef.get(r.refArt);
-    // Coût moyen du **véhicule** en priorité : la marchandise chargée peut
-    // avoir été achetée à un autre prix que celle restée au dépôt. On ne
-    // retombe sur le PMP global que si l'emplacement n'a pas de coût du tout.
+    // Un camion transporte de la marchandise **à vendre** : sa valeur est
+    // celle du chargement au prix de vente, comme dans l'application mobile
+    // d'origine (`art.valeur_ht = row.tarif1_ht * row.qteRte`).
     //
-    // Un coût nul est une valeur, pas une absence : la production rapporte un
-    // PMP à zéro pour les articles jamais entrés en stock valorisé. Le traiter
-    // comme « non renseigné » faisait basculer sur le prix d'achat et
-    // surévaluait le camion.
+    // Le PMP, lui, est un coût d'achat moyen : il vaut zéro pour les articles
+    // jamais entrés en stock valorisé — MIRACLE 12pcs ressortait ainsi à
+    // 0,000 TND alors que le camion en porte quatre — et sous-évaluait le
+    // chargement de plus de moitié (1 953 TND au lieu de 4 422 TND HT).
+    const prixVente = Number(a?.tarif1Ht ?? 0);
+    // Coût de revient, conservé à titre indicatif : c'est lui qui sert aux
+    // écarts d'inventaire et à la marge, pas à la valeur embarquée.
     const pmp = Number(
       r.pmp !== null && r.pmp !== undefined ? r.pmp
       : a?.pmp !== null && a?.pmp !== undefined ? a.pmp
       : a?.puAchat ?? 0,
     );
+    const tauxTva = Number(a?.tauxTva ?? 0);
+    // Le FODEC entre dans la base de TVA (règle tunisienne) : sans lui,
+    // KIDS ZONE ressortait à 28,586 TTC au lieu des 28,872 de la production.
+    const tauxFodec = Number(a?.tauxFodec ?? 0);
     return {
       refArt: r.refArt,
       designation: a?.designation ?? null,
       unite: a?.unite ?? null,
       quantite: round3(r.quantite),
       pmp: round3(pmp),
-      valeur: round3(r.quantite * pmp),
+      // Prix de vente unitaire et valeur du chargement.
+      prixVente: round3(prixVente),
+      valeur: round3(r.quantite * prixVente),
+      valeurTtc: round3(r.quantite * prixVente * (1 + tauxFodec / 100) * (1 + tauxTva / 100)),
+      // Ce que le chargement a coûté : utile pour la marge, pas pour l'écran.
+      valeurCout: round3(r.quantite * pmp),
       // P = produit fini (`prouit_fini` en source), seul type embarqué à la
       // vente ; MP / SF / CH ne figurent pas au stock camion.
       kind: a?.kind ?? "P",
@@ -450,6 +462,9 @@ export async function stockVehicule(vehicule: string, options?: { toutVoir?: boo
     lignes: options?.toutVoir ? lignes : embarque,
     total: options?.toutVoir ? lignes.length : embarque.length,
     valeurTotale: round3((options?.toutVoir ? lignes : embarque).reduce((t, l) => t + l.valeur, 0)),
+    // Totaux du chargement : au prix de vente (HT et TTC) et au coût.
+    valeurTotaleTtc: round3((options?.toutVoir ? lignes : embarque).reduce((t, l) => t + l.valeurTtc, 0)),
+    valeurTotaleCout: round3((options?.toutVoir ? lignes : embarque).reduce((t, l) => t + l.valeurCout, 0)),
     // Compléments d'information, sans effet sur l'écran du commercial.
     anomalies: anomalies.map(({ refArt, designation, quantite, valeur }) => ({ refArt, designation, quantite, valeur })),
     nbAnomalies: anomalies.length,

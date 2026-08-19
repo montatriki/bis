@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Camera, MapPin, Loader2, Check, Crosshair, RefreshCw, AlertTriangle } from "lucide-react";
-import { useClientActif } from "@/lib/client-actif";
+import { usePositionGps } from "@/lib/client-actif";
 import { coordValide } from "@/lib/geo";
 
 // Création d'un point de vente depuis le terrain.
@@ -50,7 +50,7 @@ export default function NouveauClientModal({
   onFermer: () => void;
   onCree: (c: ClientCree) => void;
 }) {
-  const { position, gpsEnCours, erreurGps, rafraichirPosition } = useClientActif();
+  const { position, gpsEnCours, erreurGps, rafraichirPosition } = usePositionGps();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -63,13 +63,20 @@ export default function NouveauClientModal({
   const [erreur, setErreur] = useState<string | null>(null);
 
   // Chaque ouverture repart d'un formulaire vierge et d'une position fraîche.
+  // La remise à zéro passe par la chaîne asynchrone : un `setState` synchrone
+  // dans l'effet déclencherait un rendu en cascade.
   useEffect(() => {
     if (!ouvert) return;
-    setForm({ raisonSocial: "", adresse: "", ville: "", gouvernorat: "", tel: "", email: "", matriculeF: "", famille: "" });
-    setPhoto(null);
-    setPhotoErreur(null);
-    setErreur(null);
-    if (!position) rafraichirPosition();
+    let annule = false;
+    Promise.resolve().then(() => {
+      if (annule) return;
+      setForm({ raisonSocial: "", adresse: "", ville: "", gouvernorat: "", tel: "", email: "", matriculeF: "", famille: "" });
+      setPhoto(null);
+      setPhotoErreur(null);
+      setErreur(null);
+      if (!position) rafraichirPosition();
+    });
+    return () => { annule = true; };
   }, [ouvert]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const maj = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
