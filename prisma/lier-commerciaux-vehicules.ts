@@ -87,8 +87,8 @@ async function main() {
     await prisma.commercial.updateMany({ data: { vehicleId: null } });
   }
 
-  const prisUser = new Set<string>();
-  const prisVehicule = new Set<string>();
+  const prisUser = new Set<number>();
+  const prisVehicule = new Set<number>();
   const plan: { login: string; nom: string; plaque: string; date: Date | null }[] = [];
   const ecartes: { plaque: string; nom: string; motif: string }[] = [];
 

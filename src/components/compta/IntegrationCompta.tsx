@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
+import { confirmer } from "@/lib/alertes";
 import {
   BookOpen, Scale, FileText, Loader2, Check, AlertTriangle,
   Play, RotateCcw, Download, Settings, Info,
@@ -429,7 +430,7 @@ function Journal({ accent, reload, onFlash, onDone }: {
   }, [reload]);
 
   async function annuler(refDoc: string) {
-    if (!confirm(`Annuler la pièce du document ${refDoc} ?`)) return;
+    if (!(await confirmer(`Annuler la pièce du document ${refDoc} ?`, { danger: true }))) return;
     const r = await fetch("/api/comptabilite", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "annuler", refDoc }),

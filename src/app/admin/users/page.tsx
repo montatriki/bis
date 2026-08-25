@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Pencil, Trash2, Shield, TrendingUp, MapPin, ShoppingBag, Search, X, Loader2, Save } from "lucide-react";
+import { confirmer } from "@/lib/alertes";
 
 type User = {
   id: string; name: string; login: string; email: string; role: string;
@@ -42,7 +43,7 @@ export default function UsersPage() {
   const flash = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
   async function remove(u: User) {
-    if (!confirm(`Supprimer le compte « ${u.name} » ?`)) return;
+    if (!(await confirmer(`Supprimer le compte « ${u.name} » ?`, { danger: true }))) return;
     const r = await fetch(`/api/utilisateurs?id=${u.id}`, { method: "DELETE" }).then((x) => x.json());
     if (r.ok) { flash("Compte supprimé"); setReload((k) => k + 1); }
     else flash(r.error ?? "Échec", false);

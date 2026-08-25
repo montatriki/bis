@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import PersonnelForm from "@/components/grh/PersonnelForm";
 import PointageGrid from "@/components/grh/PointageGrid";
+import { confirmer, erreur } from "@/lib/alertes";
 
 const SUB_TABS = ["Employés", "Contrats", "Gestion pointage", "Congés", "Crédits", "Traitements", "Paramètres paie", "Rapports", "Paramètres"] as const;
 type Tab = (typeof SUB_TABS)[number];
@@ -120,10 +121,10 @@ function EmployesTab({ onChanged }: { onChanged: () => void }) {
   }, [search, reload]);
 
   async function remove(id: number) {
-    if (!confirm("Supprimer cet employé ?")) return;
+    if (!(await confirmer("Supprimer cet employé ?", { danger: true }))) return;
     const r = await fetch(`/api/grh?resource=personnel&id=${id}`, { method: "DELETE" }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onChanged(); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   return (
@@ -247,14 +248,14 @@ function ContratsTab({ onFlash }: { onFlash: (m: string) => void }) {
       body: JSON.stringify({ id, etat }),
     }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onFlash(`Contrat marqué « ${etat} »`); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   async function supprimer(id: number) {
-    if (!confirm("Supprimer ce contrat ?")) return;
+    if (!(await confirmer("Supprimer ce contrat ?", { danger: true }))) return;
     const r = await fetch(`/api/grh?resource=contrats&id=${id}`, { method: "DELETE" }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onFlash("Contrat supprimé"); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -275,7 +276,7 @@ function ContratsTab({ onFlash }: { onFlash: (m: string) => void }) {
       }),
     }).then((x) => x.json());
     if (r.ok) { setAdding(false); setReload((k) => k + 1); onFlash("Contrat enregistré"); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   return (
@@ -479,7 +480,7 @@ function CongesTab({ onFlash }: { onFlash: (m: string) => void }) {
       }),
     }).then((x) => x.json());
     if (r.ok) { setAdding(false); setReload((k) => k + 1); onFlash("Congé enregistré"); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   return (
@@ -595,7 +596,7 @@ function TraitementsTab({ onFlash }: { onFlash: (m: string) => void }) {
     }).then((x) => x.json()).catch(() => ({ error: "réseau" }));
     setBusy(false);
     if (r.ok) { onFlash(r.message); setReload((k) => k + 1); }
-    else alert(r.error ?? "Échec du traitement");
+    else void erreur(String(r.error ?? "Échec du traitement"));
   }
 
   function exportCsv() {
@@ -791,13 +792,13 @@ function ParametresTab({ onFlash }: { onFlash: (m: string) => void }) {
       body: JSON.stringify({ libelle: libelle.trim() }),
     }).then((x) => x.json());
     if (r.ok) { setLibelle(""); setReload((k) => k + 1); onFlash("Ajouté"); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   async function remove(id: number) {
     const r = await fetch(`/api/grh?resource=${ref}&id=${id}`, { method: "DELETE" }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onFlash("Supprimé"); }
-    else alert(r.error ?? "Suppression impossible (élément utilisé)");
+    else void erreur(String(r.error ?? "Suppression impossible (élément utilisé)"));
   }
 
   async function addSession(e: React.FormEvent<HTMLFormElement>) {
@@ -812,7 +813,7 @@ function ParametresTab({ onFlash }: { onFlash: (m: string) => void }) {
       }),
     }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onFlash("Session créée"); (e.target as HTMLFormElement).reset(); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   return (
@@ -907,14 +908,14 @@ function ParamsPaieTab({ onFlash }: { onFlash: (m: string) => void }) {
       method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onFlash(r.message ?? "Enregistré"); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
     return r.ok;
   }
 
   async function supprimer(id: number) {
     const r = await fetch(`/api/grh?resource=${sous}&id=${id}`, { method: "DELETE" }).then((x) => x.json());
     if (r.ok) { setReload((k) => k + 1); onFlash("Supprimé"); }
-    else alert(r.error ?? "Échec");
+    else void erreur(String(r.error ?? "Échec"));
   }
 
   return (

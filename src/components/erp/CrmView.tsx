@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
+import { confirmer } from "@/lib/alertes";
 import {
   Target, Headphones, Plus, Loader2, Check, AlertTriangle, X,
   TrendingUp, Archive, MessageSquare, ChevronRight,
@@ -127,7 +128,7 @@ function Pipeline({ accent, reload, onFlash, onDone }: {
   }
 
   async function archiver(o: Opp) {
-    if (!confirm(`Archiver « ${o.libelle} » ?`)) return;
+    if (!(await confirmer(`Archiver « ${o.libelle} » ?`, { danger: true }))) return;
     const r = await fetch(`/api/crm?vue=opportunite&id=${o.id}`, { method: "DELETE" }).then((x) => x.json());
     onFlash(r.message ?? r.error ?? "—", Boolean(r.ok));
     if (r.ok) onDone();

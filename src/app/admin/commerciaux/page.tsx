@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, AlertTriangle, ArrowUpRight, ArrowRightLeft, X, Loader2 } from "lucide-react";
+import { confirmer } from "@/lib/alertes";
 
 type Ligne = { vendeur: string; ca: number; docs: number; clients: number; impaye: number };
 
@@ -138,7 +139,7 @@ function TransfertPortefeuille({
     setErreur(null);
     if (!source || !cible) { setErreur("Choisissez le commercial source et le commercial cible"); return; }
     if (source === cible) { setErreur("Source et cible sont le même commercial"); return; }
-    if (!confirm(`Transférer les ${nbSource} client(s) de « ${source} » vers « ${cible} » ?`)) return;
+    if (!(await confirmer(`Transférer les ${nbSource} client(s) de « ${source} » vers « ${cible} » ?`, { danger: true }))) return;
 
     setEnvoi(true);
     const r = await fetch("/api/commerciaux", {

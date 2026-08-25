@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   ClipboardList, Plus, Trash2, Search, X, Loader2, Check, AlertTriangle,
   Download, ChevronRight, PackageCheck, TrendingDown, TrendingUp,
@@ -342,7 +343,7 @@ function DetailInv({ id, accent, onFlash, onClose }: {
   useEffect(charger, [charger]);
 
   const valider = async () => {
-    if (!confirm("Valider l'inventaire ? Le stock sera aligné sur le comptage et l'inventaire deviendra non modifiable.")) return;
+    if (!(await confirmer("Valider l'inventaire ? Le stock sera aligné sur le comptage et l'inventaire deviendra non modifiable.", { danger: true }))) return;
     setBusy(true);
     try {
       const r = await fetch("/api/inventaire", {

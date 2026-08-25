@@ -89,7 +89,10 @@ export async function GET(req: NextRequest) {
       },
       select: { refArt: true, designation: true, unite: true, enStock: true },
       orderBy: { designation: "asc" },
-      take: 200,
+      // La coupe à 200 sur 556 articles vendables arrêtait la liste à la lettre
+      // « C » : le commercial ne pouvait demander que le début du catalogue.
+      // Sans recherche on renvoie tout ; la recherche filtre déjà côté base.
+      take: 1000,
     });
 
     return NextResponse.json({

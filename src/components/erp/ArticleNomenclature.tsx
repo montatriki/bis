@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { X, Plus, Trash2, Loader2, Network, Calculator, Check, AlertTriangle } from "lucide-react";
+import { confirmer } from "@/lib/alertes";
 
 // Nomenclature d'un article — écran « Nomenclature » de la fiche produit de
 // l'ERP d'origine (`products-management/nomenclature.js`).
@@ -99,7 +100,7 @@ export default function ArticleNomenclature({
   }
 
   async function supprimerLigne(id: number) {
-    if (!confirm("Retirer ce composant de la nomenclature ?")) return;
+    if (!(await confirmer("Retirer ce composant de la nomenclature ?", { danger: true }))) return;
     setBusy(true);
     const r = await fetch(`/api/gpao?vue=nomenclature-ligne&id=${id}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => ({ error: "réseau" }));

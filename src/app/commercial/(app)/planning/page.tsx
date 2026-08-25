@@ -75,6 +75,10 @@ export default function PlanningPage() {
   // de Sousse) alors que le commercial était à 360 m de sa première visite.
   const requete = useRef(0);
 
+  /** Dernière position connue, lisible depuis un appel différé. */
+  const positionRef = useRef<typeof position>(null);
+  useEffect(() => { positionRef.current = position; }, [position]);
+
   const charger = useCallback(() => {
     const numero = ++requete.current;
     // La position du commercial sert à mesurer le vrai trajet d'approche :
@@ -97,12 +101,17 @@ export default function PlanningPage() {
   /** Génère le plan du jour depuis la position courante, sinon depuis le dépôt. */
   async function genererTournee() {
     setGen(true);
+    // La position est lue **au moment de l'appel** : la génération automatique
+    // est différée d'un tour, et la closure figeait la valeur du rendu où le
+    // GPS n'avait pas encore répondu — le plan repartait alors du dépôt et
+    // envoyait le commercial à 186 km.
+    const p = positionRef.current;
     const r = await fetch("/api/tournee", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         date,
         taille: 12,
-        depart: position ? { lat: position.lat, lng: position.lng } : undefined,
+        depart: p ? { lat: p.lat, lng: p.lng } : undefined,
       }),
     }).then((x) => x.json()).catch(() => ({ error: "réseau" }));
     setGen(false);
@@ -126,8 +135,12 @@ export default function PlanningPage() {
     autoGen.current = true;
     // Différé d'un tour : la génération met à jour l'état, l'appeler dans le
     // corps de l'effet déclencherait un rendu en cascade.
-    const t = setTimeout(() => { genererTournee(); }, 0);
-    return () => clearTimeout(t);
+    //
+    // Le timeout n'est **pas** annulé au nettoyage : l'effet se relance à
+    // chaque changement de `tournee` ou de `position`, et l'annuler faisait
+    // sauter la génération tout en laissant le garde-fou armé — le commercial
+    // ouvrait alors un planning vide qui ne se remplissait jamais.
+    setTimeout(() => { genererTournee(); }, 0);
     // `genererTournee` est stable au sein d'un rendu ; la garde `autoGen`
     // empêche toute régénération en boucle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,6 +208,30 @@ export default function PlanningPage() {
           toast.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
           {toast.ok ? <Check size={15} className="mt-0.5 shrink-0" /> : <AlertTriangle size={15} className="mt-0.5 shrink-0" />}
           <span>{toast.msg}</span>
+        </div>
+      )}
+
+      {/* Plan bâti loin d'où se trouve le commercial.
+          Une tournée reste valable toute la journée : on ne la refait pas
+          d'office, mais on prévient quand elle ne correspond manifestement
+          plus à la position — sinon le commercial part à 60 km alors que ses
+          clients sont à 1 km. */}
+      {st && etapes.length > 0 && position && st.distanceApproche > 20_000 && (
+        <div className="flex items-start gap-2 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-sm">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold">
+              Cette tournée commence à {formatDistance(st.distanceApproche)} de vous
+            </div>
+            <div className="text-xs opacity-80 mt-0.5">
+              Elle a été planifiée depuis un autre point de départ. Régénérez-la pour
+              visiter les clients autour de votre position actuelle.
+            </div>
+          </div>
+          <button onClick={genererTournee} disabled={gen}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold disabled:opacity-50">
+            {gen ? "…" : "Regénérer ici"}
+          </button>
         </div>
       )}
 

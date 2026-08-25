@@ -25,7 +25,9 @@ const num = (v: unknown) => {
 const ETATS_CHEQUE = ["Emis", "Remis", "Encaissé", "Rejeté", "Déchiré"] as const;
 
 export async function GET(req: NextRequest) {
-  const auth = await requireSession(["ADMIN", "MANAGER"]);
+  // `tresorerie` figure dans l'application mobile du commercial : il consulte
+  // les encaissements. L'écriture reste réservée à l'administration.
+  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
 
   const sp = req.nextUrl.searchParams;

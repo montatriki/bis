@@ -31,18 +31,26 @@ function getResponse(msg: string): string {
 
 function now() { return new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
 
+/** Délai de frappe simulé, entre 0,9 s et 1,5 s. Isolé du rendu : `Math.random`
+ *  ne doit pas être appelé pendant qu'un composant se rend. */
+function delaiReponse() { return 900 + Math.random() * 600; }
+
 export default function BISAssistant() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Le message d'accueil appartient à l'état initial : le poser depuis un effet
+  // déclenchait un rendu supplémentaire à chaque montage, et `now()` lit
+  // l'horloge — un appel impur interdit pendant le rendu.
+  const [messages, setMessages] = useState<Message[]>(() => [
+    {
+      role: "assistant",
+      content:
+        "Bonjour ! Je suis **BIS Assistant** 🤖\n\nJe peux vous aider avec les données de vente, stock, clients et performances. Que souhaitez-vous savoir ?",
+      time: now(),
+    },
+  ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMessages([
-      { role: "assistant", content: "Bonjour ! Je suis **BIS Assistant** 🤖\n\nJe peux vous aider avec les données de vente, stock, clients et performances. Que souhaitez-vous savoir ?", time: now() }
-    ]);
-  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,7 +66,7 @@ export default function BISAssistant() {
     setTimeout(() => {
       setTyping(false);
       setMessages(prev => [...prev, { role: "assistant", content: getResponse(msg), time: now() }]);
-    }, 900 + Math.random() * 600);
+    }, delaiReponse());
   }
 
   return (

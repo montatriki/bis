@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { PackagePlus, Loader2, Check, AlertTriangle, Search, Send, Trash2, Truck } from "lucide-react";
+import { confirmer } from "@/lib/alertes";
 
 // Bon d'approvisionnement — tuile « BON D'APPROVISIONNEMENT » de l'app
 // commerciale : demande de réassort du stock camion auprès du dépôt.
@@ -50,7 +51,7 @@ export default function ApprovisionnementPage() {
   useEffect(charger, [charger]);
 
   const supprimer = async (b: Bon) => {
-    if (!confirm(`Supprimer le bon ${b.reference} ?`)) return;
+    if (!(await confirmer(`Supprimer le bon ${b.reference} ?`, { danger: true }))) return;
     const r = await fetch(`/api/approvisionnement?id=${b.id}`, { method: "DELETE" });
     const d = await r.json();
     flash(d.message ?? d.error, r.ok);

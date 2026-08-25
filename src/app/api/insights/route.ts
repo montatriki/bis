@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { TYPES_CA, signeCA, round3 } from "@/lib/vente-stats";
+import { rapprocheur } from "@/lib/objectifs-vendeurs";
 
 // Insights du tableau de bord admin — les quatre indicateurs de tête.
 //
@@ -247,13 +248,38 @@ export async function GET(req: NextRequest) {
       taux: round3(tauxObjectif),
       reste: round3(Math.max(0, objectifCA - realise)),
       nbVendeurs: realiseParVendeur.size,
-      parVendeur: [...realiseParVendeur.entries()]
-        .map(([vendeur, ca]) => {
-          const o = objectifs.find((x) => x.vendeur === vendeur)?.objectifCA ?? 0;
-          return { vendeur, ca: round3(ca), objectifCA: round3(o), taux: o > 0 ? round3((ca / o) * 100) : 0 };
-        })
-        .sort((a, b) => b.ca - a.ca)
-        .slice(0, 10),
+      // Les objectifs sont saisis sous une forme abrégée (« FOUED ») que les
+      // documents n'emploient pas (« Foued Fakhfekh ») : sans rapprochement,
+      // chaque vendeur s'affichait à 0 %.
+      parVendeur: (() => {
+        const cle = rapprocheur([...realiseParVendeur.keys()], objectifs.map((o) => o.vendeur));
+        const objParCle = new Map<string, number>();
+        for (const o of objectifs) {
+          const k = cle(o.vendeur);
+          if (k) objParCle.set(k, (objParCle.get(k) ?? 0) + o.objectifCA);
+        }
+        // Deux écritures du même vendeur (« MOKHTAR » et « mokhtar trabelsi »)
+        // se cumulent sur une seule ligne, au libellé le plus complet.
+        const parCle = new Map<string, { vendeur: string; ca: number }>();
+        for (const [vendeur, ca] of realiseParVendeur) {
+          const k = cle(vendeur);
+          if (!k) continue;
+          const cur = parCle.get(k);
+          if (cur) {
+            cur.ca += ca;
+            if (vendeur.length > cur.vendeur.length) cur.vendeur = vendeur;
+          } else {
+            parCle.set(k, { vendeur, ca });
+          }
+        }
+        return [...parCle.entries()]
+          .map(([k, v]) => {
+            const o = objParCle.get(k) ?? 0;
+            return { vendeur: v.vendeur, ca: round3(v.ca), objectifCA: round3(o), taux: o > 0 ? round3((v.ca / o) * 100) : 0 };
+          })
+          .sort((a, b) => b.ca - a.ca)
+          .slice(0, 10);
+      })(),
     },
     clientsRisque: {
       total: inactifs.length,

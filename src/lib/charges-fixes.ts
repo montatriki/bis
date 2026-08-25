@@ -66,6 +66,9 @@ export async function repartirCharge(id: number): Promise<ResultatRepartition> {
 
   const documents = await prisma.erpDocument.findMany({
     where: {
+      // Sans ce filtre, les factures d'achat (FAO…, rangées sous le même
+      // `typeDoc` FC que les factures client) entrent dans le chiffre.
+      nature: "Vente",
       dateDoc: { gte: du, lte: au },
       typeDoc: { in: [...TYPES_VENTE] },
     },
@@ -182,7 +185,7 @@ export async function annulerRepartition(id: number): Promise<ResultatRepartitio
   au.setHours(23, 59, 59, 999);
 
   const documents = await prisma.erpDocument.findMany({
-    where: { dateDoc: { gte: du, lte: au }, typeDoc: { in: [...TYPES_VENTE] } },
+    where: { nature: "Vente", dateDoc: { gte: du, lte: au }, typeDoc: { in: [...TYPES_VENTE] } },
     select: { refDoc: true },
   });
 
@@ -210,7 +213,7 @@ export async function annulerRepartition(id: number): Promise<ResultatRepartitio
  */
 export async function margeParArticle(du: Date, au: Date) {
   const documents = await prisma.erpDocument.findMany({
-    where: { dateDoc: { gte: du, lte: au }, typeDoc: { in: [...TYPES_VENTE] } },
+    where: { nature: "Vente", dateDoc: { gte: du, lte: au }, typeDoc: { in: [...TYPES_VENTE] } },
     select: { refDoc: true },
   });
 

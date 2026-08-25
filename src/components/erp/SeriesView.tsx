@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   Barcode, Plus, Trash2, Search, X, Loader2, Check, AlertTriangle,
   Download, ArrowRight, PackageSearch,
@@ -169,7 +170,7 @@ function Liste({ accent, reload, onTracer, onFlash }: {
   }, [charger, reload]);
 
   const supprimer = async (id: number) => {
-    if (!confirm("Supprimer ce mouvement de numéro de série ?")) return;
+    if (!(await confirmer("Supprimer ce mouvement de numéro de série ?", { danger: true }))) return;
     const r = await fetch(`/api/series?id=${id}`, { method: "DELETE" });
     const d = await r.json();
     if (!r.ok) return onFlash(d.error ?? "Échec", false);

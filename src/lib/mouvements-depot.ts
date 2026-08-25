@@ -46,7 +46,14 @@ export async function disponible(refArt: string, emplacement: string): Promise<n
   const row = await prisma.stockDepot.findUnique({
     where: { refArt_emplacement: { refArt, emplacement } },
   });
-  return row?.quantite ?? 0;
+  if (row) return row.quantite;
+  // Certaines références de la production portent un espace final significatif
+  // (« planche educatif  »). Une saisie sans cet espace tombait à zéro et le
+  // mouvement était refusé alors que le stock existe.
+  const approche = await prisma.stockDepot.findFirst({
+    where: { emplacement, refArt: { in: [refArt.trim(), `${refArt.trim()} `] } },
+  });
+  return approche?.quantite ?? 0;
 }
 
 /**
@@ -80,7 +87,7 @@ export async function creerMouvement(
     return { ok: false, message: "Source et destination doivent être différentes" };
   }
 
-  const valides = lignes
+  const saisies = lignes
     .map((l) => ({
       refArt: String(l.refArt ?? "").trim(),
       designation: l.designation ?? null,
@@ -88,9 +95,31 @@ export async function creerMouvement(
     }))
     .filter((l) => l.refArt && l.quantite > 0);
 
-  if (valides.length === 0) {
+  if (saisies.length === 0) {
     return { ok: false, message: "Aucune ligne valide (référence et quantité > 0)" };
   }
+
+  // Certaines références de la production portent un espace final significatif
+  // (« planche educatif  »). La saisie arrive sans cet espace : sans cette
+  // résolution, le contrôle de stock trouvait 0 et refusait un mouvement
+  // pourtant possible.
+  // Les deux formes peuvent coexister dans le catalogue : c'est celle qui porte
+  // réellement du stock à la source qui fait foi.
+  const candidates = saisies.flatMap((l) => [l.refArt, `${l.refArt} `]);
+  const formeReelle = new Map<string, string>();
+  if (source) {
+    const stockees = await prisma.stockDepot.findMany({
+      where: { emplacement: source, refArt: { in: candidates }, quantite: { not: 0 } },
+      select: { refArt: true },
+    });
+    for (const r of stockees) formeReelle.set(r.refArt.trim(), r.refArt);
+  }
+  const reels = await prisma.article.findMany({
+    where: { refArt: { in: candidates } },
+    select: { refArt: true },
+  });
+  for (const r of reels) if (!formeReelle.has(r.refArt.trim())) formeReelle.set(r.refArt.trim(), r.refArt);
+  const valides = saisies.map((l) => ({ ...l, refArt: formeReelle.get(l.refArt) ?? l.refArt }));
 
   // Contrôle de disponibilité à la source : on refuse de créer un stock négatif.
   const alertes: string[] = [];
@@ -214,7 +243,11 @@ export async function etatParEmplacement(emplacement?: string) {
       NOT: { quantite: 0 },
     },
     orderBy: [{ emplacement: "asc" }, { refArt: "asc" }],
-    take: 500,
+    // La coupe à 500 tombait en plein milieu du tri alphabétique : les derniers
+    // emplacements (« mokhtar 206TU7140 », « Magasin Négoce ») disparaissaient
+    // de l'écran, et FOUED n'affichait que 46 de ses 64 références. La borne
+    // reste haute par sécurité, mais au-delà du volume réel (590 lignes).
+    take: 5000,
   });
 
   const refs = [...new Set(rows.map((r) => r.refArt))];

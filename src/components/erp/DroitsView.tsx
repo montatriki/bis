@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   ShieldCheck, Loader2, Check, AlertTriangle, X, RotateCcw,
   Save, ChevronRight, Search,
@@ -195,7 +196,7 @@ function Matrice({ login, accent, onFlash, onClose }: {
   };
 
   const reinitialiser = async () => {
-    if (!confirm(`Supprimer tous les droits enregistrés de ${login} ?`)) return;
+    if (!(await confirmer(`Supprimer tous les droits enregistrés de ${login} ?`, { danger: true }))) return;
     const r = await fetch(`/api/droits?login=${encodeURIComponent(login)}`, { method: "DELETE" });
     const x = await r.json();
     if (!r.ok) return onFlash(x.error ?? "Échec", false);

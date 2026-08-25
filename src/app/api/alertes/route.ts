@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
+import { filtrePortefeuille } from "@/lib/perimetre-commercial";
 
 // Alertes d'exploitation — dérivées de l'état réel de la base.
 // Remplace les alertes et journaux fictifs du tableau de bord admin.
@@ -11,6 +12,11 @@ import { round3 } from "@/lib/vente-stats";
 export async function GET() {
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+
+  // Chaque rôle a son périmètre : un commercial n'a pas à voir les créances de
+  // tout le fichier client ni les documents que l'administration doit valider.
+  const pilote = auth.user.role === "ADMIN" || auth.user.role === "MANAGER";
+  const perimetre = filtrePortefeuille({ role: auth.user.role, name: auth.user.name });
 
   const [ruptures, sousMini, docsNonValides, gros, echusJ] = await Promise.all([
     prisma.article.findMany({
@@ -23,17 +29,21 @@ export async function GET() {
       select: { refArt: true, designation: true, enStock: true, stMin: true },
       take: 200,
     }),
-    prisma.erpDocument.count({ where: { nature: "Vente", valide: false } }),
-    // Clients dont la créance dépasse nettement le plafond usuel.
+    // La validation relève de l'administration.
+    pilote
+      ? prisma.erpDocument.count({ where: { nature: "Vente", valide: false } })
+      : Promise.resolve(0),
+    // Clients dont la créance dépasse nettement le plafond usuel — ceux du
+    // commercial connecté quand il y en a un.
     prisma.partner.findMany({
-      where: { nature: "C", soldeFin: { gt: 5000 } },
+      where: { nature: "C", soldeFin: { gt: 5000 }, ...(perimetre ?? {}) },
       orderBy: { soldeFin: "desc" },
       select: { id: true, raisonSocial: true, soldeFin: true },
       take: 5,
     }),
-    // Documents non soldés les plus anciens.
+    // Documents non soldés les plus anciens, du portefeuille concerné.
     prisma.erpDocument.findMany({
-      where: { nature: "Vente", soldeDoc: { gt: 0 } },
+      where: { nature: "Vente", soldeDoc: { gt: 0 }, ...(perimetre ?? {}) },
       orderBy: { dateDoc: "asc" },
       select: { refDoc: true, raisonSocial: true, soldeDoc: true, dateDoc: true },
       take: 5,

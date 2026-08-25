@@ -419,7 +419,17 @@ export async function GET(req: NextRequest) {
         prisma.erpDocument.aggregate({ where: { nature }, _sum: { thtNet: true, ttcNet: true, totTva: true }, _count: true }),
         prisma.erpDocument.groupBy({ by: ["typeDoc"], where: { nature }, _sum: { ttcNet: true }, _count: true, orderBy: { _sum: { ttcNet: "desc" } } }),
         prisma.erpDocument.findMany({ where: { nature, dateDoc: { not: null } }, select: { dateDoc: true, ttcNet: true }, take: 5000, orderBy: { dateDoc: "desc" } }),
-        prisma.erpDocument.groupBy({ by: ["raisonSocial"], where: { nature }, _sum: { ttcNet: true }, orderBy: { _sum: { ttcNet: "desc" } }, take: 10 }),
+        // Les transferts internes (TR), inventaires (INV) et bons de sortie
+        // n'ont pas de tiers — ils occupaient la première place du classement
+        // avec un libellé vide et 30,8 M TND. Un « top tiers » ne retient que
+        // les documents qui en désignent réellement un.
+        prisma.erpDocument.groupBy({
+          by: ["raisonSocial"],
+          where: { nature, raisonSocial: { not: null }, NOT: { raisonSocial: "" } },
+          _sum: { ttcNet: true },
+          orderBy: { _sum: { ttcNet: "desc" } },
+          take: 10,
+        }),
         // 221 documents d'achat ont un `thtNet` corrompu (HT > TTC) : la somme
         // brute donnait un HT supérieur au TTC, ce qui est impossible. On relit
         // donc les montants pour reconstruire le HT quand il est incohérent.
@@ -652,7 +662,12 @@ export async function GET(req: NextRequest) {
     // livraison chez le client ni une réception du fournisseur.
     const typesContact = nature === "F" ? ["FC", "BRE"] : ["BL", "FC", "TIC"];
     const codes = base.map((p) => p.id);
-    const [ventes, reclamations] = codes.length
+    // Encours et impayés, comme les colonnes de l'ERP d'origine
+    // (`clients.service.js`) : l'encours est ce qui est remis mais pas encore
+    // encaissé (chèques, traites), l'impayé ce qui est revenu impayé ou en
+    // préavis. Deux informations de recouvrement que le solde seul ne dit pas.
+    const sensTiers = nature === "F" ? "F" : "C";
+    const [ventes, reclamations, reglements] = codes.length
       ? await Promise.all([
           prisma.erpDocument.groupBy({
             by: ["codeCli"],
@@ -664,8 +679,26 @@ export async function GET(req: NextRequest) {
             where: { codeCli: { in: codes } },
             _max: { dateReclam: true },
           }),
+          prisma.erpReglement.findMany({
+            where: { tiersCode: { in: codes }, sens: sensTiers },
+            select: { tiersCode: true, montant: true, etat: true },
+          }),
         ])
-      : [[], []];
+      : [[], [], []];
+
+    // `Etat_Rég` n'est pas normalisé en base (« En cours », « en cours ») :
+    // la comparaison se fait donc en minuscules.
+    const encoursParTiers = new Map<number, number>();
+    const impayeParTiers = new Map<number, number>();
+    for (const r of reglements) {
+      if (r.tiersCode == null) continue;
+      const etat = (r.etat ?? "").trim().toLowerCase();
+      if (etat === "en cours") {
+        encoursParTiers.set(r.tiersCode, round3((encoursParTiers.get(r.tiersCode) ?? 0) + r.montant));
+      } else if (etat === "impayé" || etat === "impaye" || etat === "préavis" || etat === "preavis") {
+        impayeParTiers.set(r.tiersCode, round3((impayeParTiers.get(r.tiersCode) ?? 0) + r.montant));
+      }
+    }
 
     const derniereVente = new Map(ventes.map((v) => [v.codeCli, v._max.dateDoc]));
     const derniereRecl = new Map(reclamations.map((r) => [r.codeCli, r._max.dateReclam]));
@@ -681,12 +714,22 @@ export async function GET(req: NextRequest) {
       // dernière vente signifie que le client a bien été en relation depuis.
       const dernierContact =
         vente && recl ? (new Date(vente) > new Date(recl) ? vente : recl) : (vente ?? recl);
+      const encours = encoursParTiers.get(p.id) ?? 0;
+      const impayer = impayeParTiers.get(p.id) ?? 0;
+      // Risque : un impayé pèse plus lourd qu'un simple encours, et le
+      // dépassement de plafond est le signal le plus net.
+      const plafond = p.plafond ?? 0;
+      const depasse = plafond > 0 && p.soldeFin > plafond;
+      const risque = impayer > 0 || depasse ? "Élevé" : encours > 0 ? "Moyen" : "Faible";
       return {
         ...p,
         derniereVente: vente,
         derniereReclamation: recl,
         dernierContact,
         nbrJours: joursDepuis(dernierContact),
+        encours,
+        impayer,
+        risque,
       };
     });
 
@@ -928,7 +971,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, row: created });
     }
     if (resource === "partners") {
-      const id = body.id != null ? Number(body.id) : Math.floor(Date.now() / 1000);
+      // `Date.now()/1000` donnait le même identifiant à deux créations faites
+      // dans la même seconde : la seconde échouait sur la contrainte d'unicité.
+      // On prend le premier identifiant réellement libre au-dessus du maximum.
+      let id = body.id != null ? Number(body.id) : 0;
+      if (!id) {
+        const dernier = await prisma.partner.findFirst({ orderBy: { id: "desc" }, select: { id: true } });
+        id = Math.max((dernier?.id ?? 0) + 1, Math.floor(Date.now() / 1000));
+        while (await prisma.partner.findUnique({ where: { id }, select: { id: true } })) id++;
+      }
       const created = await prisma.partner.create({
         data: {
           id, nature: s(body.nature) || "C", raisonSocial: s(body.raisonSocial) || "—",
@@ -1278,7 +1329,7 @@ export async function PUT(req: NextRequest) {
     }
     if (resource === "vehicules") {
       const row = await prisma.vehicle.update({
-        where: { id: String(body.id) },
+        where: { id: Number(body.id) },
         data: {
           plate: s(body.plate) ?? undefined,
           brand: s(body.brand) ?? undefined,
@@ -1376,7 +1427,7 @@ export async function DELETE(req: NextRequest) {
       }
       await prisma.refTable.delete({ where: { id: Number(id) } });
     }
-    else if (resource === "vehicules") await prisma.vehicle.delete({ where: { id } });
+    else if (resource === "vehicules") await prisma.vehicle.delete({ where: { id: Number(id) } });
     else return NextResponse.json({ error: "unknown resource" }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch (e) {

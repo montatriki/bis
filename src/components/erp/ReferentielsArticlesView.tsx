@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   Tags, Plus, Trash2, Loader2, Check, AlertTriangle, Wand2, Pencil,
 } from "lucide-react";
@@ -95,7 +96,7 @@ export default function ReferentielsArticlesView({ accent }: { accent: string })
   };
 
   const supprimer = async (cle: string | number) => {
-    if (!confirm("Supprimer cette entrée ?")) return;
+    if (!(await confirmer("Supprimer cette entrée ?", { danger: true }))) return;
     const vue = singulier[onglet];
     const param = onglet === "unites" ? `unite=${encodeURIComponent(String(cle))}` : `code=${cle}`;
     const r = await fetch(`/api/referentiels-articles?vue=${vue}&${param}`, { method: "DELETE" });

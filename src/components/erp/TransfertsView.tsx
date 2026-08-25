@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { confirmer } from "@/lib/alertes";
 import { Loader2, Plus, Check, X, Trash2, Search, ArrowRight, AlertTriangle,
   Pencil, Printer, FileDown, ArrowUpCircle } from "lucide-react";
 
@@ -86,9 +87,13 @@ export default function TransfertsView({ accent }: { accent: string }) {
     // Stock insuffisant : on propose de forcer plutôt que de bloquer, mais
     // l'écart est annoncé article par article.
     if (r.code === "stock-insuffisant") {
-      if (confirm(`${r.error}\n\nValider quand même ? Le dépôt d'origine passera en négatif.`)) {
-        return agir(refDoc, action, true);
-      }
+      const forcer = await confirmer("", {
+        titre: "Stock insuffisant",
+        html: `${r.error}<br><br>Le dépôt d'origine passera en négatif.`,
+        intitule: "Valider quand même",
+        danger: true,
+      });
+      if (forcer) return agir(refDoc, action, true);
       return;
     }
     flash(r.message ?? r.error ?? "Échec", Boolean(r.ok));
@@ -123,7 +128,7 @@ export default function TransfertsView({ accent }: { accent: string }) {
   }
 
   async function supprimer(refDoc: string) {
-    if (!confirm(`Supprimer le transfert ${refDoc} ?`)) return;
+    if (!(await confirmer(`Supprimer le transfert ${refDoc} ?`, { danger: true }))) return;
     const r = await fetch(`/api/transferts?refDoc=${encodeURIComponent(refDoc)}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => ({ error: "réseau" }));
     flash(r.message ?? r.error ?? "Échec", Boolean(r.ok));

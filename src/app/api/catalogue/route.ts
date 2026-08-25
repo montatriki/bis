@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   // Camion du commercial connecté : le stock affiché en découle.
   let emplacement: string | null = null;
+  let plaque: string | null = null;
   if (auth.user.role === "COMMERCIAL") {
     const jour = new Date();
     jour.setHours(0, 0, 0, 0);
@@ -39,6 +40,15 @@ export async function GET(req: NextRequest) {
       orderBy: { id: "desc" },
     });
     emplacement = await emplacementVehicule(auth.user.name, mission?.vehicule);
+    // Les libellés d'emplacement viennent de la production et portent d'anciens
+    // noms de conducteur : « AZIZ 248TU6787 » est aujourd'hui le camion de
+    // Mokhtar. On expose donc la plaque, seule donnée non ambiguë, plutôt que
+    // de laisser l'écran afficher un prénom qui n'est plus le bon.
+    const affecte = await prisma.commercial.findFirst({
+      where: { userId: auth.user.id },
+      select: { vehicle: { select: { plate: true } } },
+    });
+    plaque = affecte?.vehicle?.plate?.trim() ?? mission?.vehicule?.trim() ?? null;
   }
 
   // ── Vue commerciale : le catalogue se limite au contenu du camion ──
@@ -102,7 +112,7 @@ export async function GET(req: NextRequest) {
         select: {
           refArt: true, codeBarre: true, designation: true, catalogue: true,
           unite: true, enStock: true, stMin: true,
-          tarif1Ht: true, tauxTva: true, tauxFodec: true, puAchat: true, pmp: true,
+          tarif1Ht: true, tauxTva: true, tauxFodec: true, remiseMax: true, puAchat: true, pmp: true,
         },
       }),
       prisma.article.count({ where: whereCamion }),
@@ -128,6 +138,7 @@ export async function GET(req: NextRequest) {
       total,
       nbEnStock: [...qteParRef.values()].filter((q) => q > 0).length,
       emplacement,
+      plaque,
     });
   }
 
@@ -154,7 +165,7 @@ export async function GET(req: NextRequest) {
       select: {
         refArt: true, codeBarre: true, designation: true, catalogue: true,
         unite: true, enStock: true, stMin: true,
-        tarif1Ht: true, tauxTva: true, tauxFodec: true, puAchat: true, pmp: true,
+        tarif1Ht: true, tauxTva: true, tauxFodec: true, remiseMax: true, puAchat: true, pmp: true,
       },
     }),
     prisma.article.count({ where }),

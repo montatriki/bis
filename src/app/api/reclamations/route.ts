@@ -25,10 +25,27 @@ const num = (v: unknown) => {
 };
 
 /** Motifs repris de l'écran `commercial/reclamation`. */
-const TYPES_RECLAMATION = [
+// Types de repli, employés seulement si le référentiel est vide. Les vrais
+// types viennent de la production (`type_reclamation`) et décrivent des motifs
+// de non-vente — « Pas intéresser », « achete chez concurent », « Sur stockage »
+// — et non des litiges de livraison. Une liste figée ici refusait la saisie de
+// tout type importé.
+const TYPES_DEFAUT = [
   "Produit endommagé", "Erreur de quantité", "Produit non conforme",
   "Retard de livraison", "Erreur de facturation", "Autre",
 ] as const;
+
+/** Types autorisés : le référentiel s'il est renseigné, le repli sinon. */
+async function typesReclamation(): Promise<string[]> {
+  const rows = await prisma.refTable.findMany({
+    where: { kind: "type-reclamation" },
+    select: { label: true },
+    orderBy: { code: "asc" },
+  });
+  const refs = rows.map((r) => r.label).filter(Boolean);
+  // « Autre » reste toujours disponible : c'est le choix de repli du terrain.
+  return refs.length ? [...refs, "Autre"] : [...TYPES_DEFAUT];
+}
 
 const ETATS_RECLAMATION = ["Ouverte", "En cours", "Résolue", "Rejetée"] as const;
 
@@ -65,7 +82,7 @@ export async function GET(req: NextRequest) {
       ouvertes: parEtat.find((e) => e.etat === "Ouverte")?._count._all ?? 0,
       parEtat: parEtat.map((e) => ({ etat: e.etat, nb: e._count._all })),
       parType: parType.map((t) => ({ type: t.type, nb: t._count._all })),
-      types: TYPES_RECLAMATION,
+      types: await typesReclamation(),
       etats: ETATS_RECLAMATION,
     });
   }
@@ -95,7 +112,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     rows, total: rows.length,
-    types: TYPES_RECLAMATION,
+    types: await typesReclamation(),
     etats: ETATS_RECLAMATION,
   });
 }
@@ -111,7 +128,7 @@ export async function POST(req: NextRequest) {
   }
 
   const type = s(body.type) || "Autre";
-  if (!(TYPES_RECLAMATION as readonly string[]).includes(type)) {
+  if (!(await typesReclamation()).includes(type)) {
     return NextResponse.json({ error: `Type inconnu : ${type}` }, { status: 400 });
   }
 

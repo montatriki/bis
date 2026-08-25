@@ -33,6 +33,22 @@ const pct = (v: unknown) => Math.max(0, Math.min(100, num(v)));
 
 const ETATS = ["En attente", "En cours", "Terminé", "Livré", "Annulé"] as const;
 
+/**
+ * Rapproche un état saisi de la liste officielle. La production écrit
+ * « encours » sans espace ni accent : une comparaison stricte refusait un état
+ * pourtant porté par ses propres projets.
+ */
+function etatNormalise(valeur: string): string | null {
+  const propre = valeur.normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .toLowerCase().replace(/[\s_-]/g, "");
+  for (const e of ETATS) {
+    const ref = e.normalize("NFD").replace(/\p{Diacritic}/gu, "")
+      .toLowerCase().replace(/[\s_-]/g, "");
+    if (ref === propre) return e;
+  }
+  return null;
+}
+
 type JalonLike = { poids: number; avancement: number };
 
 /**
@@ -122,7 +138,7 @@ export async function GET(req: NextRequest) {
     let documents: { refDoc: string; typeDoc: string | null; dateDoc: Date | null; ttcNet: number }[] = [];
     if (row.codeCli != null) {
       const docs = await prisma.erpDocument.findMany({
-        where: { codeCli: row.codeCli, typeDoc: { in: [...TYPES_CA] } },
+        where: { nature: "Vente", codeCli: row.codeCli, typeDoc: { in: [...TYPES_CA] } },
         select: { refDoc: true, typeDoc: true, dateDoc: true, ttcNet: true },
         orderBy: { dateDoc: "desc" },
         take: 20,
@@ -190,9 +206,10 @@ export async function POST(req: NextRequest) {
     const projet = s(body.projet);
     if (!projet) return NextResponse.json({ error: "Nom du projet requis" }, { status: 400 });
 
-    const etat = s(body.etat) || "En attente";
-    if (!(ETATS as readonly string[]).includes(etat)) {
-      return NextResponse.json({ error: `État invalide : ${etat}` }, { status: 400 });
+    const saisi = s(body.etat) || "En attente";
+    const etat = etatNormalise(saisi);
+    if (!etat) {
+      return NextResponse.json({ error: `État invalide : ${saisi}` }, { status: 400 });
     }
 
     const periodeDu = date(body.periodeDu);
@@ -272,8 +289,15 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
   if (vue === "projet") {
-    if (body.etat != null && !(ETATS as readonly string[]).includes(s(body.etat))) {
-      return NextResponse.json({ error: `État invalide : ${s(body.etat)}` }, { status: 400 });
+    // Même tolérance qu'à la création : « encours » de la production est
+    // reconnu comme « En cours ».
+    let etatMaj: string | undefined;
+    if (body.etat != null) {
+      const norm = etatNormalise(s(body.etat));
+      if (!norm) {
+        return NextResponse.json({ error: `État invalide : ${s(body.etat)}` }, { status: 400 });
+      }
+      etatMaj = norm;
     }
 
     const codeCli = body.codeCli != null ? int(body.codeCli) : undefined;
@@ -286,7 +310,8 @@ export async function PUT(req: NextRequest) {
 
     // Passer à « Terminé » sans date de fin réelle : on la pose au jour même,
     // sinon le projet resterait sans date de clôture exploitable.
-    const etat = body.etat != null ? s(body.etat) : undefined;
+    // Forme canonique retenue plus haut (« encours » → « En cours »).
+    const etat = etatMaj;
     const actuel = await prisma.projet.findUnique({ where: { id }, select: { dateFinReel: true } });
     const dateFinReel =
       body.dateFinReel != null

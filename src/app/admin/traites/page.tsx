@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import TraitePrint from "./TraitePrint";
 import { montantEnLettres, formatDT } from "@/lib/traite-montant";
+import { confirmer } from "@/lib/alertes";
 
 // Traites bancaires (lettres de change / الكمبيالة) — module KEMBYELTY, ADMIN.
 //
@@ -254,7 +255,7 @@ export default function TraitesPage() {
   };
 
   const supprimer = async (t: Traite) => {
-    if (!confirm(`Supprimer la traite ${t.reference} (${formatDT(t.montant)}) ?`)) return;
+    if (!(await confirmer(`Supprimer la traite ${t.reference} (${formatDT(t.montant)}) ?`, { danger: true }))) return;
     const res = await fetch(`/api/traites?id=${t.id}`, { method: "DELETE" });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) return flash(d.error ?? "Échec", false);

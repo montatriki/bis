@@ -150,7 +150,7 @@ async function main() {
     { name: "Grossiste El Wafa", city: "Monastir", governorate: "Monastir", lat: 35.7643, lng: 10.8113, balance: 1560.75, riskScore: 40, category: "vente en gros", isPlanned: false },
   ];
 
-  let firstClientId = "";
+  let firstClientId = 0;
   for (const c of clientsData) {
     const existing = await prisma.client.findFirst({ where: { name: c.name } });
     if (!existing) {
@@ -192,11 +192,13 @@ async function main() {
         },
       });
 
+      const ligneExistante = await prisma.documentLine.findFirst({
+        where: { documentId: doc.id, productId: product.id },
+      });
       await prisma.documentLine.upsert({
-        where: { id: doc.id + "_line1" },
+        where: { id: ligneExistante?.id ?? 0 },
         update: {},
         create: {
-          id: doc.id + "_line1",
           documentId: doc.id,
           productId: product.id,
           qty: 1,
@@ -307,7 +309,7 @@ async function main() {
     { code: "FRS003", name: "PAPETERIE DU SUD", contact: "Olfa Trabelsi", phone: "+216 73 333 444", city: "Sousse", balance: 0, category: "Local" },
     { code: "FRS004", name: "GLOBAL TOYS LTD", contact: "Import Dept", phone: "+86 755 0000", city: "Shenzhen", balance: 45200.75, category: "Import" },
   ];
-  const supplierMap: Record<string, string> = {};
+  const supplierMap: Record<string, number> = {};
   for (const s of suppliersData) {
     const sup = await prisma.supplier.upsert({ where: { code: s.code }, update: {}, create: s });
     supplierMap[s.code] = sup.id;
@@ -368,7 +370,7 @@ async function main() {
     { number: "626", label: "Frais postaux et télécom", class: "CLASSE_6" as const },
     { number: "707", label: "Ventes de marchandises", class: "CLASSE_7" as const },
   ];
-  const accountMap: Record<string, string> = {};
+  const accountMap: Record<string, number> = {};
   for (const a of accountsData) {
     const acc = await prisma.account.upsert({ where: { number: a.number }, update: {}, create: { ...a, isStandard: true } });
     accountMap[a.number] = acc.id;

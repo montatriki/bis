@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { computeDocument, round3, type LineInput } from "@/lib/document-calc";
+import { memeCommercial } from "@/lib/perimetre-commercial";
 
 // Lignes d'un document ERP.
 // GET  /api/erp/document-lines?refDoc=XXX          -> { rows, totals, document }
@@ -28,6 +29,13 @@ export async function GET(req: NextRequest) {
   const document = await prisma.erpDocument.findUnique({ where: { refDoc } });
   if (!document) {
     return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
+  }
+
+  // Un commercial ne consulte que ses propres documents : sans ce contrôle, il
+  // lisait le détail de ceux d'un collègue — client, lignes et montants — en
+  // devinant simplement une référence.
+  if (auth.user.role === "COMMERCIAL" && !memeCommercial(document.commercial, auth.user.name)) {
+    return NextResponse.json({ error: "Document d'un autre commercial" }, { status: 403 });
   }
 
   const rows = await prisma.erpDocumentLine.findMany({

@@ -108,7 +108,7 @@ export async function PUT(req: NextRequest) {
   if (!auth.ok) return auth.res;
 
   const body = await req.json().catch(() => ({}));
-  const id = s(body.id);
+  const id = Number(body.id);
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
   const role = body.role != null ? asRole(body.role) : undefined;
@@ -152,7 +152,7 @@ export async function DELETE(req: NextRequest) {
   const auth = await requireSession(["ADMIN"]);
   if (!auth.ok) return auth.res;
 
-  const id = req.nextUrl.searchParams.get("id") ?? "";
+  const id = Number(req.nextUrl.searchParams.get("id"));
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
   // Un administrateur ne peut pas supprimer son propre compte.

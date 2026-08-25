@@ -5,15 +5,28 @@ import { useRouter } from "next/navigation";
 import { Search, X, ShoppingCart, Plus, Minus, Package, Loader2, Check, MapPin, AlertTriangle, Trash2 } from "lucide-react";
 import { useClientSeul } from "@/lib/client-actif";
 import TicketVente from "@/components/commercial/TicketVente";
+import { confirmer } from "@/lib/alertes";
 
 type Article = {
   refArt: string; codeBarre: string | null; designation: string; catalogue: string | null;
   unite: string | null; enStock: number; stMin: number;
   /** Quantité chargée dans le camion, panier compris (borne du sélecteur). */
   stockCamion?: number;
-  tarif1Ht: number; tauxTva: number; prixTtc: number;
+  /** Stock global de l'article, tous emplacements — ce que la production
+   *  affiche en seconde pastille (`en_stock_prinsipal`). */
+  stockGlobal?: number;
+  tarif1Ht: number; tauxTva: number; tauxFodec?: number; prixTtc: number;
+  /** Remise maximale autorisee sur l'article, en % (0 = pas de plafond). */
+  remiseMax?: number;
 };
-type CartItem = { article: Article; qty: number };
+type CartItem = { article: Article; qty: number; remise?: number };
+
+/** Modes de règlement de l'ERP d'origine (`Panier-component.js`). */
+const MODES_PAIEMENT = ["Espèce", "Chèque", "Traite", "Retenu"] as const;
+type ModePaiement = (typeof MODES_PAIEMENT)[number];
+
+/** Valeur numérique brute, utilisable dans un `<input type="number">`. */
+const fmtNombre = (v: unknown) => (Number(v) || 0).toFixed(3);
 
 const fmt = (v: unknown) =>
   new Intl.NumberFormat("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(v) || 0);
@@ -25,10 +38,25 @@ export default function CataloguePage() {
   const [nbEnStock, setNbEnStock] = useState(0);
   // Camion du commercial : le stock affiché est celui qu'il a à bord.
   const [emplacement, setEmplacement] = useState<string | null>(null);
+  /** Plaque du véhicule affecté : les libellés d'emplacement de la production
+   *  portent d'anciens noms de conducteur et induisent en erreur. */
+  const [plaque, setPlaque] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Remise en cours de saisie, par article. Comme dans l'ERP d'origine, le
+  // commercial peut entrer soit le pourcentage, soit le prix net : les deux
+  // champs restent lies.
+  const [remises, setRemises] = useState<Record<string, { pct: string; net: string }>>({});
+  // Étape de règlement, entre le panier et l'émission du ticket : c'est la
+  // séquence de l'application d'origine — on choisit le mode, on saisit le
+  // montant encaissé, puis le ticket est émis et imprimé.
+  const [paiement, setPaiement] = useState(false);
+  const [modePay, setModePay] = useState<ModePaiement>("Espèce");
+  const [montantRegle, setMontantRegle] = useState("");
+  const [numPiece, setNumPiece] = useState("");
+  const [echeance, setEcheance] = useState("");
   const [showCart, setShowCart] = useState(false);
   // Référence du document dont le ticket est affiché (null = aucun).
   const [ticketRef, setTicketRef] = useState<string | null>(null);
@@ -53,6 +81,7 @@ export default function CataloguePage() {
           setTotal(d.total ?? 0);
           setNbEnStock(d.nbEnStock ?? 0);
           setEmplacement(d.emplacement ?? null);
+          setPlaque(d.plaque ?? null);
           setLoading(false);
         })
         .catch(() => { if (!cancelled) setLoading(false); });
@@ -70,14 +99,24 @@ export default function CataloguePage() {
       .then((d) => {
         if (annule || !Array.isArray(d.lignes)) return;
         setCart(
-          d.lignes.map((l: { refArt: string; designation: string; unite: string | null; qte: number; puHt: number; tauxTva: number }) => ({
+          // La remise et le FODEC de chaque ligne doivent être repris : sans eux
+          // le panier se recalculait au prix catalogue et affichait 61,000 TND
+          // là où le serveur émettait le ticket à 54,900.
+          d.lignes.map((l: {
+            refArt: string; designation: string; unite: string | null;
+            qte: number; puHt: number; tauxTva: number; tauxFodec?: number; remise?: number;
+          }) => ({
             article: {
               refArt: l.refArt, designation: l.designation, unite: l.unite,
               codeBarre: null, catalogue: null, enStock: 0, stMin: 0,
-              tarif1Ht: l.puHt, tauxTva: l.tauxTva,
-              prixTtc: Math.round((l.puHt * (1 + l.tauxTva / 100) + Number.EPSILON) * 1000) / 1000,
+              tarif1Ht: l.puHt, tauxTva: l.tauxTva, tauxFodec: l.tauxFodec ?? 0,
+              prixTtc:
+                Math.round(
+                  (l.puHt * (1 + (l.tauxFodec ?? 0) / 100) * (1 + l.tauxTva / 100) + Number.EPSILON) * 1000,
+                ) / 1000,
             },
             qty: l.qte,
+            remise: l.remise ?? 0,
           })),
         );
       })
@@ -89,14 +128,24 @@ export default function CataloguePage() {
   // alimente le badge du menu. L'état local reste mis à jour immédiatement
   // pour que l'interface ne clignote pas en attendant la réponse.
   function addToCart(a: Article) {
+    // La remise saisie doit suivre l'article dans le panier local, sinon le
+    // total affiché repart du prix catalogue.
+    const remise = Number(remises[a.refArt]?.pct) || 0;
     setCart((prev) => {
       const ex = prev.find((i) => i.article.refArt === a.refArt);
-      if (ex) return prev.map((i) => (i.article.refArt === a.refArt ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { article: a, qty: 1 }];
+      if (ex) {
+        return prev.map((i) =>
+          i.article.refArt === a.refArt ? { ...i, qty: i.qty + 1, remise } : i);
+      }
+      return [...prev, { article: a, qty: 1, remise }];
     });
     fetch("/api/panier", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 1 }),
+      body: JSON.stringify({
+        vue: "ligne", refArt: a.refArt, qte: 1,
+        // Remise éventuellement saisie avant l'ajout.
+        remise: Number(remises[a.refArt]?.pct) || 0,
+      }),
     }).catch(() => {});
   }
   function updateQty(ref: string, delta: number) {
@@ -113,6 +162,53 @@ export default function CataloguePage() {
   const getQty = (ref: string) => cart.find((i) => i.article.refArt === ref)?.qty ?? 0;
 
   /**
+   * Remise de ligne : les deux champs sont liés, comme au catalogue de l'ERP
+   * d'origine — saisir un taux met à jour le prix net, saisir un prix net
+   * recalcule le taux (`remise = 100 − net × 100 / prix TTC`).
+   *
+   * Le plafond `remiseMax` de l'article est appliqué à la saisie ; le serveur
+   * le revérifie, un contrôle d'interface ne protégeant rien à lui seul.
+   */
+  function majRemise(a: Article, champ: "pct" | "net", valeur: string) {
+    const ttc = a.prixTtc || 0;
+    let pct = "", net = "";
+    if (champ === "pct") {
+      pct = valeur;
+      const p = Number(valeur);
+      net = valeur === "" || !Number.isFinite(p) ? "" : (ttc * (1 - p / 100)).toFixed(3);
+    } else {
+      net = valeur;
+      const n = Number(valeur);
+      pct = valeur === "" || !Number.isFinite(n) || ttc <= 0
+        ? ""
+        : (100 - (n * 100) / ttc).toFixed(2);
+    }
+    setRemises((r) => ({ ...r, [a.refArt]: { pct, net } }));
+
+    const taux = Number(pct);
+    if (!Number.isFinite(taux) || pct === "") return;
+    // Plafond de l'article : au-delà, la remise est refusée (le serveur
+    // renvoie l'alerte et remet la ligne à zéro).
+    if (a.remiseMax && a.remiseMax > 0 && taux > a.remiseMax) {
+      setToast(`Remise maximale de ${a.remiseMax} % pour ${a.refArt}`);
+      setTimeout(() => setToast(null), 3500);
+      setRemises((r) => ({ ...r, [a.refArt]: { pct: "", net: "" } }));
+      return;
+    }
+    setCart((prev) =>
+      prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: taux } : i)),
+    );
+    // La remise n'est envoyée que si la ligne est déjà au panier : sinon elle
+    // sera transmise à l'ajout.
+    if (getQty(a.refArt) > 0) {
+      fetch("/api/panier", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 0, remise: taux }),
+      }).catch(() => {});
+    }
+  }
+
+  /**
    * Quantité encore disponible à la vente : ce que porte le camion moins ce qui
    * est déjà réservé dans le panier. Calculé côté client pour que le compteur
    * réagisse au clic, sans attendre un aller-retour serveur.
@@ -123,10 +219,29 @@ export default function CataloguePage() {
   };
 
   const totalItems = cart.reduce((s, i) => s + i.qty, 0);
-  const totalHT = cart.reduce((s, i) => s + i.qty * i.article.tarif1Ht, 0);
-  // TVA calculée ligne par ligne : chaque article a son propre taux.
-  const totalTVA = cart.reduce((s, i) => s + i.qty * i.article.tarif1Ht * (i.article.tauxTva / 100), 0);
-  const totalTTC = totalHT + totalTVA;
+  // Totaux du panier, calculés comme le document : remise de ligne, puis FODEC
+  // dans la base de TVA. Les ignorer affichait 38,614 TND au commercial pour un
+  // ticket émis à 39,000 — le prix TTC de la production.
+  const totalHT = cart.reduce(
+    (s, i) => s + i.qty * i.article.tarif1Ht * (1 - (i.remise ?? 0) / 100),
+    0,
+  );
+  const totalTTC = cart.reduce((s, i) => {
+    const htNet = i.qty * i.article.tarif1Ht * (1 - (i.remise ?? 0) / 100);
+    const fodec = htNet * ((i.article.tauxFodec ?? 0) / 100);
+    return s + htNet + fodec + (htNet + fodec) * (i.article.tauxTva / 100);
+  }, 0);
+  // La TVA affichée est le solde TTC − HT : elle absorbe le FODEC, comme sur
+  // la ligne de vente de l'ERP d'origine.
+  const totalTVA = totalTTC - totalHT;
+  // `tot_remise` de l'ERP d'origine est une remise **HT** : vérifié sur les
+  // 440 tickets de production émis depuis juin 2026, où `tht_net = tht_brut −
+  // tot_remise` sans exception. La mesurer sur le TTC gonflait le montant
+  // affiché (6,100 au lieu de 5,094 sur un panier à 10 %).
+  const totalRemise = cart.reduce(
+    (s, i) => s + i.qty * i.article.tarif1Ht * ((i.remise ?? 0) / 100),
+    0,
+  );
 
   /**
    * Distance au-delà de laquelle on doute que le commercial soit réellement
@@ -145,39 +260,66 @@ export default function CataloguePage() {
       const km = clientActif.distance! >= 1000
         ? `${(clientActif.distance! / 1000).toFixed(1)} km`
         : `${Math.round(clientActif.distance!)} m`;
-      if (!confirm(
-        `Vous semblez être à ${km} de « ${clientActif.raisonSocial} ».\n\n` +
-        `Le ticket atteste d'une livraison sur place. Confirmer quand même ?`,
-      )) return;
+      const ok = await confirmer("", {
+        titre: "Client éloigné",
+        html:
+          `Vous semblez être à <b>${km}</b> de « ${clientActif.raisonSocial} ».` +
+          `<br><br>Le ticket atteste d'une livraison sur place.`,
+        intitule: "Émettre quand même",
+        danger: true,
+      });
+      if (!ok) return;
     }
 
+    // Le règlement se saisit avant l'émission, comme dans l'application
+    // d'origine : on passe à l'étape « paiement » plutôt que d'émettre
+    // directement.
+    setPaiement(true);
+    setMontantRegle(totalTTC.toFixed(3));
+  }
+
+  /**
+   * Émet le ticket et enregistre le règlement.
+   *
+   * Passe par `/api/panier` — et non plus directement par `/api/commandes` —
+   * pour que les remises de ligne et l'encaissement suivent le même chemin que
+   * le panier serveur : le ticket est validé (sortie de stock, débit client)
+   * puis le règlement imputé, le reste éventuel demeurant au débit.
+   */
+  async function emettreTicket() {
+    if (!clientActif) return;
     setSaving(true);
-    const r = await fetch("/api/commandes", {
+    const montant = Number(montantRegle) || 0;
+    const r = await fetch("/api/panier", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        vue: "valider",
         codeCli: clientActif.id,
-        raisonSocial: clientActif.raisonSocial,
-        // Vente en tournée : le client est livré sur place, on émet donc un
-        // ticket ferme (sortie de stock + débit du compte client), et non une
-        // commande en attente qui ne mouvementerait rien.
         typeDoc: "TIC",
-        valider: true,
-        lignes: cart.map((i) => ({
-          refArt: i.article.refArt,
-          designation: i.article.designation,
-          unite: i.article.unite,
-          qte: i.qty,
-          puHt: i.article.tarif1Ht,
-          tauxTva: i.article.tauxTva,
-        })),
+        reglements: montant > 0
+          ? [{
+              mode: modePay,
+              montant,
+              numPiece: numPiece || null,
+              echeance: modePay === "Chèque" || modePay === "Traite" ? echeance || null : null,
+            }]
+          : [],
       }),
     }).then((x) => x.json()).catch(() => ({ error: "réseau" }));
     setSaving(false);
     if (r.ok) {
       setCart([]);
+      setRemises({});
+      setPaiement(false);
       setShowCart(false);
-      flash(`Ticket ${r.refDoc} émis (${fmt(r.ttcNet)} TND) — stock mis à jour`);
+      setNumPiece("");
+      setEcheance("");
+      const reste = Number(r.reste) || 0;
+      flash(
+        `Ticket ${r.refDoc} émis (${fmt(r.ttcNet)} TND)` +
+        (reste > 0 ? ` — reste ${fmt(reste)} TND au débit du client` : " — réglé"),
+      );
       // Le ticket s'ouvre aussitôt : en tournée, le client repart avec.
       setTicketRef(r.refDoc ?? null);
     } else {
@@ -188,7 +330,11 @@ export default function CataloguePage() {
   /** Vide le panier, côté écran et côté serveur. */
   async function viderPanier() {
     if (cart.length === 0) return;
-    if (!confirm(`Vider le panier (${totalItems} article(s)) ?`)) return;
+    const ok = await confirmer(
+      `${totalItems} article(s) seront retirés du panier.`,
+      { titre: "Vider le panier", intitule: "Vider le panier", danger: true },
+    );
+    if (!ok) return;
     // L'écran se met à jour tout de suite : les quantités réservées sont
     // relâchées, donc les pastilles « À bord » remontent immédiatement.
     setCart([]);
@@ -211,7 +357,7 @@ export default function CataloguePage() {
           </p>
           {emplacement && (
             <p className="text-[var(--text-secondary)] text-xs mt-0.5">
-              Stock du véhicule <span className="font-semibold">{emplacement}</span>
+              Stock du véhicule <span className="font-semibold">{plaque ?? emplacement}</span>
             </p>
           )}
         </div>
@@ -276,15 +422,63 @@ export default function CataloguePage() {
               </div>
               <div className="flex items-center justify-between mb-1">
                 <div className="font-bold text-[var(--text-primary)] tabular-nums">{fmt(a.tarif1Ht)} TND</div>
-                <div className={`text-xs px-2 py-0.5 rounded-full ${
-                  rupture ? "bg-red-50 dark:bg-red-500/10 text-red-600"
-                  : bas ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                  : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
-                  {emplacement ? "À bord" : "Stock"} : {restant}
+                <div className="flex items-center gap-1.5">
+                  <div className={`text-xs px-2 py-0.5 rounded-full ${
+                    rupture ? "bg-red-50 dark:bg-red-500/10 text-red-600"
+                    : bas ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                    : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
+                    {emplacement ? "À bord" : "Stock"} : {restant}
+                  </div>
+                  {/* Second stock, comme sur l'application d'origine : le camion
+                      ne dit pas si le dépôt peut réapprovisionner. Seuils repris
+                      de la production — vert ≥ 5, orange 1 à 4, rouge en dessous. */}
+                  {emplacement && a.stockGlobal != null && (
+                    <div
+                      title="Stock global de l'article (tous emplacements)"
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        a.stockGlobal >= 5 ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        : a.stockGlobal >= 1 ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        : "bg-red-50 dark:bg-red-500/10 text-red-600"}`}>
+                      {/* Les quantités sont fractionnaires pour certains articles
+                          (383,5) : on retire les zéros inutiles sans tronquer. */}
+                      Dépôt : {Number(a.stockGlobal).toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mb-3">
+              <div className="text-[10px] text-[var(--text-secondary)] mb-2">
                 TTC {fmt(a.prixTtc)} · TVA {a.tauxTva}%
+              </div>
+
+              {/* Remise et prix net, comme au catalogue de l'ERP d'origine :
+                  les deux champs sont liés, l'un se déduit de l'autre. */}
+              {/* Ligne de prix de l'ERP d'origine, à l'identique :
+                     [ prix TTC de base — grisé ]  %  [ remise ]  $  [ net ]
+                  Le premier champ rappelle le tarif catalogue et n'est pas
+                  modifiable ; les deux autres sont liés (`handlePrixChange`). */}
+              <div className="flex items-center gap-1 mb-3">
+                <input type="text" value={fmt(a.prixTtc)} disabled
+                  aria-label={`Prix TTC catalogue de ${a.designation}`}
+                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
+                             bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg
+                             text-[var(--text-secondary)] opacity-70 cursor-not-allowed" />
+                <span className="text-[11px] font-bold text-[var(--text-secondary)] px-0.5">%</span>
+                <input type="number" inputMode="decimal" min={0} max={100} step="0.01"
+                  value={remises[a.refArt]?.pct ?? ""}
+                  onChange={(e) => majRemise(a, "pct", e.target.value)}
+                  placeholder="0"
+                  aria-label={`Remise en pourcentage pour ${a.designation}`}
+                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
+                             bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg
+                             focus:outline-none focus:border-blue-500" />
+                <span className="text-[11px] font-bold text-[var(--text-secondary)] px-0.5">$</span>
+                <input type="number" inputMode="decimal" min={0} step="0.001"
+                  value={remises[a.refArt]?.net ?? fmtNombre(a.prixTtc)}
+                  onChange={(e) => majRemise(a, "net", e.target.value)}
+                  aria-label={`Prix net TTC pour ${a.designation}`}
+                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
+                             bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg
+                             focus:outline-none focus:border-blue-500" />
               </div>
 
               {qty === 0 ? (
@@ -294,16 +488,21 @@ export default function CataloguePage() {
                   <Plus size={13} /> {rupture ? "Rupture" : "Ajouter"}
                 </motion.button>
               ) : (
-                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-500/10 rounded-xl p-1">
-                  <button onClick={() => updateQty(a.refArt, -1)} className="w-8 h-8 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm hover:bg-red-50 transition">
+                <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl p-1">
+                  <button onClick={() => updateQty(a.refArt, -1)} className="w-8 h-8 shrink-0 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm hover:bg-red-50 transition">
                     <Minus size={13} className="text-red-500" />
                   </button>
-                  <span className="font-bold text-blue-700 dark:text-blue-400">{qty}</span>
+                  <span className="font-bold text-blue-700 dark:text-blue-400 w-6 text-center">{qty}</span>
                   <button onClick={() => updateQty(a.refArt, 1)} disabled={restant <= 0}
                     title={restant <= 0 ? "Plus rien à bord pour cet article" : undefined}
-                    className="w-8 h-8 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm hover:bg-emerald-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    className="w-8 h-8 shrink-0 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm hover:bg-emerald-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
                     <Plus size={13} className="text-emerald-500" />
                   </button>
+                  {/* Total de la ligne : prix net × quantité, comme dans l'ERP
+                      d'origine (`option.net * option.qteCmd`). */}
+                  <div className="flex-1 min-w-0 text-right pr-1.5 text-xs font-bold tabular-nums text-[var(--text-primary)]">
+                    {fmt(Number(remises[a.refArt]?.net ?? a.prixTtc) * qty)}
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -370,21 +569,56 @@ export default function CataloguePage() {
                     )}
 
                     <div className="space-y-2 mb-4">
-                      {cart.map((item) => (
-                        <div key={item.article.refArt} className="flex items-center justify-between p-3 bg-[var(--bg-primary)] rounded-xl text-sm">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-[var(--text-primary)] truncate">{item.article.designation}</div>
-                            <div className="text-[var(--text-secondary)] text-xs">{fmt(item.article.tarif1Ht)} × {item.qty}</div>
+                      {cart.map((item) => {
+                        // La ligne se lit comme en production : `net × qteCmd`, le net
+                        // étant le prix TTC après remise (`pu_ttc`). Afficher le tarif
+                        // HT catalogue donnait des lignes qui ne totalisaient pas le
+                        // « Net à payer » — 32,449 × 1 face à un net de 54,900.
+                        const remise = item.remise ?? 0;
+                        const prixPlein =
+                          item.article.tarif1Ht *
+                          (1 + (item.article.tauxFodec ?? 0) / 100) *
+                          (1 + item.article.tauxTva / 100);
+                        const net = prixPlein * (1 - remise / 100);
+                        return (
+                          <div key={item.article.refArt} className="flex items-center justify-between p-3 bg-[var(--bg-primary)] rounded-xl text-sm">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-[var(--text-primary)] truncate">{item.article.designation}</div>
+                              <div className="text-[var(--text-secondary)] text-xs flex items-center gap-1.5 flex-wrap">
+                                {remise > 0 ? (
+                                  <>
+                                    <span className="line-through opacity-60">{fmt(prixPlein)}</span>
+                                    <span className="font-medium text-[var(--text-primary)]">{fmt(net)} × {item.qty}</span>
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold text-[11px]">
+                                      −{remise}%
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span>{fmt(net)} × {item.qty}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right ml-3">
+                              <div className="font-semibold text-[var(--text-primary)] tabular-nums">
+                                {fmt(net * item.qty)}
+                              </div>
+                              {remise > 0 && (
+                                <div className="text-[11px] text-emerald-600 tabular-nums">
+                                  {/* Remise HT, comme `MT_Remise` en production. */}
+                                  remise {fmt(item.article.tarif1Ht * (remise / 100) * item.qty)}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="font-semibold text-[var(--text-primary)] ml-3 tabular-nums">
-                            {fmt(item.article.tarif1Ht * item.qty)}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <div className="border-t border-[var(--border-primary)] pt-3">
                       <Row label="Total HT" value={fmt(totalHT)} />
+                      {/* `tot_remise` de l'ERP d'origine : le cumul des remises
+                          accordées, pour que le client voie ce qu'il gagne. */}
+                      {totalRemise > 0 && <Row label="Remise" value={`− ${fmt(totalRemise)}`} muted />}
                       <Row label="TVA" value={fmt(totalTVA)} muted />
                       <Row label="Net à payer" value={fmt(totalTTC)} strong />
                     </div>
@@ -392,7 +626,80 @@ export default function CataloguePage() {
                 )}
               </div>
 
-              {cart.length > 0 && (
+              {/* Étape de règlement — reprend la séquence de l'application
+                  d'origine : mode de paiement, montant encaissé, puis
+                  émission. Un encaissement partiel laisse le solde au débit
+                  du client. */}
+              {cart.length > 0 && paiement && (
+                <div className="p-5 border-t border-[var(--border-primary)] space-y-3">
+                  <div className="text-xs font-black uppercase tracking-wider text-[var(--text-secondary)]">
+                    Règlement
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {MODES_PAIEMENT.map((m) => (
+                      <button key={m} type="button" onClick={() => setModePay(m)}
+                        className={`py-2 rounded-lg text-xs font-semibold border transition ${
+                          modePay === m
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)]"
+                        }`}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="block">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Montant encaissé (TND)
+                    </span>
+                    <input type="number" inputMode="decimal" min={0} step="0.001"
+                      value={montantRegle} onChange={(e) => setMontantRegle(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 text-sm text-right tabular-nums bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-blue-500" />
+                  </label>
+
+                  {(modePay === "Chèque" || modePay === "Traite") && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                          N° {modePay.toLowerCase()}
+                        </span>
+                        <input value={numPiece} onChange={(e) => setNumPiece(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-blue-500" />
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                          Échéance
+                        </span>
+                        <input type="date" value={echeance} onChange={(e) => setEcheance(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-blue-500" />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Ce qui restera dû après encaissement. */}
+                  {(() => {
+                    const reste = Math.round((totalTTC - (Number(montantRegle) || 0)) * 1000) / 1000;
+                    return reste > 0 ? (
+                      <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                        Reste à payer : <strong>{fmt(reste)} TND</strong> — porté au débit du client
+                      </div>
+                    ) : null;
+                  })()}
+
+                  <button onClick={emettreTicket} disabled={saving}
+                    className="w-full bg-emerald-600 text-white py-3 rounded-xl font-medium hover:bg-emerald-500 transition text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                    {saving && <Loader2 className="animate-spin" size={16} />}
+                    Émettre le ticket
+                  </button>
+                  <button onClick={() => setPaiement(false)} disabled={saving}
+                    className="w-full py-2.5 rounded-xl font-medium text-sm border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition disabled:opacity-50">
+                    Retour au panier
+                  </button>
+                </div>
+              )}
+
+              {cart.length > 0 && !paiement && (
                 <div className="p-5 border-t border-[var(--border-primary)]">
                   <button onClick={validerPanier} disabled={saving || !clientActif}
                     className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-500 transition text-sm disabled:opacity-50 flex items-center justify-center gap-2">

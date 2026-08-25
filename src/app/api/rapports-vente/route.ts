@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { TYPES_CA, signeCA, periode, round3 } from "@/lib/vente-stats";
+import { filtrePortefeuille } from "@/lib/perimetre-commercial";
 
 // Rapports de vente — reprend les 5 axes de `vente-module/rapports` dans l'ERP source :
 //   article · client · commercial · gouvernorat · famille client
@@ -20,16 +21,21 @@ export async function GET(req: NextRequest) {
   const axe = sp.get("axe") ?? "article";
   const { debut, fin } = periode(sp.get("du"), sp.get("au"));
 
+  // Un commercial ne voit que son portefeuille : sans ce filtre, l'écran
+  // « Statistiques » lui exposait le chiffre d'affaires de ses 19 collègues.
+  const perimetre = filtrePortefeuille({ role: auth.user.role, name: auth.user.name });
+
   const where = {
     nature: "Vente",
     typeDoc: { in: [...TYPES_CA] },
     dateDoc: { gte: debut, lte: fin },
+    ...(perimetre ?? {}),
   };
 
   // Balance âgée des créances : ancienneté du dernier document non soldé.
   if (axe === "creances") {
     const impayes = await prisma.erpDocument.findMany({
-      where: { nature: "Vente", soldeDoc: { gt: 0 } },
+      where: { nature: "Vente", soldeDoc: { gt: 0 }, ...(perimetre ?? {}) },
       select: { refDoc: true, dateDoc: true, soldeDoc: true, raisonSocial: true, codeCli: true },
     });
 
@@ -60,7 +66,7 @@ export async function GET(req: NextRequest) {
   // Clients sans achat récent, par ancienneté du dernier document.
   if (axe === "inactifs") {
     const docs = await prisma.erpDocument.findMany({
-      where: { nature: "Vente", typeDoc: { in: [...TYPES_CA] }, codeCli: { not: null } },
+      where: { nature: "Vente", typeDoc: { in: [...TYPES_CA] }, codeCli: { not: null }, ...(perimetre ?? {}) },
       select: { codeCli: true, raisonSocial: true, dateDoc: true, ttcNet: true },
       orderBy: { dateDoc: "desc" },
     });

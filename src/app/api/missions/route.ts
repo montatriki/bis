@@ -318,7 +318,7 @@ export async function GET(req: NextRequest) {
       prisma.vehicle.findMany(),
       prisma.gpsPosition.findMany({ orderBy: { timestamp: "desc" }, take: 200 }),
     ]);
-    const dernierParVehicule = new Map<string, (typeof derniersPoints)[number]>();
+    const dernierParVehicule = new Map<number, (typeof derniersPoints)[number]>();
     for (const pt of derniersPoints) {
       if (pt.vehicleId && !dernierParVehicule.has(pt.vehicleId)) dernierParVehicule.set(pt.vehicleId, pt);
     }
@@ -830,9 +830,20 @@ export async function PUT(req: NextRequest) {
   }
 
   if (vue === "tournee") {
-    const etat = body.etat != null ? s(body.etat) : undefined;
-    if (etat != null && !(ETATS_MISSION as readonly string[]).includes(etat)) {
-      return NextResponse.json({ error: `État invalide : ${etat}` }, { status: 400 });
+    // Les 2 610 tournées importées portent « Cloturé » (orthographe de l'ERP
+    // source) là où l'application écrit « Clôturée » : une comparaison stricte
+    // refusait de modifier une tournée en lui laissant son propre état.
+    const saisi = body.etat != null ? s(body.etat) : undefined;
+    let etat: string | undefined;
+    if (saisi != null) {
+      const norm = (v: string) =>
+        v.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[\s_-]/g, "");
+      const cible = ETATS_MISSION.find((e) => norm(e) === norm(saisi))
+        ?? (estCloturee(saisi) ? "Clôturée" : undefined);
+      if (!cible) {
+        return NextResponse.json({ error: `État invalide : ${saisi}` }, { status: 400 });
+      }
+      etat = cible;
     }
     const row = await prisma.erpMission.update({
       where: { id },

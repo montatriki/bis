@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
 import { echeancesAVenir, libelleEcheance } from "@/lib/echeances-vehicules";
+import { filtrePortefeuille, emplacementVehicule } from "@/lib/perimetre-commercial";
 
 // Notifications de la barre supérieure.
 //
@@ -67,29 +68,76 @@ export async function GET() {
   const auth = await requireSession();
   if (!auth.ok) return auth.res;
 
+  // Chaque rôle a son périmètre : un commercial recevait « 5 006 documents à
+  // valider » et les visites techniques de véhicules qui ne sont pas le sien —
+  // des alertes d'administration sur lesquelles il ne peut rien.
+  const role = auth.user.role;
+  const estCommercial = role === "COMMERCIAL";
+  const estClient = role === "CLIENT";
+  const pilote = role === "ADMIN" || role === "MANAGER";
+
+  // Portefeuille du commercial : ses impayés sont ceux de ses propres clients.
+  const perimetre = filtrePortefeuille({ role, name: auth.user.name });
+
+  // Un client ne voit que ce qui le concerne : ses propres documents impayés.
+  const filtreImpayes = estClient
+    ? { nature: "Vente", soldeDoc: { gt: 0 }, codeCli: auth.user.codeTiers ?? -1 }
+    : perimetre
+      ? { nature: "Vente", soldeDoc: { gt: 0 }, ...perimetre }
+      : { nature: "Vente", soldeDoc: { gt: 0 } };
+
+  // Le stock qui compte pour un commercial est celui de son camion ; pour les
+  // autres, la rupture au catalogue.
+  const emplacement = estCommercial
+    ? await emplacementVehicule(auth.user.name, null)
+    : null;
+
   const [persistees, ruptures, impayes, docsNonValides] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: auth.user.id },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    prisma.article.count({ where: { archiver: 0, vendable: 1, enStock: { lte: 0 } } }),
+    // Rupture : le camion du commercial, le catalogue pour les autres.
+    estClient
+      ? Promise.resolve(0)
+      : emplacement
+        ? prisma.stockDepot.count({ where: { emplacement, quantite: { lte: 0 } } })
+        : prisma.article.count({ where: { archiver: 0, vendable: 1, enStock: { lte: 0 } } }),
     prisma.erpDocument.findMany({
-      where: { nature: "Vente", soldeDoc: { gt: 0 } },
+      where: filtreImpayes,
       orderBy: { dateDoc: "asc" },
       select: { refDoc: true, raisonSocial: true, soldeDoc: true, dateDoc: true },
       take: 3,
     }),
-    prisma.erpDocument.count({ where: { nature: "Vente", valide: false } }),
+    // La validation des documents relève de l'administration : un commercial ne
+    // valide pas, un client encore moins.
+    pilote
+      ? prisma.erpDocument.count({ where: { nature: "Vente", valide: false } })
+      : Promise.resolve(0),
   ]);
 
   // Échéances du parc roulant : assurance, visite, vignette et entretiens
   // périodiques. Un véhicule sans assurance valide ne doit pas rouler, l'alerte
   // reste donc affichée tant que la situation n'est pas régularisée.
-  const echeances = (await echeancesAVenir()).filter((e) => e.gravite !== "proche");
+  //
+  // Un commercial ne voit que son propre véhicule — les autres ne le regardent
+  // pas ; un client n'a pas de parc roulant.
+  const toutesEcheances = estClient ? [] : await echeancesAVenir();
+  const plaqueSienne = estCommercial
+    ? (await prisma.commercial.findFirst({
+        where: { userId: auth.user.id },
+        select: { vehicle: { select: { plate: true } } },
+      }))?.vehicle?.plate?.trim().toUpperCase() ?? null
+    : null;
+  const echeances = toutesEcheances
+    .filter((e) => e.gravite !== "proche")
+    .filter((e) => !estCommercial || (plaqueSienne && e.plaque.trim().toUpperCase() === plaqueSienne));
 
   const notifs: Notif[] = persistees.map((n) => ({
-    id: n.id,
+    // Les alertes recalculées portent un identifiant textuel (`sys-ruptures`) :
+    // l'identifiant numérique de la base est donc rendu sous forme de texte.
+    id: String(n.id),
     title: n.title,
     message: n.message,
     type: n.type,
@@ -104,8 +152,10 @@ export async function GET() {
   if (ruptures > 0) {
     notifs.push({
       id: "sys-ruptures",
-      title: "Articles en rupture",
-      message: `${ruptures} article(s) à zéro en stock`,
+      title: emplacement ? "Rupture dans votre camion" : "Articles en rupture",
+      message: emplacement
+        ? `${ruptures} référence(s) épuisée(s) dans ${emplacement}`
+        : `${ruptures} article(s) à zéro en stock`,
       type: "STOCK",
       isRead: false,
       createdAt: maintenant,
@@ -193,7 +243,12 @@ export async function POST(req: NextRequest) {
   // marquables ; les alertes système se recalculent et sont ignorées ici.
   const where =
     Array.isArray(ids) && ids.length
-      ? { userId: auth.user.id, id: { in: ids.filter((i): i is string => typeof i === "string") } }
+      ? {
+          userId: auth.user.id,
+          // Seules les notifications persistées sont marquables : les alertes
+          // système (`sys-…`) n'ont pas d'identifiant numérique.
+          id: { in: ids.map((i) => Number(i)).filter((i) => Number.isFinite(i)) },
+        }
       : { userId: auth.user.id };
 
   const { count } = await prisma.notification.updateMany({ where, data: { isRead: true } });

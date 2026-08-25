@@ -27,6 +27,12 @@ export type ValidationResult = {
  * Valide un document : applique stock + solde, puis marque `valide = true`.
  * Sans effet (et sans erreur) si le document est déjà validé.
  */
+/**
+ * Emplacement d'imputation quand le document ne nomme pas de véhicule : c'est le
+ * dépôt depuis lequel la vente au bureau est servie (`Code_mag = 1` en production).
+ */
+const DEPOT_PAR_DEFAUT = "Dépôt principale";
+
 export async function validerDocument(refDoc: string): Promise<ValidationResult> {
   const doc = await prisma.erpDocument.findUnique({
     where: { refDoc },
@@ -58,8 +64,13 @@ export async function validerDocument(refDoc: string): Promise<ValidationResult>
 
   // Emplacement d'où sort (ou où entre) la marchandise. Une vente en tournée
   // part du **stock du véhicule**, pas du dépôt : c'est ce que le commercial a
-  // réellement chargé. Sans emplacement, seul le stock global est touché.
-  const emplacement = (doc.vehicule ?? "").trim();
+  // réellement chargé.
+  //
+  // Sans véhicule (saisie au bureau), le mouvement s'impute au dépôt principal :
+  // sans cela `stock_depots` n'était jamais touché et une vente depuis le dépôt
+  // laissait son stock inchangé — seul le compteur global bougeait, ce qui
+  // creusait l'écart entre les deux.
+  const emplacement = (doc.vehicule ?? "").trim() || DEPOT_PAR_DEFAUT;
 
   // Sortie de stock : on refuse de vendre à découvert. L'import compte déjà
   // 64 articles en stock négatif ; laisser passer aggraverait la valorisation
@@ -67,20 +78,32 @@ export async function validerDocument(refDoc: string): Promise<ValidationResult>
   if (sStock < 0) {
     // Contrôle sur l'emplacement quand il est connu (stock camion), sinon sur
     // le stock global de l'article.
-    const dispoEmplacement = emplacement
-      ? new Map(
-          (
-            await prisma.stockDepot.findMany({
-              where: { emplacement, refArt: { in: [...parArticle.keys()] } },
-            })
-          ).map((r) => [r.refArt, r.quantite]),
-        )
-      : null;
+    // `Article.enStock` et la somme des emplacements divergent sur 161 articles
+    // — un écart hérité de la production, où les deux compteurs ne sont pas
+    // tenus ensemble (l'article peut afficher -5 131 quand le dépôt en porte
+    // 8 228). Le stock par emplacement est le seul chiffre vérifiable, c'est
+    // donc lui qui fait foi ; à défaut d'emplacement nommé, on somme les
+    // emplacements de l'article plutôt que de lire le compteur global.
+    const lignesStock = await prisma.stockDepot.findMany({
+      where: {
+        refArt: { in: [...parArticle.keys()] },
+        ...(emplacement ? { emplacement } : {}),
+      },
+      select: { refArt: true, quantite: true },
+    });
+    const dispoEmplacement = new Map<string, number>();
+    for (const r of lignesStock) {
+      dispoEmplacement.set(r.refArt, (dispoEmplacement.get(r.refArt) ?? 0) + r.quantite);
+    }
 
     const insuffisants = [...parArticle.entries()]
       .map(([refArt, { qte }]) => {
         const art = byRef.get(refArt);
-        const dispo = dispoEmplacement ? (dispoEmplacement.get(refArt) ?? 0) : (art?.enStock ?? 0);
+        // Un article sans ligne de stock n'a jamais été mouvementé : on retombe
+        // sur le compteur de l'article faute de mieux.
+        const dispo = dispoEmplacement.has(refArt)
+          ? dispoEmplacement.get(refArt)!
+          : (art?.enStock ?? 0);
         return { refArt, qte, art, dispo };
       })
       .filter((x) => x.art && x.dispo < x.qte);
@@ -241,7 +264,9 @@ export async function devaliderDocument(refDoc: string): Promise<ValidationResul
   const byRef = new Map(articles.map((a) => [a.refArt, a]));
 
   const ops: Prisma.PrismaPromise<unknown>[] = [];
-  const emplacement = (doc.vehicule ?? "").trim();
+  // Même règle qu'à la validation : sans véhicule, le mouvement a été imputé au
+  // dépôt principal, c'est donc là qu'il faut le reprendre.
+  const emplacement = (doc.vehicule ?? "").trim() || DEPOT_PAR_DEFAUT;
 
   if (sStock !== 0) {
     for (const [refArt, qte] of parArticle) {

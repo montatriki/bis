@@ -74,7 +74,7 @@ enum ReglementSens {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        Int   @id @default(autoincrement())
   name      String
   email     String   @unique
   login     String   @unique
@@ -98,8 +98,8 @@ model User {
 }
 
 model Manager {
-  id         String   @id @default(cuid())
-  userId     String   @unique
+  id         Int   @id @default(autoincrement())
+  userId     Int   @unique
   user       User     @relation(fields: [userId], references: [id])
   department String?
   createdAt  DateTime @default(now())
@@ -108,10 +108,10 @@ model Manager {
 }
 
 model Commercial {
-  id            String    @id @default(cuid())
-  userId        String    @unique
+  id            Int    @id @default(autoincrement())
+  userId        Int    @unique
   user          User      @relation(fields: [userId], references: [id])
-  vehicleId     String?   @unique
+  vehicleId     Int?   @unique
   vehicle       Vehicle?  @relation(fields: [vehicleId], references: [id])
   zone          String?
   targetCA      Float     @default(5000)
@@ -131,10 +131,10 @@ model Commercial {
 }
 
 model Client {
-  id             String      @id @default(cuid())
-  userId         String?     @unique
+  id             Int      @id @default(autoincrement())
+  userId         Int?     @unique
   user           User?       @relation(fields: [userId], references: [id])
-  commercialId   String?
+  commercialId   Int?
   commercial     Commercial? @relation(fields: [commercialId], references: [id])
   name           String
   address        String?
@@ -166,7 +166,7 @@ model Client {
 }
 
 model Vehicle {
-  id              String        @id @default(cuid())
+  id              Int        @id @default(autoincrement())
   plate           String        @unique
   brand           String
   model           String?
@@ -209,7 +209,7 @@ model Vehicle {
 /// au premier des deux atteint.
 model VehiculeOperation {
   id        Int     @id @default(autoincrement())
-  vehicleId String
+  vehicleId Int
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   libelle String // LibOpération : « Vidange moteur », « Courroie »…
@@ -237,10 +237,10 @@ model VehiculeOperation {
 }
 
 model GpsPosition {
-  id           String      @id @default(cuid())
-  commercialId String?
+  id           Int      @id @default(autoincrement())
+  commercialId Int?
   commercial   Commercial? @relation(fields: [commercialId], references: [id])
-  vehicleId    String?
+  vehicleId    Int?
   vehicle      Vehicle?    @relation(fields: [vehicleId], references: [id])
   lat          Float
   lng          Float
@@ -251,7 +251,7 @@ model GpsPosition {
 }
 
 model Product {
-  id            String   @id @default(cuid())
+  id            Int   @id @default(autoincrement())
   reference     String   @unique
   barcode       String?
   name          String
@@ -269,9 +269,9 @@ model Product {
   minStock   Int       @default(5)
   unit       String    @default("U")
   tvaRate    Float     @default(19)
-  depotId    String?
+  depotId    Int?
   depot      Depot?    @relation(fields: [depotId], references: [id])
-  supplierId String?
+  supplierId Int?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
   orderLines    OrderLine[]
@@ -282,7 +282,7 @@ model Product {
 }
 
 model Supplier {
-  id        String   @id @default(cuid())
+  id        Int   @id @default(autoincrement())
   code      String   @unique
   name      String
   contact   String?
@@ -305,7 +305,7 @@ model Supplier {
 }
 
 model Depot {
-  id        String   @id @default(cuid())
+  id        Int   @id @default(autoincrement())
   code      String   @unique
   name      String
   address   String?
@@ -319,12 +319,12 @@ model Depot {
 }
 
 model StockMovement {
-  id          String       @id @default(cuid())
+  id          Int       @id @default(autoincrement())
   reference   String       @unique
   type        MovementType
-  productId   String
+  productId   Int
   product     Product      @relation(fields: [productId], references: [id])
-  depotId     String?
+  depotId     Int?
   depot       Depot?       @relation(fields: [depotId], references: [id])
   qty         Float
   qtyBefore   Float        @default(0)
@@ -338,10 +338,10 @@ model StockMovement {
 }
 
 model PurchaseDocument {
-  id         String       @id @default(cuid())
+  id         Int       @id @default(autoincrement())
   type       DocumentType
   reference  String       @unique
-  supplierId String
+  supplierId Int
   supplier   Supplier     @relation(fields: [supplierId], references: [id])
   totalHT    Float        @default(0)
   totalTTC   Float        @default(0)
@@ -357,11 +357,11 @@ model PurchaseDocument {
 }
 
 model Account {
-  id         String       @id @default(cuid())
+  id         Int       @id @default(autoincrement())
   number     String       @unique
   label      String
   class      AccountClass
-  parentId   String?
+  parentId   Int?
   isStandard Boolean      @default(false)
   createdAt  DateTime     @default(now())
 
@@ -371,7 +371,7 @@ model Account {
 }
 
 model JournalEntry {
-  id          String   @id @default(cuid())
+  id          Int   @id @default(autoincrement())
   reference   String   @unique
   journal     String   @default("OD")
   date        DateTime @default(now())
@@ -386,10 +386,10 @@ model JournalEntry {
 }
 
 model AccountEntry {
-  id             String       @id @default(cuid())
-  journalEntryId String
+  id             Int       @id @default(autoincrement())
+  journalEntryId Int
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
-  accountId      String
+  accountId      Int
   account        Account      @relation(fields: [accountId], references: [id])
   label          String?
   debit          Float        @default(0)
@@ -400,7 +400,7 @@ model AccountEntry {
 }
 
 model BankAccount {
-  id        String   @id @default(cuid())
+  id        Int   @id @default(autoincrement())
   code      String   @unique
   bank      String
   rib       String?
@@ -416,18 +416,18 @@ model BankAccount {
 }
 
 model Reglement {
-  id            String        @id @default(cuid())
+  id            Int        @id @default(autoincrement())
   reference     String        @unique
   sens          ReglementSens
   mode          ReglementMode
   amount        Float
   date          DateTime      @default(now())
   dueDate       DateTime?
-  clientId      String?
+  clientId      Int?
   client        Client?       @relation(fields: [clientId], references: [id])
-  supplierId    String?
+  supplierId    Int?
   supplier      Supplier?     @relation(fields: [supplierId], references: [id])
-  bankAccountId String?
+  bankAccountId Int?
   bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
   chequeNumber  String?
   status        String        @default("ENCAISSE")
@@ -438,12 +438,12 @@ model Reglement {
 }
 
 model Document {
-  id           String       @id @default(cuid())
+  id           Int       @id @default(autoincrement())
   type         DocumentType
   reference    String       @unique
-  clientId     String
+  clientId     Int
   client       Client       @relation(fields: [clientId], references: [id])
-  commercialId String?
+  commercialId Int?
   commercial   Commercial?  @relation(fields: [commercialId], references: [id])
   totalHT      Float        @default(0)
   totalTTC     Float        @default(0)
@@ -461,10 +461,10 @@ model Document {
 }
 
 model DocumentLine {
-  id         String   @id @default(cuid())
-  documentId String
+  id         Int   @id @default(autoincrement())
+  documentId Int
   document   Document @relation(fields: [documentId], references: [id])
-  productId  String
+  productId  Int
   product    Product  @relation(fields: [productId], references: [id])
   qty        Float
   unitPrice  Float
@@ -477,9 +477,9 @@ model DocumentLine {
 }
 
 model Order {
-  id           String      @id @default(cuid())
+  id           Int      @id @default(autoincrement())
   reference    String      @unique
-  clientId     String
+  clientId     Int
   client       Client      @relation(fields: [clientId], references: [id])
   status       OrderStatus @default(PENDING)
   totalTTC     Float       @default(0)
@@ -494,10 +494,10 @@ model Order {
 }
 
 model OrderLine {
-  id        String   @id @default(cuid())
-  orderId   String
+  id        Int   @id @default(autoincrement())
+  orderId   Int
   order     Order    @relation(fields: [orderId], references: [id])
-  productId String
+  productId Int
   product   Product  @relation(fields: [productId], references: [id])
   qty       Int
   unitPrice Float
@@ -508,10 +508,10 @@ model OrderLine {
 }
 
 model Visit {
-  id           String     @id @default(cuid())
-  commercialId String
+  id           Int     @id @default(autoincrement())
+  commercialId Int
   commercial   Commercial @relation(fields: [commercialId], references: [id])
-  clientId     String
+  clientId     Int
   client       Client     @relation(fields: [clientId], references: [id])
   checkedIn    Boolean    @default(false)
   checkInTime  DateTime?
@@ -528,10 +528,10 @@ model Visit {
 }
 
 model Recording {
-  id           String     @id @default(cuid())
-  visitId      String
+  id           Int     @id @default(autoincrement())
+  visitId      Int
   visit        Visit      @relation(fields: [visitId], references: [id])
-  commercialId String
+  commercialId Int
   commercial   Commercial @relation(fields: [commercialId], references: [id])
   duration     Int?
   fileUrl      String?
@@ -545,8 +545,8 @@ model Recording {
 }
 
 model Claim {
-  id          String   @id @default(cuid())
-  clientId    String
+  id          Int   @id @default(autoincrement())
+  clientId    Int
   client      Client   @relation(fields: [clientId], references: [id])
   type        String
   description String
@@ -558,8 +558,8 @@ model Claim {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
+  id        Int   @id @default(autoincrement())
+  userId    Int
   title     String
   message   String
   type      String
@@ -578,7 +578,7 @@ model Notification {
 /// situation évolue (nouveau montant, nouvelle échéance).
 model AlerteAcquittee {
   id        Int      @id @default(autoincrement())
-  userId    String
+  userId    Int
   /// Identifiant stable de l'alerte système (`sys-ruptures`, `sys-impaye-…`).
   cle       String
   /// Empreinte du contenu : si elle change, l'alerte est de nouveau pertinente.
@@ -2277,6 +2277,13 @@ model PanierLigne {
   // changer rétroactivement ce que le commercial a annoncé au client.
   puHt        Float  @default(0)
   tauxTva     Float  @default(0)
+  // Le FODEC entre dans la base de TVA (règle tunisienne) : sans lui, le
+  // panier facturait 28,586 là où l'ERP d'origine annonce 28,872.
+  tauxFodec   Float  @default(0)
+  // Remise accordée sur la ligne, en pourcentage du prix TTC — c'est ainsi que
+  // l'ERP d'origine la saisit (« remise % » et « net » liés au catalogue),
+  // plafonnée par `Article.remiseMax`.
+  remise      Float  @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt

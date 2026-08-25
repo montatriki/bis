@@ -45,8 +45,21 @@ export async function GET(req: NextRequest) {
           `${v.code ?? ""} ${v.label}`.toUpperCase().includes(plaque.toUpperCase()))
       : undefined;
 
+    // Les emplacements de stock reprennent les `Code_mag` de la production, qui
+    // mélangent entrepôts et camions (« AZIZ 248TU6787 » est un camion, pas un
+    // dépôt). On repère la plaque dans le libellé pour les distinguer à l'écran.
+    const plaques = vehicules.map((v) => (v.code ?? v.label).toUpperCase());
+    const estCamion = (label: string) =>
+      plaques.some((p) => label.toUpperCase().includes(p));
+    const emplacements = rows
+      .filter((r) => r.kind === "depot")
+      .map((r) => ({ code: r.code ?? r.label, label: r.label, camion: estCamion(r.label) }));
+
     return NextResponse.json({
-      depots: rows.filter((r) => r.kind === "depot").map((r) => ({ code: r.code ?? r.label, label: r.label })),
+      // `depots` ne garde que les vrais entrepôts ; les camions sont listés à part.
+      depots: emplacements.filter((e) => !e.camion),
+      depotsCamions: emplacements.filter((e) => e.camion),
+      emplacements,
       vehicules: vehicules.map((r) => ({ code: r.code ?? r.label, label: r.label })),
       vehiculeAttribue: sien ? (sien.code ?? sien.label) : null,
       plaqueAttribuee: plaque,

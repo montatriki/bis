@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import prisma from "./prisma";
 
 export type SessionUser = {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: string;

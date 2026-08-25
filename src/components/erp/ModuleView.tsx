@@ -30,6 +30,7 @@ import ProjetsView from "@/components/erp/ProjetsView";
 import DroitsView from "@/components/erp/DroitsView";
 import SettingsView from "@/components/erp/SettingsView";
 import ReportsView from "@/components/erp/ReportsView";
+import { confirmer } from "@/lib/alertes";
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(n) || 0);
 const fmtDate = (v: string) => (v ? new Date(v).toLocaleDateString("fr-FR") : "—");
@@ -127,6 +128,9 @@ export default function ModuleView({ moduleSlug, subSlug }: { moduleSlug: string
   const wres = view ? writeResource(view) : null;
 
   const [reloadKey, setReloadKey] = useState(0);
+  // Un export parcourt toutes les pages : le drapeau évite qu'un second clic
+  // relance le parcours pendant qu'il est en cours.
+  const [exportEnCours, setExportEnCours] = useState(false);
   const fetchRows = useCallback(() => setReloadKey((k) => k + 1), []);
 
   // Pas de rafraîchissement automatique : un rechargement toutes les 30 s
@@ -221,7 +225,7 @@ export default function ModuleView({ moduleSlug, subSlug }: { moduleSlug: string
 
   async function remove() {
     if (!wres || !selected) return;
-    if (!confirm("Confirmer la suppression de cet enregistrement ?")) return;
+    if (!(await confirmer("Confirmer la suppression de cet enregistrement ?", { danger: true }))) return;
     setBusy(true);
     const r = await fetch(`/api/erp?resource=${wres}&id=${encodeURIComponent(selected)}`, { method: "DELETE" }).then((x) => x.json());
     setBusy(false);
@@ -229,12 +233,38 @@ export default function ModuleView({ moduleSlug, subSlug }: { moduleSlug: string
     else flash("Erreur: " + (r.error ?? "échec"));
   }
 
-  function exportExcel() {
-    const header = cols.map((c) => c.label).join(";");
-    const lines = rows.map((row) => cols.map((c) => String(row[c.key] ?? "").replace(/;/g, ",")).join(";"));
-    const csv = "﻿" + [header, ...lines].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = `${sub!.slug}.csv`; a.click(); URL.revokeObjectURL(url);
+  // L'export ne portait que sur `rows`, c'est-à-dire la page affichée : 50 lignes
+  // sur 4 568 clients. On parcourt donc toutes les pages, avec les filtres
+  // courants, avant de composer le fichier.
+  async function exportExcel() {
+    if (!view || exportEnCours) return;
+    setExportEnCours(true);
+    try {
+      const parts = [baseParams(view)];
+      if (search) parts.push(`search=${encodeURIComponent(search)}`);
+      if (sort) parts.push(`sort=${sort.field}&dir=${sort.dir}`);
+      for (const [k, v] of Object.entries(filters)) if (v.trim()) parts.push(`f_${k}=${encodeURIComponent(v.trim())}`);
+      for (const [k, v] of Object.entries(barFilters)) if (v && v.trim()) parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(v.trim())}`);
+
+      const toutes: Row[] = [];
+      // Garde-fou : au-delà de 200 pages on s'arrête, un export de cette taille
+      // relève de la base, pas du navigateur.
+      for (let p = 0; p < 200; p++) {
+        const d = await fetch(`/api/erp?${[...parts, `page=${p}`].join("&")}`).then((r) => r.json());
+        const lot: Row[] = d.rows ?? [];
+        toutes.push(...lot);
+        if (lot.length === 0 || toutes.length >= (d.total ?? 0)) break;
+      }
+
+      const source = toutes.length ? toutes : rows;
+      const header = cols.map((c) => c.label).join(";");
+      const lignes = source.map((row) => cols.map((c) => String(row[c.key] ?? "").replace(/;/g, ",")).join(";"));
+      const csv = "\uFEFF" + [header, ...lignes].join("\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a"); a.href = url; a.download = `${sub!.slug}.csv`; a.click(); URL.revokeObjectURL(url);
+    } finally {
+      setExportEnCours(false);
+    }
   }
 
   function toggleSort(c: Column) {
@@ -291,7 +321,9 @@ export default function ModuleView({ moduleSlug, subSlug }: { moduleSlug: string
   const hasFilters = cols.some((c) => c.filter);
 
   return (
-    <div className="space-y-3 text-[var(--text-primary)]">
+    // `data-impression="contenu"` : seule cette zone part à l'imprimante — le
+    // gabarit @media print masque le reste (menu, barres d'action).
+    <div className="space-y-3 text-[var(--text-primary)]" data-impression="contenu">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3 border-b border-[var(--border-primary)] pb-3">
         <div>
@@ -425,8 +457,8 @@ export default function ModuleView({ moduleSlug, subSlug }: { moduleSlug: string
                     className="flex items-center gap-1.5 border border-[var(--border-primary)] px-3 py-2 rounded-xl text-sm text-violet-600 hover:bg-violet-50 disabled:opacity-30"><ArrowRightLeft size={15} /> Transformer</button>
                 </>
               )}
-              <button title="Imprimer" onClick={() => window.print()} className="p-2 rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--accent-light)]"><Printer size={15} /></button>
-              <button title="Exporter Excel" onClick={exportExcel} className="flex items-center gap-1.5 border border-[var(--border-primary)] text-emerald-600 px-3 py-2 rounded-xl text-sm hover:bg-emerald-50"><Download size={15} /> Excel</button>
+              <button title="Imprimer" data-impression="masquer" onClick={() => window.print()} className="p-2 rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--accent-light)]"><Printer size={15} /></button>
+              <button title="Exporter Excel" data-impression="masquer" onClick={exportExcel} disabled={exportEnCours} className="flex items-center gap-1.5 border border-[var(--border-primary)] text-emerald-600 px-3 py-2 rounded-xl text-sm hover:bg-emerald-50 disabled:opacity-40"><Download size={15} /> {exportEnCours ? "Export…" : "Excel"}</button>
             </div>
 
             {/* Table */}

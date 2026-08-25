@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   Settings, Tag, Boxes, Users, FolderTree, Plus, Pencil, Trash2,
   Loader2, Check, AlertTriangle, Save, X, Landmark, Building2,
@@ -121,7 +122,7 @@ function Referentiels({ scope, accent, reload, onFlash, onDone }: {
   }
 
   async function supprimer(r: Ref) {
-    if (!confirm(`Supprimer « ${r.label} » ?`)) return;
+    if (!(await confirmer(`Supprimer « ${r.label} » ?`, { danger: true }))) return;
     const res = await fetch(`/api/parametres?vue=refs&id=${r.id}`, { method: "DELETE" }).then((x) => x.json());
     onFlash(res.message ?? res.error ?? "—", Boolean(res.ok));
     if (res.ok) onDone();

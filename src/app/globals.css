@@ -435,3 +435,78 @@ body::after {
   /* Le cadre de l'application déborderait sur le ticket. */
   body.impression-ticket::after { display: none !important; }
 }
+
+/* ============================================================
+   Impression d'un écran de module (listes, documents, rapports)
+   Le bouton « Imprimer » appelait `window.print()` sans gabarit : la barre
+   latérale, les filtres et les boutons d'action sortaient sur le papier avec
+   le tableau. On ne garde que la zone de contenu.
+   ============================================================ */
+
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+
+  /* Chrome de l'application : rien de tout cela n'a de sens sur papier. */
+  aside,
+  nav,
+  [data-impression="masquer"] {
+    display: none !important;
+  }
+
+  /* La zone de contenu reprend toute la largeur une fois le menu retiré. */
+  [data-impression="contenu"] {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Les tableaux longs doivent se poursuivre page après page plutôt que d'être
+     coupés dans un conteneur à défilement. */
+  [data-impression="contenu"] * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  table { width: 100% !important; border-collapse: collapse !important; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Le fond sombre du thème gaspillerait l'encre et rendrait le texte illisible. */
+  body, [data-impression="contenu"] { background: #fff !important; color: #000 !important; }
+}
+
+/* ============================================================
+   SweetAlert2 — accord avec le thème de l'application
+   Le fond et la couleur du texte sont passés à l'ouverture (voir
+   `src/lib/alertes.ts`) ; ces règles couvrent les éléments internes que
+   l'option `background` ne touche pas.
+   ============================================================ */
+
+.swal2-popup {
+  font-family: inherit;
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 20px 45px rgb(0 0 0 / 18%);
+}
+
+.swal2-title,
+.swal2-html-container {
+  color: var(--text-primary) !important;
+}
+
+.swal2-html-container {
+  font-size: 0.95rem;
+}
+
+.swal2-actions button {
+  font-weight: 600;
+  border-radius: 0.75rem;
+}
+
+/* La popup doit passer au-dessus des panneaux latéraux et modales de
+   l'application, qui montent jusqu'à z-index 50. */
+.swal2-container {
+  z-index: 9999;
+}

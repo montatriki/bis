@@ -31,6 +31,11 @@ export async function POST(req: NextRequest) {
   const partner = await prisma.partner.findUnique({ where: { id: codeCli } });
   if (!partner) return NextResponse.json({ error: "Tiers introuvable" }, { status: 404 });
 
+  const mode = body?.mode ? String(body.mode) : "Espèces";
+  const echeance = body?.echeance ? String(body.echeance) : "";
+  /** Effet à recouvrer : encaissement différé à la date d'échéance. */
+  const aEcheance = mode === "Chèque" || mode === "Traite";
+
   // Les identifiants de règlement sont numériques et non auto-incrémentés
   // dans les données importées : on prend le suivant disponible.
   const last = await prisma.erpReglement.findFirst({ orderBy: { id: "desc" }, select: { id: true } });
@@ -43,9 +48,17 @@ export async function POST(req: NextRequest) {
         sens,
         datePay: new Date(),
         montant,
-        modePay: body?.mode ? String(body.mode) : "Espèces",
+        modePay: mode,
         numPiece: body?.numPiece ? String(body.numPiece) : null,
-        etat: "Encaissé",
+        // Document réglé : c'est ce lien qui permet au ticket imprimé
+        // d'afficher le montant encaissé et au document de se solder.
+        numDoc: body?.numDoc ? String(body.numDoc) : null,
+        echeance: echeance || null,
+        // Un chèque ou une traite n'est encaissé qu'à son échéance : le
+        // marquer « Encaissé » dès la remise fausserait la trésorerie et
+        // l'écran des effets à recouvrer. L'espèce, elle, entre en caisse
+        // immédiatement.
+        etat: aEcheance ? "En cours" : "Encaissé",
         tiersCode: codeCli,
         tiersNom: partner.raisonSocial,
         utilisateur: auth.user.name,

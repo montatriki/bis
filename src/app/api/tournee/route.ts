@@ -26,8 +26,22 @@ function perimetre(user: { role: string; name: string }): string | null {
  * Coût attribué à chaque visite manquante quand un secteur ne remplit pas la
  * journée : un planning à 6 visites au lieu de 12 obligera à rouler un autre
  * jour. Exprimé en mètres pour rester homogène avec les distances.
+ *
+ * La pénalité est **ramenée à la visite**, comme les autres termes du coût.
+ * Appliquée en bloc, elle écrasait tout : un commercial à Hammamet avec sept
+ * clients à moins de 5 km se voyait envoyer à Sousse, 59 km plus loin, parce
+ * que les cinq visites manquantes pesaient 75 km face à un secteur complet.
  */
 const PENALITE_VISITE_MANQUANTE_M = 15_000;
+
+/**
+ * Distance au-delà de laquelle un secteur n'est plus « sur place ».
+ *
+ * En deçà, le commercial est déjà dans la zone : aucune pénalité de
+ * remplissage ne justifie de lui faire traverser le pays. Visiter sept
+ * clients à sa porte vaut mieux que douze à une heure de route.
+ */
+const RAYON_SUR_PLACE_M = 15_000;
 
 /** Nombre de visites planifiées par défaut dans une journée. */
 const TAILLE_DEFAUT = 12;
@@ -283,23 +297,37 @@ export async function POST(req: NextRequest) {
     ? Math.min(200_000, rayonDemande)
     : RAYON_JOURNEE;
 
-  // Choix du secteur de la journée.
+  // Le commercial est-il déjà entouré de clients ?
   //
-  // Le carburant se joue sur deux postes : le trajet d'**approche** (aller
-  // jusqu'à la zone) et le trajet **entre visites**. L'ancienne version ne
-  // regardait que la densité : elle pouvait envoyer à 120 km un commercial qui
-  // avait des clients à 500 m. On arbitre donc explicitement entre les deux.
+  // C'est le cas le plus fréquent sur le terrain, et le plus mal traité
+  // jusqu'ici : parti de Hammamet avec 23 clients à moins de 15 km, le
+  // planificateur cherchait le *meilleur amas* du portefeuille et l'envoyait
+  // à Sousse, 59 km plus loin, parce que l'amas y était plus dense. Un
+  // commercial ne traverse pas le pays quand sa journée est faisable à sa
+  // porte.
   //
-  // Coût estimé d'un secteur = approche + trajet interne approximé.
-  // Un secteur deux fois plus dense mais deux fois plus loin ne vaut le
-  // déplacement que si le gain sur les inter-visites compense l'aller.
+  // On sert donc d'abord ce qui l'entoure ; la recherche de secteur ne
+  // reprend la main que s'il n'y a pas de quoi remplir la journée sur place.
+  const autourDeMoi = geo
+    .map((c) => ({ c, d: distanceM(depart.lat, depart.lng, c.latitude, c.longitude) }))
+    .filter((x) => x.d <= rayon)
+    .sort((a, b) => a.d - b.d);
+
   const groupeDe = (centre: (typeof geo)[number]) =>
     geo.filter((c) => distanceM(centre.latitude, centre.longitude, c.latitude, c.longitude) <= rayon);
 
   let meilleurGroupe: typeof geo = [];
   let meilleurCout = Number.POSITIVE_INFINITY;
 
-  for (const centre of geo) {
+  if (autourDeMoi.length >= taille) {
+    // De quoi remplir la journée sans quitter la zone : on retient les clients
+    // les plus proches, la sélection fine et l'ordre de passage étant traités
+    // plus bas.
+    meilleurGroupe = autourDeMoi.map((x) => x.c);
+    meilleurCout = 0;
+  }
+
+  for (const centre of meilleurGroupe.length >= taille ? [] : geo) {
     const groupe = groupeDe(centre);
     // Un secteur qui ne remplit pas la journée oblige à rouler davantage
     // ailleurs : on pénalise proportionnellement aux visites manquantes.
@@ -313,8 +341,18 @@ export async function POST(req: NextRequest) {
       groupe.length;
 
     // Coût ramené à la visite : c'est ce qui compte pour l'exploitant.
-    const cout = (approche + etalement * retenues) / retenues
-      + (taille - retenues) * PENALITE_VISITE_MANQUANTE_M;
+    //
+    // L'approche est payée **une fois** pour toute la journée, la pénalité de
+    // remplissage est donc elle aussi ramenée à la visite — sinon elle domine
+    // tout le calcul et envoie au loin un commercial déjà entouré de clients.
+    const manquantes = taille - retenues;
+    // Un secteur où l'on se trouve déjà ne se pénalise pas : la journée peut
+    // être complétée sur place ou le lendemain, sans un aller de 60 km.
+    const penalite = approche <= RAYON_SUR_PLACE_M
+      ? 0
+      : (manquantes * PENALITE_VISITE_MANQUANTE_M) / taille;
+
+    const cout = (approche + etalement * retenues) / retenues + penalite;
 
     if (cout < meilleurCout) { meilleurGroupe = groupe; meilleurCout = cout; }
   }

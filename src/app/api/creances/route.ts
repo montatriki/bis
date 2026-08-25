@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
+import { filtrePortefeuille } from "@/lib/perimetre-commercial";
 
 // Détail des créances clients et de la trésorerie — ouvert depuis la carte
 // « Créances clients » du tableau de bord.
@@ -25,8 +26,13 @@ const TRANCHES = [
 const JOUR = 86_400_000;
 
 export async function GET(req: NextRequest) {
-  const auth = await requireSession(["ADMIN", "MANAGER"]);
+  // La production sert cet écran au commercial (`etatImpayerParClient` de
+  // l'application mobile) : c'est son outil de relance sur tournée. Il n'y voit
+  // que son propre portefeuille.
+  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+
+  const perimetre = filtrePortefeuille({ role: auth.user.role, name: auth.user.name });
 
   const sp = req.nextUrl.searchParams;
   const axe = sp.get("axe") ?? "anciennete";
@@ -83,7 +89,7 @@ export async function GET(req: NextRequest) {
 
   // Documents de vente non soldés : la créance réelle, pièce par pièce.
   const impayes = await prisma.erpDocument.findMany({
-    where: { nature: "Vente", soldeDoc: { gt: 0 } },
+    where: { nature: "Vente", soldeDoc: { gt: 0 }, ...(perimetre ?? {}) },
     select: {
       refDoc: true, typeDoc: true, dateDoc: true, raisonSocial: true,
       codeCli: true, soldeDoc: true, ttcNet: true, commercial: true,

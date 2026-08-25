@@ -6,6 +6,8 @@ import ValorisationFamilles from "@/components/erp/ValorisationFamilles";
 import DetailAchats from "@/components/erp/DetailAchats";
 import DetailCreances from "@/components/erp/DetailCreances";
 import DetailRuptures from "@/components/erp/DetailRuptures";
+import { erreur } from "@/lib/alertes";
+import { MOIS_LONGS } from "@/lib/vente-stats";
 import {
   Users, Truck, TrendingUp, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Cpu, Brain,
@@ -75,8 +77,6 @@ type Insights = {
   };
 };
 
-const MOIS_LONGS = ["janvier", "février", "mars", "avril", "mai", "juin",
-  "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 
 /**
  * Lien de relance WhatsApp. `wa.me` ouvre l'application (mobile ou web) avec le
@@ -160,7 +160,19 @@ export default function AdminDashboard() {
   const [voirRuptures, setVoirRuptures] = useState(false);
   // Couche affichée sur la carte de supervision (trafic / clients / zones).
   const [coucheGis, setCoucheGis] = useState<"trafic" | "clients" | "zones">("trafic");
-  const [activeTheme, setActiveTheme] = useState<"latte" | "espresso" | "matcha">("latte");
+  // Le thème retenu est lu une fois à la construction de l'état : le poser
+  // depuis un effet provoquait un second rendu et un flash du thème par défaut.
+  // `localStorage` peut être indisponible (fenêtre privée) : on retombe alors
+  // sur le thème par défaut.
+  const [activeTheme, setActiveTheme] = useState<"latte" | "espresso" | "matcha">(() => {
+    if (typeof window === "undefined") return "latte";
+    try {
+      const saved = localStorage.getItem("bis-dashboard-theme");
+      return saved === "espresso" || saved === "matcha" || saved === "latte" ? saved : "latte";
+    } catch {
+      return "latte";
+    }
+  });
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
 
   // Live ERP stats from Postgres via /api/synthese
@@ -184,6 +196,43 @@ export default function AdminDashboard() {
   const [topClients, setTopClients] = useState<TopClient[]>([]);
   const [recents, setRecents] = useState<DocRecent[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
+  /** Objectifs en cours de saisie, par vendeur — l'admin les fixe depuis la modale. */
+  const [objSaisie, setObjSaisie] = useState<Record<string, string>>({});
+  const [objEnCours, setObjEnCours] = useState<string | null>(null);
+
+  /** Recharge les indicateurs après une saisie, pour que les taux suivent. */
+  async function rechargerInsights() {
+    const ins = await fetch("/api/insights").then((r) => r.json()).catch(() => null);
+    if (ins?.objectif) setInsights(ins);
+  }
+
+  /** Fixe l'objectif du mois pour un vendeur. */
+  async function enregistrerObjectif(vendeur: string) {
+    if (!insights) return;
+    const brut = objSaisie[vendeur];
+    const montant = Number(String(brut ?? "").replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(montant) || montant < 0) {
+      await erreur("Saisissez un montant positif.", "Objectif invalide");
+      return;
+    }
+    setObjEnCours(vendeur);
+    const r = await fetch("/api/objectifs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        vendeur, montant,
+        mois: insights.periode.mois, annee: insights.periode.annee,
+        objectifCA: montant,
+      }),
+    }).then((x) => x.json()).catch(() => ({ error: "réseau" }));
+    setObjEnCours(null);
+    if (!r.ok) {
+      await erreur(r.error ?? "Enregistrement impossible");
+      return;
+    }
+    setObjSaisie((prev) => { const n = { ...prev }; delete n[vendeur]; return n; });
+    await rechargerInsights();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -244,13 +293,12 @@ export default function AdminDashboard() {
     }
   };
 
+  // Application des variables CSS du thème courant — aucun changement d'état ici.
   useEffect(() => {
-    const saved = localStorage.getItem("bis-dashboard-theme");
-    if (saved) {
-      setActiveTheme(saved as any);
-      applyTheme(saved as any);
-    }
-  }, []);
+    applyTheme(activeTheme);
+    // `applyTheme` ne lit que son argument : le relancer à chaque rendu serait inutile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTheme]);
 
   const changeTheme = (theme: "latte" | "espresso" | "matcha") => {
     setActiveTheme(theme);
@@ -644,6 +692,26 @@ export default function AdminDashboard() {
                           <div className="w-full bg-[var(--bg-primary)] h-1.5 rounded-full overflow-hidden border border-[var(--border-primary)]">
                             <div className={`h-full rounded-full ${v.taux >= 100 ? "bg-emerald-500" : v.taux >= 80 ? "bg-amber-500" : "bg-red-500"}`}
                               style={{ width: `${Math.min(100, v.taux)}%` }} />
+                          </div>
+                          {/* Saisie de l'objectif : sans elle, un vendeur sans
+                              objectif restait bloqué à 0 % sans moyen de le fixer. */}
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <input
+                              type="number" min={0} step={100}
+                              value={objSaisie[v.vendeur] ?? (v.objectifCA || "")}
+                              onChange={(e) => setObjSaisie((p) => ({ ...p, [v.vendeur]: e.target.value }))}
+                              placeholder="Objectif TND"
+                              className="w-32 px-2 py-1 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-[11px] tabular-nums"
+                            />
+                            <button
+                              onClick={() => enregistrerObjectif(v.vendeur)}
+                              disabled={objEnCours === v.vendeur}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[var(--accent-primary)] text-white disabled:opacity-40">
+                              {objEnCours === v.vendeur ? "…" : "Fixer"}
+                            </button>
+                            {v.objectifCA <= 0 && (
+                              <span className="text-[10px] text-amber-500 font-semibold">objectif non fixé</span>
+                            )}
                           </div>
                         </div>
                       ))}

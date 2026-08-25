@@ -127,6 +127,11 @@ const partnerCols: Column[] = [
   { key: "debit", label: "Débit", type: "money", sortable: true },
   { key: "credit", label: "Crédit", type: "money", sortable: true },
   { key: "soldeFin", label: "Solde", type: "money", sortable: true },
+  // Colonnes de recouvrement de l'ERP d'origine : l'encours est ce qui est
+  // remis mais pas encore encaissé, l'impayé ce qui est revenu impayé.
+  { key: "encours", label: "Encours", type: "money", sortable: true },
+  { key: "impayer", label: "Impayé", type: "money", sortable: true },
+  { key: "risque", label: "Risque", type: "text", sortable: true },
 ];
 
 // full "Liste des produits" layout, matching the external app

@@ -191,6 +191,16 @@ actions relevées dans le code source `production/BIS/app/src`.
 | ✅ | commercial/catalogue — mauvais camion | catalogue **vide** pour Mokhtar | l'emplacement du commercial était résolu par le **préfixe du libellé de dépôt** avant la plaque : « mokhtar 206TU7140 » désigne aujourd'hui le camion d'Aziz, et Mokhtar recevait donc le catalogue d'un véhicule qui n'est plus le sien — vide. La plaque affectée fait désormais foi, le libellé ne servant qu'à défaut : mokhtar → 248TU6787 (9 articles), foued → 243TU3251 (22), sihem → 243TU7638 (29), heni → 238TU1019 (40) |
 | ✅ | catalogue — prix TTC | FODEC absent du calcul | même correction que la valeur embarquée : **tous les prix HT et TTC sont désormais identiques à la production** (KIDS ZONE 24,022 / 28,872, DouDou 44,929 / 54,000) |
 | ✅ | écrans commerciaux — rechargements en boucle | **toute la page se rechargeait toutes les 30 s** (salves `sync-stock`, `panier`, `notifications`, `position`… visibles dans les journaux) | le GPS émet un point toutes les 30 s (`maximumAge: 30_000`) ; chaque point appelait `setPosition`, changeait la valeur du contexte partagé et **re-rendait tout l'arbre de la tournée** — y compris les écrans qui n'utilisent pas la position, qui refaisaient alors tous leurs appels réseau. Le contexte est scindé : `CtxClient` (client en cours) et `CtxPosition` (GPS). Les écrans sans distance passent par `useClientSeul()`, la modale de création par `usePositionGps()`. **Plus aucun appel répété sur 75 s** (stock camion, catalogue, clients), et le suivi GPS reste intact : 1 remontée à l'arrivée, 1 après un déplacement réel de 2,5 km, aucune à l'arrêt |
+| ✅ | commercial/planning — tournée à 59 km | à Hammamet, avec 23 clients à moins de 15 km, le plan envoyait à **Akouda / Sousse** et « Regénérer » ne changeait rien | le planificateur cherchait le **meilleur amas** du portefeuille au lieu de servir ce qui entoure le commercial : l'amas de Sousse étant plus dense, il l'emportait malgré 59 km d'approche, et la pénalité de remplissage (5 visites manquantes × 15 km = 75 km) achevait d'écraser le secteur local. Quand il y a de quoi remplir la journée autour de soi (76 clients dans 40 km ici), ce sont ces clients qui sont retenus ; la recherche d'amas ne reprend la main que faute de clients sur place. **Depuis Hammamet : 8 Hammamet + 3 Nabeul, première visite à 673 m** — et le comportement reste correct depuis Tunis (7 Tunis), Bizerte (11 Bizerte) et Sousse (10 Sousse) |
+| ✅ | commercial/planning — plan périmé au rechargement | rouvrir la page gardait la tournée d'un autre point de départ, sans le signaler | une tournée reste volontairement valable la journée (la refaire d'office effacerait les visites déjà faites), mais l'écran **prévient désormais** quand elle commence à plus de 20 km : « Cette tournée commence à 53,8 km de vous », avec un bouton **Regénérer ici** — vérifié, l'itinéraire repart alors du client à 673 m |
+| ✅ | commercial/planning — génération automatique inopérante | ouvrir la page sans tournée laissait un planning vide | l'effet armait son garde-fou (`autoGen`) **avant** l'appel différé, puis son nettoyage annulait le `setTimeout` au changement d'état : la génération ne partait jamais et ne pouvait plus repartir. Le timeout n'est plus annulé |
+| ✅ | commercial/planning — plan bâti depuis le dépôt | la génération automatique repartait de Sousse malgré un GPS actif (tournée à 186 km) | `genererTournee` lisait `position` dans sa closure, figée au rendu où le GPS n'avait pas encore répondu. La position est désormais lue **à l'instant de l'appel** (`positionRef`) — vérifié : `depart = {36.4, 10.6167}`, première visite à 673 m |
+| ✅ | commercial/panier — prix facturé | KIDS ZONE facturé **28,586** au lieu de 28,872 | le panier calculait `TTC = HT × (1 + TVA)` en ignorant le FODEC, alors que l'ERP d'origine raisonne en **TTC** (`t1_ttc` au catalogue, `Mt_tva = valeur_ttc − valeur_ht`). Le taux de FODEC est désormais porté par la ligne de panier et transmis à la commande — **Net à payer 28,872 TND, identique à la production** |
+| ✅ | commercial/panier — « Valider le panier → Ticket » | le ticket était créé mais laissé **En cours** : ni sortie de stock, ni débit client, contrairement à ce qu'annonce l'écran | la validation n'était jamais déclenchée. Un ticket (`TIC`, `tStock: S` / `tSolde: D`) est encaissé sur place : il est maintenant validé dans la foulée — vérifié sur 2 unités : **stock camion 10 → 8, solde client 0 → 57,744 TND**, mouvement de stock enregistré. Une commande (COM) reste, elle, à valider par l'administration |
+| ✅ | commercial/catalogue — remise par article | la ligne de prix de l'ERP d'origine était absente | reproduite à l'identique — **`[prix TTC catalogue, grisé]  %  [remise]  $  [net]`** — plus le **total de ligne** (`net × qté`) à côté du sélecteur de quantité. Les deux champs saisissables sont liés (`net = t1_ttc × (1 − remise/100)`, `remise = 100 − net × 100 / t1_ttc`), plafonnés par `remiseMax` et revérifiés côté serveur. Vérifié à l'écran : base 39,000 → **remise 10 % → net 35,100**, total de ligne 35,100 |
+| ✅ | commercial/panier — étape de règlement | le ticket était émis sans passer par le paiement | reprise de la séquence de `Panier-component.js` : **Espèce / Chèque / Traite / Retenu**, montant encaissé, n° de pièce et échéance pour les effets, reste à payer affiché. Un chèque est enregistré « En cours » avec son échéance (il n'entre en caisse qu'à sa date) ; un encaissement partiel laisse le solde au débit du client. Vérifié bout en bout : encaissement de 30 TND sur 39,000 → **stock camion 14 → 13**, reste 9,000 TND au débit |
+| ✅ | ticket imprimé — règlement absent | le ticket sortait sans **mode de paiement** ni **montant réglé**, et le document restait dû en totalité malgré l'encaissement | le règlement était bien enregistré mais n'était rattaché ni au document (`modePayement`, `totalRegle`, `soldeDoc` jamais mis à jour) ni au ticket (`numDoc` vide, d'où « réglé : 0 » à l'impression). Les deux liens sont posés — vérifié : ticket 51,970 TND, encaissement de 40 en espèces → **mode « Espèce » · réglé 40 · reste 11,970**, et solde client 11,970 (pas de double comptage) |
+| ✅ | commercial/panier — total affiché | le panier annonçait **38,614** pour un ticket émis à 39,000 | les totaux d'écran ignoraient le FODEC et les remises de ligne, contrairement au document. Alignés sur le calcul serveur — **Net à payer 39,000 TND, identique au `t1_ttc` de la production** |
 
 **Avancement : 68/68 écrans terminés — tous les modules repris et vérifiés sur les données réelles ; le stock se resynchronise seul sur la production.**
 
@@ -245,3 +255,973 @@ de valeurs en dur.
   à leur nom, donc aucun camion à leur attribuer. Ils se connectent et
   travaillent normalement, mais sans stock embarqué.
 - Le parc compte 7 véhicules ; 5 sont affectés.
+
+## Structure de la base — identifiants
+
+Les 24 tables issues du squelette de départ portaient un identifiant textuel
+(cuid : `cmqs2plif000s03g8qywpgsj9`). Converties en **entier auto-incrémenté**
+(migration `20260824120000_identifiants_serial`), clés étrangères et index
+repris à l'identique, dans l'ordre chronologique de création.
+
+Restent volontairement en texte les **clés métier partagées avec la production**,
+qui servent de référence commune avec l'ERP d'origine et ses scripts de synchronisation :
+`articles_ext.refArt` (`n29`), `documents_ext.refDoc` (`BRT240086`),
+`unite_art.unite`, `gpao_nomenclatures.refArt`.
+
+Les 74 tables de la reprise ERP étaient déjà en `integer` auto-incrémenté.
+
+Vérifié : 0 ligne perdue, tous les liens résolus (commercial → utilisateur → véhicule),
+24 séquences calées au-dessus du maximum, audit 83 routes × 4 rôles à 0 anomalie,
+0 erreur TypeScript.
+
+## Base `bechir` — reconstruction et performance
+
+La base de travail est désormais **`bechir`** (`bechir1` conservée comme source).
+102 tables recréées, clé primaire déclarée `serial`, puis données clonées depuis
+`bechir1` : **242 071 lignes, 0 échec**.
+
+### Règle de clonage des identifiants
+
+| Cas | Traitement | Nombre |
+|---|---|---|
+| id auto-généré, aucune table ne la référence | **id régénéré** à partir de 1 | 22 |
+| id auto-généré, référencée par d'autres tables | **id conservé** — sinon les enfants pointent dans le vide | 33 |
+| clé métier (`refArt`, `refDoc`, `unite`) | copiée telle quelle | 47 |
+
+Régénérer les identifiants d'une table référencée casse les rattachements :
+mesuré sur `inventaires` (id 37–634, pas 1–598), une copie sans id produit
+**41 lignes orphelines** et rattache silencieusement les 1 242 autres au mauvais
+inventaire — aucune erreur levée, seuls les chiffres sont faux.
+
+Résultat : `document_lines_ext` passe de 18–187136 à **1–187077**,
+`stock_depots` de 87–5536 à **1–472**, tandis que `inventaires` et
+`erp_missions` gardent leur numérotation. **0 orpheline, 69 clés étrangères validées.**
+
+### Performance
+
+36 colonnes de clé étrangère n'avaient aucun index : chaque jointure y faisait
+un balayage complet. Index créés, mesuré sur la jointure
+`documents_ext` ↔ `erp_missions` :
+
+| | `bechir1` | `bechir` |
+|---|---|---|
+| Plan | `Seq Scan` | `Index Only Scan` |
+| Blocs lus | 985 | **26** |
+| Temps du nœud | 7,251 ms | **0,538 ms** |
+
+Total : 284 index, 69 clés étrangères, 89 séquences, 8 types énumérés.
+
+Le schéma est versionné dans `db/` (voir `db/README.md`) : structure, index,
+clés étrangères, séquences et script de clonage. Reconstruction complète
+vérifiée en **18 s** depuis ces seuls fichiers.
+
+## Réalignement sur la production — 24 août 2026
+
+Comparaison chiffre par chiffre avec `41.226.17.73:3050`. Six anomalies trouvées et corrigées.
+
+### 1. Chiffre d'affaires surévalué de 1 123 466 TND
+
+Nos **145 factures d'achat** (`FAO…`, fournisseurs Graphy Print, EPI…) portent le
+même `typeDoc` **FC** que les factures client et entraient dans le CA. Quatre
+calculs ne filtraient pas sur `nature` : `charges-fixes.ts` (×3) et `projets`.
+
+CA : **6 012 530,56 → 4 889 064,57**, identique à la production au centime.
+
+### 2. Stock du dépôt principal : 524 749 unités manquantes
+
+545 références présentes en production étaient absentes de notre catalogue.
+Deux causes distinctes :
+- **29 articles** créés en production depuis notre import → importés (catalogue 552 → 592) ;
+- **517 lignes de stock sans fiche article** — la production elle-même ne les
+  affiche pas (son écran joint `article`), c'est un résidu de sa propre base.
+
+### 3. Documents en retard
+
+97 documents créés en production entre le 19 et le 24 août manquaient, et
+4 tickets avaient été modifiés après notre import (l'importeur préserve
+l'existant). Importés puis réalignés sur les montants de production.
+
+### 4. Affectations commercial ↔ véhicule
+
+La référence est le **`Code_mag` du compte utilisateur en production** : c'est le
+dépôt depuis lequel l'application mobile fait vendre le commercial.
+
+| Compte | `Code_mag` | Véhicule |
+|---|---|---|
+| MOKHTAR | 13 | 248TU6787 |
+| aziz | 2 | 206TU7140 |
+| heni | 7 | 238TU1019 |
+| sihem | 10 | 243TU7638 |
+| FOUED | 9 | 243TU3251 |
+
+L'historique des documents dit qui a *conduit* un camion, ce qui n'est pas
+l'affectation déclarée — s'y fier menait à une conclusion inverse. Les libellés
+d'emplacement portent d'anciens noms de conducteur (« AZIZ 248TU6787 » est le
+camion de Mokhtar) : trompeurs à l'écran, mais fidèles à la production.
+
+Vérifié : stock camion à **écart 0,00 pour les 5 commerciaux**.
+
+### 5. Camions listés comme dépôts
+
+Les `Code_mag` de la production mélangent entrepôts et camions.
+`/api/mouvements-depot?vue=emplacements` sépare désormais les **3 vrais dépôts**
+(Dépôt principale, Magasin 1, Magasin Négoce) des **7 camions**.
+
+### 6. Transfert de stock refusé à tort
+
+Deux formes d'une même référence coexistent au catalogue (`planche educatif` et
+`planche educatif ` avec espace final). `creerMouvement` cherchait la forme
+saisie, trouvait 0 et refusait le mouvement alors que le stock existait sous
+l'autre forme. La résolution privilégie maintenant la forme qui porte
+réellement du stock à la source.
+
+Vérifié : transfert dépôt → camion de 2 unités, stock décrémenté puis restitué.
+
+### Contrôle final
+
+| | Production | Nous |
+|---|---|---|
+| CA | 4 889 064,57 | **4 889 064,57** |
+| Dépôt principale | 1 397 755 | **1 397 755** |
+| 5 camions commerciaux | — | **écart 0,00** |
+
+Le stock de production bouge en continu (mesuré : 2 100 → 2 150 → 2 178 → 2 199
+sur le 238TU1019 en quelques minutes). Les écarts constatés entre deux mesures
+sont de l'activité réelle, pas un défaut : contrôlé immédiatement après
+`npm run sync:stock`, l'écart est nul sur tous les emplacements.
+
+### 7. Modules et documents complétés
+
+| Module | Production | Avant | Après |
+|---|---|---|---|
+| Réclamations client | 291 | 0 | **291** |
+| Frais de mission | 61 | 0 | **61** |
+| Charges fixes | 30 | 0 | **30** |
+| Composants nomenclature | 675 | 0 | **648** |
+| Chéquiers | 25 | 2 | **27** |
+| Documents d'achat | 10 613 | 10 476 | **10 619** |
+
+Les 27 composants et 3 nomenclatures écartés portent des références absentes du
+catalogue ; les 6 documents d'achat en plus sont nos doublons `-V` (une même
+référence porte un bon de réception d'achat *et* un bon de livraison de vente).
+
+Scripts ajoutés : `prisma/import-modules-manquants.ts`,
+`prisma/import-achats-complement.ts` — tous deux rejouables.
+
+## Scan intégral pour la mise en production — 24 août 2026
+
+Balayage des **63 écrans de module** × **4 rôles** au navigateur, puis test des
+actions d'écriture (créer / modifier / supprimer / valider / dévalider).
+
+### Bugs bloquants corrigés
+
+**1. Vente depuis le dépôt : le stock ne bougeait pas**
+
+`validerDocument` n'écrivait dans `stock_depots` que si le document nommait un
+véhicule. Une vente saisie au bureau décrémentait le compteur global de
+l'article sans toucher le dépôt — les deux chiffres s'éloignaient à chaque
+document. Le mouvement s'impute désormais au dépôt principal à défaut de
+véhicule, à la validation **comme à la dévalidation** (sans quoi une
+dévalidation n'aurait pas restitué le stock).
+
+Vérifié : 8 231 → 8 228 → 8 231, solde client 0 → 35,70 → 0.
+
+**2. 20 articles invendables alors que le stock existait**
+
+Le contrôle de disponibilité lisait `Article.enStock`. Or ce compteur diverge de
+la somme des emplacements sur **161 articles** — un écart hérité de la
+production, qui ne tient pas les deux ensemble (l'article affiche −5 131 quand
+le dépôt en porte 8 228). Le stock par emplacement est le seul chiffre
+vérifiable : c'est lui qui fait foi désormais.
+
+À noter : la production **ne contrôle pas** le stock à la validation (aucun
+message de ce type dans son code) et laisse le stock devenir négatif. Notre
+contrôle reste plus strict, mais il lit maintenant la bonne source.
+
+**3. Création de tiers en échec**
+
+L'identifiant venait de `Date.now()/1000` : deux créations dans la même seconde
+produisaient le même numéro et la seconde échouait sur la contrainte d'unicité.
+Remplacé par le premier identifiant réellement libre.
+
+**4. Référentiels articles vides**
+
+`fam_art`, `sous_fam_art` et `unite_art` étaient à zéro : les colonnes famille
+et unité affichaient des numéros nus et les filtres de la fiche article
+n'avaient rien à proposer. Importés — **21 familles, 43 sous-familles,
+7 unités**, 0 rattachement orphelin.
+
+**5. « Top tiers » faussé sur le rapport achats**
+
+Les transferts internes (TR, 9 370 documents sans tiers par nature) occupaient
+la première place avec un libellé vide et 30,8 M TND. Le classement ne retient
+plus que les documents désignant réellement un tiers.
+
+### État des 63 écrans
+
+**0 erreur console, 0 appel API en échec.** Les 9 écrans sans tableau sont des
+synthèses (rapport achats, balance de trésorerie, CBN…) ou des modules vides en
+production aussi (`numeros_serie`, `vehicules_operations`, `opportunites`
+n'existent même pas côté production).
+
+Scripts ajoutés : `prisma/import-referentiels-articles.ts`,
+`scripts/scan-ecrans.mjs`, `scripts/scan-roles.mjs`.
+
+### Bugs trouvés au test des boutons
+
+**6. Séquences en retard : toute création échouait sur 7 tables**
+
+Les tables importées avec leurs identifiants ont laissé leur séquence à sa
+valeur d'origine : `ligne_mission` en était à 697 pour un maximum de 21 954.
+Conséquence visible : **`/api/tournee` renvoyait 500** et le planning du
+commercial ne se générait plus. Idem pour réclamations, charges fixes, frais de
+mission, chéquiers, nomenclature et positions GPS.
+
+Corrigé par `db/05-sequences.sql`, à rejouer après tout import.
+Vérifié : tournée régénérée, 12 clients, nouvelles lignes en 21956+.
+
+**7. Défauts de rendu React (4 erreurs de lint qui n'étaient pas cosmétiques)**
+
+- `BISAssistant` : message d'accueil posé par un effet (rendu supplémentaire à
+  chaque montage) et `Math.random()` appelé pendant le rendu ;
+- `admin/dashboard` : thème lu depuis `localStorage` dans un effet — d'où un
+  flash du thème par défaut à chaque chargement ;
+- `admin/synthese` : `setLoading(true)` synchrone dans l'effet.
+
+C'est le motif qui produisait les rechargements en cascade signalés plus tôt.
+Lint : **22 → 16** erreurs, les 16 restantes étant des `any` et des apostrophes
+sans effet fonctionnel.
+
+### Actions vérifiées de bout en bout
+
+Créer / modifier / supprimer testés sur : tiers, article, véhicule, compte
+bancaire, référentiel dépôt, réclamation, charge fixe — **7 modules, 200 sur
+toutes les opérations**, données de test supprimées après contrôle.
+
+Cycle document complet : création → lignes → validation → dévalidation, avec
+vérification du stock (8 231 → 8 228 → 8 231) et du solde client (0 → 35,70 → 0).
+
+### Contrôle final
+
+| | Production | Nous |
+|---|---|---|
+| CA | 4 889 064,57 | **4 889 064,57** |
+| Stock, 9 emplacements | — | **écart 0,00** |
+| Réclamations / charges / frais | 291 / 30 / 61 | **291 / 30 / 61** |
+| Familles / sous-familles / unités | 21 / 43 / 7 | **21 / 43 / 7** |
+
+### Boutons : impression et export
+
+**8. Le bouton « Imprimer » sortait toute l'interface**
+
+`window.print()` était appelé sans gabarit : le menu latéral, la barre de
+filtres et les boutons d'action partaient sur le papier avec le tableau. Deux
+gabarits existaient déjà (traite A4 paysage, ticket rouleau 80 mm) mais aucun
+pour les écrans de module.
+
+Ajouté : `@media print` masque le chrome de l'application (`aside`, `nav`,
+`[data-impression="masquer"]`) et n'imprime que `[data-impression="contenu"]`,
+avec en-têtes de tableau répétés et lignes non coupées entre deux pages.
+
+Vérifié en mode impression : menu 0, boutons 0, contenu visible, 50 lignes.
+
+**9. L'export Excel ne sortait que la page affichée**
+
+`exportExcel` ne lisait que `rows`, soit 50 lignes sur 4 568 clients. Il
+parcourt maintenant toutes les pages avec les filtres courants, le bouton
+affichant « Export… » pendant le parcours.
+
+Vérifié : 50 lignes à l'écran → **4 518 lignes exportées**, BOM UTF-8 conservé
+pour Excel.
+
+### Actions de liste vérifiées
+
+Recherche, tri, pagination et filtre de période testés sur clients, documents et
+articles — tous corrects (`search=market` → 162, `dateDu`/`dateAu` sur 2026 →
+5 059 documents, chiffres confirmés en base).
+
+## Remise du catalogue commercial — 24 août 2026
+
+### Le bug : Net à payer au prix catalogue
+
+Panier avec 10 % de remise : les lignes valaient 35,100 et 19,800, mais l'écran
+affichait **61,000 TND** — le total au tarif plein (39,000 + 22,000).
+
+La remise était pourtant bien enregistrée (`remise = 10` en base) et l'API
+renvoyait déjà 54,900. Le défaut était côté affichage, en trois points :
+
+1. **Au rechargement**, le panier reconstruit depuis le serveur ne reprenait
+   **ni `remise` ni `tauxFodec`** — le calcul repartait du prix catalogue ;
+2. **`addToCart`** n'attachait pas la remise saisie à la ligne locale ;
+3. **Le total par ligne** côté serveur ignorait remise et FODEC.
+
+### La remise était invisible sur les lignes
+
+Le récapitulatif affichait `32,449 × 1` — le **PU HT catalogue** — alors que la
+production affiche `net × qteCmd`, le net étant le prix TTC remisé (`pu_ttc`).
+Les lignes ne totalisaient donc pas le « Net à payer ».
+
+Formule reprise du bundle de production
+(`bisSecure/server/bis-dist/build/static/js/main.90cdc4d9.js`) :
+
+```
+remise = 100 − 100 × saisie / t1_ttc        (saisie du net → %)
+pu_ttc = ht_value − ht_value × remise / 100 (saisie du % → net)
+ligne  = net × qteCmd
+tot_remise = Σ MT_Remise
+```
+
+### Ce que les deux écrans affichent maintenant
+
+| | Avant | Après |
+|---|---|---|
+| Ligne FARTOUNA | 32,449 × 1 → 32,449 | ~~39,000~~ **35,100** × 1 · −10 % |
+| Ligne foot-ball | 18,487 × 1 → 18,487 | ~~22,000~~ **19,800** × 1 · −10 % |
+| Remise | absente | **− 6,100 TND** |
+| Net à payer | 61,000 | **54,900** |
+
+Le panneau du catalogue montre le prix plein barré, le net, le badge `−10 %` et
+le montant de remise par ligne. L'écran `/commercial/panier` a une colonne
+**Remise** dédiée et la ligne « Remise » en pied, comme `tot_remise` en production.
+
+### Parcours ticket vérifié de bout en bout
+
+Ticket **TIC260001** émis à 54,899 TTC avec 40 TND en espèces :
+stock camion 14 → 13 et 15 → 14, compte client débité de 14,899, document
+« Validé » portant mode **Espèce**, réglé **40**, reste **14,899**. Le ticket
+imprimé reprend les lignes remisées (19,799 et 35,100), la remise 5,094 et le
+FODEC 0,292. Données de test supprimées, stock resynchronisé.
+
+## Libellés de véhicule trompeurs — 24 août 2026
+
+L'écran du commercial affichait « Stock du véhicule **AZIZ 248TU6787** » pour
+Mokhtar Trabelsi, ce qui laissait croire à une mauvaise affectation.
+
+### Ce que disent les sources de production
+
+| Source | Réponse |
+|---|---|
+| Compte utilisateur (`Code_mag`) | MOKHTAR → 13 → **248TU6787** |
+| App mobile (`y.user.Code_mag`) | le dépôt vient du compte |
+| Ordres de mission | 5 dernières tournées de Mokhtar (6→21 août) : **248TU6787**, dont celle « En cours » |
+
+**L'affectation était donc correcte.** Mokhtar a changé de véhicule début août :
+206TU7140 auparavant (61 ordres), 248TU6787 désormais.
+
+### Le vrai défaut : deux libellés inversés
+
+Les libellés d'emplacement de la production portent d'anciens noms de conducteur,
+et deux sont exactement croisés :
+
+| Libellé | Conducteur réel |
+|---|---|
+| « AZIZ 248TU6787 » | **Mokhtar Trabelsi** |
+| « mokhtar 206TU7140 » | **Aziz Chelly** |
+
+Ces libellés viennent de la production et servent de clé aux lignes de stock :
+les renommer en base couperait le lien avec la synchronisation. `/api/catalogue`
+expose donc désormais la **plaque** (`plaque: "248TU6787"`) à côté du libellé, et
+l'écran affiche la plaque seule — donnée non ambiguë.
+
+Vérifié : le stock du camion est exact, **7 articles aux quantités identiques à
+la production** (80, 15, 14, 8, 6, 6, 4).
+
+### Affectations actuelles, confirmées par les ordres de mission en cours
+
+| Commercial | Véhicule |
+|---|---|
+| mokhtar trabelsi | 248TU6787 |
+| aziz chelly | 206TU7140 |
+| SIHEM HARABI | 243TU7638 |
+| heni rekik | 238TU1019 |
+| Foued Fakhfekh | 243TU3251 |
+| HENI LAJMI | 252TU6847 |
+
+## Boîtes de dialogue — SweetAlert2
+
+Les `confirm()` et `alert()` du navigateur affichaient « **localhost:3000 says** »,
+ignoraient le thème et n'offraient que « OK / Cancel ».
+
+**31 appels natifs remplacés dans 19 fichiers** par `src/lib/alertes.ts`, qui
+expose quatre fonctions : `confirmer`, `erreur`, `succes`, `info`.
+
+Ce que cela change concrètement :
+
+| | Avant | Après |
+|---|---|---|
+| En-tête | « localhost:3000 says » | **« Vider le panier »** |
+| Message | « Vider le panier (3 article(s)) ? » | « 3 article(s) seront retirés du panier. » |
+| Boutons | OK / Cancel | **« Vider le panier » / « Annuler »** |
+| Apparence | dialogue système | couleurs du thème, coins arrondis |
+
+Le bouton nomme l'action plutôt que « OK » : à sa lecture, on sait ce qui va se
+passer. Les actions destructrices passent `danger: true` (icône d'avertissement,
+bouton rouge, focus par défaut sur « Annuler »).
+
+Détails techniques : la palette est lue depuis les variables CSS
+(`--bg-card`, `--text-primary`) à chaque ouverture, donc le dialogue suit le
+thème clair/sombre ; `.swal2-container` est en `z-index: 9999` pour passer
+au-dessus des panneaux latéraux de l'application.
+
+Vérifié au navigateur : popup affichée, **aucun dialogue natif déclenché**,
+63 écrans de module et 34 pages des 4 rôles sans erreur console.
+
+## Objectifs par vendeur — rapprochement et saisie
+
+### Le bug : 7 vendeurs sur 8 à 0 %
+
+La modale « Objectif du mois » affichait 113,5 % au global mais un objectif de
+**0 TND pour presque tous les vendeurs**, alors que 56 objectifs existent en base.
+
+Cause : les objectifs sont saisis sous une forme abrégée que les documents
+n'emploient pas.
+
+| Objectif | Document |
+|---|---|
+| `FOUED` | `Foued Fakhfekh` |
+| `sihem` | `SIHEM HARABI` |
+| `MOKHTAR` | `mokhtar trabelsi` |
+| `HENI LAJMI` | `HENI LAJMI` ← seul identique |
+
+Le rapprochement se faisait sur le nom brut (`objectifs.find(x => x.vendeur === vendeur)`),
+d'où le seul 94,1 % affiché — celui de HENI LAJMI, identique par hasard.
+
+### La correction, et le piège des homonymes
+
+Regrouper par prénom ne suffit pas : **`heni rekik` et `HENI LAJMI` sont deux
+personnes**, qui coexistent le même mois avec des objectifs distincts
+(20 427 et 12 225). Un premier essai les avait fusionnés sur une seule ligne.
+
+`src/lib/objectifs-vendeurs.ts` retient donc le nom complet dès qu'il y en a un,
+et ne rattache un prénom isolé que si le rapprochement est sans ambiguïté — un
+prénom ambigu revient au vendeur qui n'a pas déjà son propre objectif.
+
+Les deux API concernées (`/api/objectifs` et `/api/insights`) partagent ce module.
+
+| Vendeur | Avant | Après |
+|---|---|---|
+| Foued Fakhfekh | 0 % | **110,1 %** |
+| mokhtar trabelsi | 0 % | **108,8 %** |
+| SIHEM HARABI | 0 % | **120,5 %** |
+| heni rekik | 0 % | **115,4 %** |
+| aziz chelly | 0 % | **114,9 %** |
+| HENI LAJMI | 94,1 % | 94,1 % |
+| HICHEM KRIAA | 0 % | **90,9 %** |
+
+### Saisie des objectifs par l'administrateur
+
+Chaque ligne de la modale porte maintenant un champ **Objectif TND** et un bouton
+**Fixer**, qui appelle le `PUT /api/objectifs` existant (réservé ADMIN/MANAGER).
+Un vendeur sans objectif est signalé « objectif non fixé ».
+
+Vérifié : IYED KACEM passe de `0 TND · 0 %` à `6 000 TND · 82,7 %`, taux
+recalculé et affiché immédiatement.
+
+### Carte « Objectifs par vendeur » sur `/admin/synthese`
+
+La saisie demandée se trouve désormais sur l'écran de pilotage lui-même, et non
+dans une modale du tableau de bord.
+
+La carte porte :
+
+- un **sélecteur mois / année** — l'écran s'ouvre sur le mois courant, ce qui est
+  le moment où l'on fixe les objectifs ;
+- quatre indicateurs de période : réalisé, objectif, atteinte, nombre de vendeurs
+  sans objectif ;
+- une ligne par vendeur avec sa barre de progression, son écart en TND, un champ
+  **Objectif TND** et un bouton **Fixer** ;
+- la mention « objectif non fixé » en orange pour ceux qui n'en ont pas.
+
+L'enregistrement appelle le `PUT /api/objectifs` existant (ADMIN/MANAGER), puis
+recharge la carte : le taux se recalcule immédiatement, et une confirmation
+SweetAlert2 s'affiche.
+
+Vérifié : août 2026 ouvre sur 6 vendeurs sans objectif ; le passage à juin 2026
+affiche les objectifs existants avec leurs taux (110 %, 109 %, 121 %, 115 %,
+115 %, 94 %) et les écarts ; la saisie de 7 000 TND pour IYED KACEM est bien
+enregistrée en base.
+
+`MOIS_LONGS` était dupliqué dans le tableau de bord : la constante vit maintenant
+dans `src/lib/vente-stats.ts`, aux côtés de `MOIS_COURTS`.
+
+### Objectif global et vue annuelle
+
+**Objectif global réparti** — `POST /api/objectifs { total, mois, annee, mode }`.
+L'administrateur saisit un montant unique, réparti entre les vendeurs selon deux
+clés au choix :
+
+| Mode | Règle | Quand l'employer |
+|---|---|---|
+| **Au prorata du réalisé** (défaut) | part proportionnelle au chiffre de la période | cas usuel : on demande davantage à qui vend davantage, et personne ne reçoit un objectif hors de portée de sa tournée |
+| **À parts égales** | même montant pour tous | début d'exercice, ou secteurs redécoupés — l'historique ne dit plus rien |
+
+Les objectifs de production étant saisis à la main sans règle mécanique, aucune
+clé ne s'imposait : les deux sont donc offertes, avec l'effet expliqué sous le
+champ.
+
+Le reliquat d'arrondi va au plus gros contributeur, pour que la somme des parts
+tombe exactement sur le total demandé (vérifié : 300 000 TND répartis en
+101 710 + 88 825 + 39 045 + 34 742 + 24 137 + 11 541 = 300 000).
+
+**Vue annuelle** — `mois = 0` cumule les douze mois. Le stockage reste mensuel :
+un objectif annuel de 120 000 TND est ventilé en 12 × 10 000, et la vue annuelle
+le recompose. Vérifié dans les deux sens (120 000 en annuel, 10 000 en mars).
+
+Vérifié à l'écran : saisie de 300 000 TND sur août 2026 → objectif 300 000,
+atteinte 73 %, plus aucun vendeur sans objectif.
+
+## Catalogue commercial — second stock manquant
+
+L'application de production affiche **deux pastilles** par carte article ; la
+nôtre n'en montrait qu'une.
+
+| Pastille | Champ de production | Sens |
+|---|---|---|
+| icône camion | `stock_depot` | ce que le commercial a à bord |
+| icône magasin | `en_stock_prinsipal` | stock global de l'article, tous emplacements |
+
+Le second est `article.en_stock` — le compteur global, pas le stock du dépôt
+principal. C'est ce qui explique les valeurs négatives visibles sur l'écran
+d'origine (−383, −339) : le compteur global diverge de la somme des
+emplacements sur 161 articles, un écart hérité de la production.
+
+`/api/catalogue` exposait déjà `stockGlobal` avec la bonne valeur ; seul
+l'affichage l'ignorait. Ajouté avec les seuils de couleur de la production —
+vert ≥ 5, orange 1 à 4, rouge en dessous.
+
+Vérifié, les 7 articles du camion de Mokhtar :
+
+| Article | À bord | Dépôt | Production |
+|---|---|---|---|
+| FARTOUNA 12PCS 26 | 14 | 87 | 14 / 87 |
+| foot-ball | 15 | −383 | 15 / −383 |
+| KIDS ZONE | 8 | −339 | 8 / −339 |
+| mini box 9pcs | 4 | 62 | 4 / 62 |
+| papier cadeaux | 80 | 200 | 80 / 200 |
+| Surprise DouDou | 6 | 383,5 | 6 / 383.5 |
+| surprise rolly poly | 6 | 2 792 | 6 / 2792 |
+
+## Vérification du stock de tous les commerciaux
+
+Comparaison exhaustive avec la production, **ligne à ligne** sur les 9 emplacements
+(et non plus seulement sur les totaux).
+
+### Le stock lui-même était juste
+
+| Commercial | Emplacement | Références | Résultat |
+|---|---|---|---|
+| Mokhtar Trabelsi | AZIZ 248TU6787 | 16 | identique |
+| Aziz Chelly | mokhtar 206TU7140 | 58 | identique |
+| Sihem Harabi | 243TU7638 | 13 | identique |
+| Heni Rekik | 238TU1019 | 54 | identique |
+| Foued Fakhfekh | FOUED 243TU3251 | 64 | identique |
+
+**0 quantité divergente, 0 ligne en trop.** Les 494 lignes présentes en
+production et absentes chez nous n'ont **aucune fiche article** dans sa propre
+base : son écran, qui joint l'article, ne les affiche pas non plus. Vérifié —
+même nombre de lignes et mêmes totaux au centime sur les 9 emplacements.
+
+Le catalogue de chaque commercial correspond aussi à
+`get-articles-by-depot-positive` de la production : **7, 56, 9, 53, 64** articles.
+
+### Deux troncatures corrigées
+
+**`etatParEmplacement` — `take: 500`.** Le tri étant alphabétique, la coupe
+tombait en plein milieu : « mokhtar 206TU7140 » et « Magasin Négoce »
+disparaissaient de l'écran admin, et FOUED n'affichait que 46 de ses
+64 références. Porté à 5 000 (590 lignes réelles).
+
+Après correction, les 9 emplacements correspondent à la production :
+1 397 109 · 2 699 · 2 816 · 6 202 · −184 · −895 · 614 · −5 · −149.
+
+**Suggestions de réapprovisionnement — `take: 200`.** Sur 556 articles
+vendables, la liste s'arrêtait à la lettre « C » : le commercial ne pouvait
+demander que le début du catalogue. Porté à 1 000 — **556 articles proposés**.
+
+## Notifications cloisonnées par rôle
+
+Un commercial recevait **les mêmes 19 alertes que l'administrateur** : « 5 006
+documents de vente en attente de validation », les visites techniques de tous
+les véhicules, les créances de tout le fichier client. Des alertes sur
+lesquelles il ne peut rien agir, qui noient les siennes.
+
+Les deux sources (`/api/notifications` et `/api/alertes`) construisaient leurs
+requêtes sans jamais regarder le rôle.
+
+### Périmètre appliqué
+
+| Alerte | ADMIN / MANAGER | COMMERCIAL | CLIENT |
+|---|---|---|---|
+| Rupture de stock | catalogue entier | **son camion** | — |
+| Documents à valider | oui | — | — |
+| Échéances véhicule | tout le parc | **son véhicule** | — |
+| Impayés | tous | **ses clients** | **ses documents** |
+| Créances élevées | tous | **ses clients** | — |
+
+Le message s'adapte au périmètre : « Rupture dans votre camion — 9 référence(s)
+épuisée(s) dans AZIZ 248TU6787 » plutôt que « 290 article(s) à zéro en stock ».
+
+### Vérifié
+
+| Rôle | Avant | Après |
+|---|---|---|
+| admin | 19 | 19 |
+| manager | 19 | 19 |
+| **mokhtar** | **19** | **6** |
+| **client** | **19** | **3** |
+
+Contrôles croisés : les impayés de Mokhtar portent bien `commercial = MOKHTAR`
+(TIC240095, TIC240096), ceux du client son `codeCli = 41101016`. Foued voit des
+documents différents (TIC240002/6/7) et **aucune** alerte de créance élevée — il
+n'a effectivement aucun client au-dessus de 5 000 TND, seuls Mokhtar (6) et Aziz
+(1) en ont.
+
+Le cloisonnement s'appuie sur `filtrePortefeuille`, déjà employé ailleurs : il
+suit automatiquement les affectations, sans liste à tenir à jour.
+
+## Scan comparatif des deux plateformes
+
+148 routes de production relevées et confrontées à notre projet.
+
+### Ce qui manquait — ajouté
+
+**1. Colonnes de recouvrement sur la liste clients** (droits `liste-clients`)
+
+`encours`, `impayé` et `risque` étaient absents. Formules de `clients.service.js` :
+`encours` = règlements « En cours » (remis, pas encore encaissés),
+`impayé` = règlements « impayé » ou « Préavis ».
+
+Vérifié : *aziza de commerce de detail* → encours **338 727 TND**, risque « Moyen ».
+103 clients ont un encours.
+
+**2. Cinq référentiels vides**
+
+| Référentiel | Production | Avant | Après |
+|---|---|---|---|
+| type-reclamation | 7 | 0 | **7** |
+| modele-impression | 14 | 0 | **14** |
+| formule (GPAO) | 7 | 0 | **7** |
+| emplacements trésorerie | 6 | 2 | **8** |
+
+**3. Identité fiscale de la société**
+
+La production la stocke dans l'en-tête HTML de facture (`societe.entete_page`),
+logo en base64 compris. En sont extraits l'adresse et surtout le **matricule
+fiscal `1584153T/A/M/000`** — mention obligatoire sur une facture tunisienne,
+que notre ticket savait afficher mais dont la valeur manquait.
+
+**4. Trois écrans refusés au commercial**
+
+`etatImpayerParClient`, `parcRoulant` et `tresorerie` figurent dans son
+application mobile ; chez nous ils renvoyaient **403**. Ouverts en lecture,
+cloisonnés au portefeuille — l'écriture reste à l'administration.
+
+| | admin | mokhtar | foued | sihem |
+|---|---|---|---|---|
+| Créances | 16 629 doc. | **1 661** | **3 627** | **1 724** |
+
+### Vérifié présent, par test réel
+
+- **6 axes de rapport de vente** (article, commercial, client, gouvernorat, famille, statistiques)
+- **liste-documents-vente** : recherche par période, type, client, commercial ; lignes ; transformation
+- **create-devis/AVC** : 8 champs d'en-tête modifiables, et par ligne prix HT, remise, TVA, FODEC
+- **save-regulation-state** : `En cours` → `Encaissé` → restauré
+- **get-article-historique**, **document-lines** (équivalent de `document-data-for-print`)
+
+Vides en production aussi, donc fidèles : charges véhicule (0), numéros de série
+(module absent), séries de vente.
+
+Un premier `grep` avait signalé « Ajouter », « Supprimer », « Imprimer » comme
+absents : c'était le grep qui ciblait mal, les tests API les montrent tous
+opérationnels.
+
+## Test fonctionnel des modules — cycles complets vérifiés en base
+
+Chaque module testé par son cycle réel, avec contrôle du stock et des soldes
+avant/après, puis retour à l'état initial.
+
+| Module | Cycle testé | Résultat |
+|---|---|---|
+| **Vente** | création → lignes → validation | stock 80 → 75, client débité 64,26 (FODEC inclus) |
+| **Vente** | dévalidation | stock 80, solde 0 — symétrie exacte |
+| **Vente** | transformation BL → FAC | `FAO260001` créée, lien source/cible posé, montant conservé |
+| **Achat** | réception BRE | stock 2 → 12, fournisseur crédité |
+| **Trésorerie** | règlement client 100 TND | solde 58 821,73 → 58 721,73 |
+| **Trésorerie** | suppression du règlement | solde restauré à 58 821,73 |
+| **Inventaire** | création → validation | créé en « Brouillon », écart 13,089 TND, stock régularisé 55 → 58 |
+| **Gestion tourner** | bon de sortie BST | dépôt 55 → 50, camion 20 → 25 |
+| **Gestion tourner** | bon de retour BRT | retour exact à 55 / 20 |
+
+**Contrôles métier confirmés** : la transformation BL → FC est refusée (« cibles
+possibles : FAC »), et la validation d'inventaire alerte si le stock a bougé
+depuis la saisie.
+
+### Lecture vérifiée sur tous les modules
+
+CRM (291 réclamations), GRH (7 employés, pointage, contrats), Comptabilité
+(**équilibrée : débit = crédit = 26 515,03**), GPAO (55 nomenclatures), Projets,
+Charges fixes (30), Objectifs.
+
+Les 9 écrans du commercial et ceux des rôles manager et client répondent tous.
+Le client est bien refusé sur `/api/creances` (il a son espace dédié).
+
+Vides en production aussi, donc fidèles : GMAO (0 machine), enregistrements
+vocaux (0).
+
+### Deux fausses alertes de ma part
+
+- **« Inventaire validé — non modifiable »** : j'utilisais `stPhysique` au lieu
+  de `qteComptee` et un `PUT` au lieu de `POST vue=valider`. Avec les bons noms,
+  le cycle fonctionne parfaitement.
+- **Journal de caisse vide** : j'interrogeais `/api/enregistrements` (vocaux)
+  au lieu de `/api/missions?vue=jour`. Le journal remonte bien la mission du
+  jour, les frais et la réconciliation.
+
+### Une erreur de nettoyage, corrigée
+
+Mon `DELETE ... LIKE 'BST2600%'` a emporté **4 bons de sortie antérieurs** à mes
+tests (créés le 31/07 par le compte « ZZC-vendeur »). Restaurés depuis la
+sauvegarde ; les 102 tables ont retrouvé leur volumétrie exacte.
+
+### Trois validations trop strictes — corrigées
+
+Un même défaut à trois endroits : une liste de valeurs figée dans le code, qui
+refusait des valeurs pourtant portées par les données de production.
+
+**1. Types de réclamation inventés**
+
+La route validait contre « Produit endommagé », « Erreur de quantité »… — des
+libellés sans rapport avec la production, dont les types décrivent des motifs de
+non-vente : « Pas intéresser », « achete chez concurent », « Sur stockage ».
+Saisir un type du référentiel était refusé (`Type inconnu : Sur stockage`).
+
+Les types viennent désormais du référentiel `type-reclamation`, avec repli sur
+la liste d'origine s'il est vide. Vérifié : les 7 types de production sont
+proposés et acceptés.
+
+**2. État de projet « encours »**
+
+Le seul projet de production porte `encours` ; la validation attendait
+« En cours » et refusait la création. La comparaison ignore maintenant espaces,
+casse et accents : `encours` → **« En cours »**.
+
+**3. État de tournée « Cloturé » — 2 610 missions concernées**
+
+`estCloturee()` reconnaissait déjà les deux orthographes, mais la validation du
+`PUT` comparait la chaîne exacte : **modifier une tournée en lui laissant son
+propre état était refusé** (`État invalide : Cloturé`).
+
+Vérifié : le PUT accepte « Cloturé » et le normalise en « Clôturée ».
+
+### Modules restants vérifiés
+
+Transferts, traites, bordereaux, chéquiers, mouvements de compte, droits
+d'accès, utilisateurs, séries, insights — tous en 200.
+
+Charges fixes : cycle création/suppression complet, base restaurée à 30.
+
+Vides en production aussi : traites (module absent), séries, opportunités CRM,
+contrats et congés GRH.
+
+### Rapports de vente : fuite de données entre commerciaux
+
+`/api/rapports-vente` acceptait le rôle COMMERCIAL sans appliquer de périmètre :
+**Mokhtar voyait le chiffre d'affaires de ses 19 collègues**, tous axes confondus.
+
+Corrigé sur les trois requêtes de la route (documents, créances, clients).
+
+| Axe | admin | mokhtar | foued |
+|---|---|---|---|
+| commercial | 19 lignes | **1** | **1** |
+| article | 206 | **40** | — |
+| client | 1 915 | **164** | — |
+| gouvernorat | 30 | **14** | — |
+| famille | 13 | **9** | — |
+| créances | 16 629 doc. / 12 214 473 TND | **1 661 / 1 075 119** | **3 627 / 3 019 020** |
+
+### Parcours commercial complet, vérifié de bout en bout
+
+Panier (remise 10 %) → ticket → encaissement partiel :
+
+| Étape | Résultat |
+|---|---|
+| Totaux panier | HT 43,24 · remise 4,804 · TVA 8,73 · TTC 51,97 |
+| Ticket émis | TIC260001, validé |
+| Stock camion | 8 → **6** |
+| Encaissement | 40 TND espèces, reste **11,97** |
+| Solde client | **11,97** au débit |
+| Ticket imprimé | société + **MF 1584153T/A/M/000**, ligne remisée, tous les totaux |
+
+Contrôle arithmétique : 43,24 + 8,298 + 0,432 = **51,970**, écart **0,0000**.
+
+Planning et tournée : régénération depuis une position GPS, 12 clients, départ
+correctement pris en compte (Tunis → clients de Tunis).
+
+Base entièrement restaurée après chaque test : 28 641 documents, 14 539
+règlements, 19 530 lignes de mission, 2 632 missions, 0 mouvement résiduel.
+
+### Deux failles de cloisonnement entre commerciaux
+
+Après le correctif des rapports de vente, un balayage des routes ouvertes au
+rôle COMMERCIAL en a révélé deux autres.
+
+**1. Lecture du détail d'un document étranger** (`/api/erp/document-lines`)
+
+En devinant une référence, un commercial lisait le document d'un collègue :
+client, lignes et montant. Vérifié — Mokhtar accédait à `CMI242806` de Foued,
+5 lignes, **3 078,72 TND**.
+
+**2. Transformation d'un document étranger** (`/api/erp/document-transform`)
+
+Plus grave : ce n'était pas qu'une lecture. Mokhtar a pu **transformer en bon de
+livraison** un document de Foued — une écriture sur un portefeuille qui n'est pas
+le sien. Le document créé a été supprimé et le lien `transformeEn` rétabli.
+
+Les deux routes contrôlent maintenant `memeCommercial(document.commercial, user)`.
+
+| Test | Avant | Après |
+|---|---|---|
+| Mokhtar lit le document de Foued | 200 + détail complet | **403** |
+| Mokhtar transforme celui de Foued | 200, document créé | **403** |
+| Mokhtar sur ses propres documents | 200 | **200** |
+| Admin sur n'importe quel document | 200 | **200** |
+
+Les quatre autres routes ouvertes au commercial sans périmètre sont légitimes :
+`etat-stock`, `sync-stock` et `vehicules` portent des données communes, `series`
+refuse déjà l'accès (403).
+
+### Contrôle des permissions par rôle
+
+Balayage des écritures sensibles pour chaque rôle.
+
+| Action | ADMIN | MANAGER | COMMERCIAL | CLIENT |
+|---|---|---|---|---|
+| Supprimer un utilisateur | oui | **403** | **403** | **403** |
+| Modifier les droits | oui | **403** | **403** | **403** |
+| Créer un article | oui | oui | **403** | **403** |
+| Supprimer un tiers | oui | oui | **403** | **403** |
+| Valider un document | oui | oui | **403** | **403** |
+| Lire un document quelconque | oui | oui | **son portefeuille** | **403** |
+
+Le rôle CLIENT est verrouillé sur toutes les routes ERP (403) et son espace
+dédié ne renvoie que ses propres documents — 30 documents, **0 fuite**.
+
+### État final de la base après tous les tests
+
+Les 102 tables ont retrouvé leur volumétrie, aux trois exceptions attendues :
+
+- `gps_positions` — le suivi GPS écrit en continu ;
+- `erp_missions` / `ligne_mission` — la tournée créée par mes premiers tests a
+  été supprimée, la base est donc plus propre que la sauvegarde intermédiaire ;
+- `ref_tables` — horodatage de la dernière synchronisation de stock.
+
+| Table | Lignes |
+|---|---|
+| documents_ext | 28 641 |
+| document_lines_ext | 187 070 |
+| partners / articles_ext | 4 568 / 592 |
+| erp_reglements | 14 539 |
+| erp_missions / ligne_mission | 2 632 / 19 530 |
+| inventaires / réclamations | 598 / 291 |
+| stock_movements_ext | **0** |
+
+## Resynchronisation complète sur la production — 25 août 2026
+
+Connexion aux trois accès (Admin PC, Mokhtar mobile, Admin mobile) et
+comparaison exhaustive.
+
+### Observation sur la production
+
+**Elle ne cloisonne rien** : le compte Mokhtar accède exactement aux mêmes
+données que l'Admin — 13 897 règlements, 4 529 clients, tous les documents.
+Notre projet est donc plus strict que l'original sur ce point.
+
+### Écarts comblés
+
+| Donnée | Production | Avant | Après |
+|---|---|---|---|
+| Règlements clients | 13 897 | 13 827 | **13 897** |
+| Règlements fournisseurs | 718 | 712 | **718** |
+| Ordres de mission | 2 648 | 2 632 | **2 648** |
+| Clients | 4 529 | 4 518 | **4 530** ¹ |
+| Documents de vente | 18 023 | 18 016 | **18 023** |
+
+¹ 4 529 + le client 41102224, supprimé côté production mais cité par nos documents.
+
+**CA : 4 892 020,37 — identique au centime.**
+
+### Un règlement supprimé en production
+
+`idSource 14464` (429,62 TND, ticket TIC254030) existait chez nous mais plus en
+production, où le ticket porte `total_regle = 0`. Supprimé pour rester fidèle.
+
+### 11 articles fantômes supprimés
+
+La production écrit certaines références **avec un espace final**
+(« planche educatif  », « mah  »). Un import antérieur avait créé une seconde
+fiche sans l'espace : **11 doublons** portant 0 ligne, 0 stock, 0 mouvement.
+
+C'est ce qui brouillait la résolution de référence et faisait échouer un
+transfert de stock. Supprimés après vérification qu'aucun n'était utilisé.
+
+**581 articles** = les 580 de production + `vx 22` (supprimé côté production
+mais cité par nos documents).
+
+### Stock, après resynchronisation
+
+Dépôt principale 1 397 109 · FOUED 6 202 · mokhtar 206TU7140 2 699 ·
+238TU1019 2 816 · AZIZ 248TU6787 −895 · 243TU7638 −184 · Magasin Négoce 614 ·
+HENI 252TU6756 −149 · doblo252TU6847 −5.
+
+### Contrôle d'intégrité après resynchronisation
+
+| Contrôle | Résultat |
+|---|---|
+| Lignes de document orphelines | **0** |
+| Lignes de mission orphelines | **0** |
+| Règlements sans tiers | **0** |
+| Stock sans article | **0** |
+| Lignes citant un doublon supprimé | **0** |
+
+**216 lignes citent un article inexistant** — 32 références qui n'ont pas de
+fiche **en production non plus** (`magic bon`, `f 32`, `support goblet`…) : des
+articles retirés de son catalogue mais encore cités par ses anciens documents.
+Incohérence héritée, reproduite fidèlement.
+
+Vérifié que la suppression des 11 doublons n'a rien cassé : aucune ligne ne les
+cite, aucun stock orphelin.
+
+### Six commandes conservées
+
+`CMI260001` à `CMI260006` (31/07 et 05/08) n'existent pas en production mais
+portent des lignes et des clients réels — **commandes saisies dans
+l'application**, pas des résidus de test. De type COM, elles n'entrent pas dans
+le calcul du CA, qui reste identique à la production.
+
+### Écrans vérifiés après synchronisation
+
+| Écran | Lignes |
+|---|---|
+| clients | 4 530 |
+| articles | 581 |
+| documents de vente | 18 029 (dont 47 doublons `-V` légitimes) |
+| règlements clients | 13 897 |
+| missions | 2 648 |
+| réclamations | 291 |
+
+Les six écrans du commercial répondent, cloisonnement en place : `stats` ne
+montre que « mokhtar trabelsi », les notifications portent sur son camion.
+
+### Contrôle de cohérence final
+
+| Contrôle | Résultat |
+|---|---|
+| Écritures comptables | débit = crédit = **26 515,03**, équilibré |
+| Tiers au solde incohérent | **0** sur 4 580 |
+| Mouvements de stock résiduels | **0** |
+| Audit 83 routes × 4 rôles | **0 anomalie** |
+
+**9 434 documents au TTC ≠ HT + TVA + timbre + FODEC** — le compte est
+**exactement le même en production** (9 434 sur 18 023). Elle ne renseigne pas
+`totfodec` sur ces documents tout en l'incluant dans le TTC. Reprise fidèle au
+document près.

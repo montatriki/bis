@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   Factory, Plus, Trash2, Search, X, Loader2, Check, AlertTriangle,
   Calculator, CalendarClock, Layers, Wrench, ChevronRight, ChevronDown,
@@ -215,7 +216,7 @@ function Postes({ accent, onFlash }: { accent: string; onFlash: (m: string, ok?:
   };
 
   const supprimer = async (p: Poste) => {
-    if (!confirm(`Supprimer le poste ${p.code} ?`)) return;
+    if (!(await confirmer(`Supprimer le poste ${p.code} ?`, { danger: true }))) return;
     const r = await fetch(`/api/gpao?vue=poste&id=${p.id}`, { method: "DELETE" });
     const d = await r.json();
     if (!r.ok) return onFlash(d.error ?? "Échec", false);
@@ -623,7 +624,7 @@ function Gammes({ accent, onFlash }: { accent: string; onFlash: (m: string, ok?:
   };
 
   const supprimer = async (g: GammeRow) => {
-    if (!confirm(`Supprimer la gamme ${g.gamme} et ses opérations ?`)) return;
+    if (!(await confirmer(`Supprimer la gamme ${g.gamme} et ses opérations ?`, { danger: true }))) return;
     const r = await fetch(`/api/gpao?vue=gamme&id=${g.id}`, { method: "DELETE" });
     const d = await r.json();
     if (!r.ok) return onFlash(d.error ?? "Échec", false);

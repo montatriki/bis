@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ShoppingCart, Trash2, Loader2, Check, AlertTriangle, Search, Send, Plus, Minus } from "lucide-react";
+import { confirmer } from "@/lib/alertes";
 
 // Panier de commande — tuile « PANIER DE COMMANDE » de l'app commerciale.
 // Le panier est persistant : il survit au changement d'écran et alimente le
@@ -10,6 +11,8 @@ import { ShoppingCart, Trash2, Loader2, Check, AlertTriangle, Search, Send, Plus
 type Ligne = {
   id: number; refArt: string; designation: string | null; unite: string | null;
   qte: number; puHt: number; tauxTva: number; totalHT: number; totalTTC: number;
+  /** Remise de ligne en %, et FODEC : nécessaires pour afficher le prix net. */
+  remise?: number; tauxFodec?: number;
 };
 type ClientRef = { id: number; raisonSocial: string | null; ville: string | null; soldeFin: number };
 
@@ -19,7 +22,7 @@ const fmt = (v: unknown) =>
 export default function PanierPage() {
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [client, setClient] = useState<{ codeCli: number | null; clientNom: string | null }>({ codeCli: null, clientNom: null });
-  const [tot, setTot] = useState({ totalHT: 0, totalTVA: 0, totalTTC: 0 });
+  const [tot, setTot] = useState({ totalHT: 0, totalTVA: 0, totalTTC: 0, totalRemise: 0 });
   const [load, setLoad] = useState(true);
   const [busy, setBusy] = useState(false);
   const [clients, setClients] = useState<ClientRef[]>([]);
@@ -37,7 +40,10 @@ export default function PanierPage() {
       .then((d) => {
         setLignes(d.lignes ?? []);
         setClient({ codeCli: d.panier?.codeCli ?? null, clientNom: d.panier?.clientNom ?? null });
-        setTot({ totalHT: d.totalHT ?? 0, totalTVA: d.totalTVA ?? 0, totalTTC: d.totalTTC ?? 0 });
+        setTot({
+          totalHT: d.totalHT ?? 0, totalTVA: d.totalTVA ?? 0,
+          totalTTC: d.totalTTC ?? 0, totalRemise: d.totalRemise ?? 0,
+        });
       })
       .catch(() => flash("Chargement impossible", false))
       .finally(() => setLoad(false));
@@ -76,7 +82,10 @@ export default function PanierPage() {
   };
 
   const vider = async () => {
-    if (!confirm("Vider le panier ?")) return;
+    const ok = await confirmer("Le panier sera entièrement vidé.", {
+      titre: "Vider le panier", intitule: "Vider le panier", danger: true,
+    });
+    if (!ok) return;
     const r = await fetch("/api/panier", { method: "DELETE" });
     const d = await r.json();
     flash(d.message ?? "Vidé", r.ok);
@@ -174,6 +183,7 @@ export default function PanierPage() {
                   <tr className="text-[11px] uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3 text-left font-semibold">Article</th>
                     <th className="px-4 py-3 text-right font-semibold">PU HT</th>
+                    <th className="px-4 py-3 text-right font-semibold">Remise</th>
                     <th className="px-4 py-3 text-center font-semibold">Quantité</th>
                     <th className="px-4 py-3 text-right font-semibold">Total TTC</th>
                     <th className="w-12" />
@@ -186,7 +196,25 @@ export default function PanierPage() {
                         <div className="font-medium text-slate-800">{l.designation ?? l.refArt}</div>
                         <div className="text-xs text-slate-400 font-mono">{l.refArt}{l.unite ? ` · ${l.unite}` : ""}</div>
                       </td>
-                      <td className="px-4 py-2.5 text-right">{fmt(l.puHt)}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        {(l.remise ?? 0) > 0 ? (
+                          <div>
+                            <div className="line-through text-slate-400 text-xs">{fmt(l.puHt)}</div>
+                            <div>{fmt(l.puHt * (1 - (l.remise ?? 0) / 100))}</div>
+                          </div>
+                        ) : (
+                          fmt(l.puHt)
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {(l.remise ?? 0) > 0 ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold text-xs">
+                            −{l.remise} %
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-center gap-1.5">
                           <button onClick={() => majQte(l.refArt, l.qte - 1)}
@@ -217,6 +245,12 @@ export default function PanierPage() {
               <div className="flex justify-between text-sm text-slate-600">
                 <span>Total HT</span><span>{fmt(tot.totalHT)} TND</span>
               </div>
+              {/* `tot_remise` de l'ERP d'origine : le cumul des remises accordées. */}
+              {tot.totalRemise > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600">
+                  <span>Remise</span><span>− {fmt(tot.totalRemise)} TND</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm text-slate-600">
                 <span>TVA</span><span>{fmt(tot.totalTVA)} TND</span>
               </div>

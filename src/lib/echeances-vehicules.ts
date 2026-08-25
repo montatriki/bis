@@ -22,7 +22,7 @@ export const PREAVIS = {
 export type Gravite = "expire" | "urgent" | "proche";
 
 export type Echeance = {
-  vehicleId: string;
+  vehicleId: number;
   plaque: string;
   /** `assurance` | `visite` | `vignette` | `operation`. */
   nature: string;
@@ -155,7 +155,7 @@ export function prochaineEcheance(
  * vérification quotidienne de 8 h de l'application d'origine, mais sans
  * dépendre du fait que quelqu'un soit connecté à cet instant précis.
  */
-export async function notifierEcheances(userIds: string[]): Promise<number> {
+export async function notifierEcheances(userIds: number[]): Promise<number> {
   if (userIds.length === 0) return 0;
 
   const echeances = (await echeancesAVenir()).filter((e) => e.gravite !== "proche");

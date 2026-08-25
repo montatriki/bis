@@ -26,7 +26,10 @@ const dateOuNull = (v: unknown) => {
 };
 
 export async function GET(req: NextRequest) {
-  const auth = await requireSession(["ADMIN", "MANAGER"]);
+  // Le commercial consulte le parc (`parcRoulant` de l'application mobile) :
+  // il doit voir les échéances du véhicule qu'il conduit. L'écriture reste
+  // réservée à l'administration.
+  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
   const sp = req.nextUrl.searchParams;
   const vue = sp.get("vue") ?? "echeances";
@@ -43,7 +46,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (vue === "operations") {
-    const vehicleId = s(sp.get("id"));
+    const vehicleId = Number(sp.get("id")) || 0;
     const operations = await prisma.vehiculeOperation.findMany({
       where: vehicleId ? { vehicleId } : undefined,
       orderBy: [{ actif: "desc" }, { prochaineDate: "asc" }],
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (vue === "operations") {
-      const vehicleId = s(body.vehicleId);
+      const vehicleId = Number(body.vehicleId);
       const libelle = s(body.libelle);
       if (!vehicleId) return NextResponse.json({ error: "Véhicule requis" }, { status: 400 });
       if (!libelle) return NextResponse.json({ error: "Libellé de l'opération requis" }, { status: 400 });
@@ -160,7 +163,7 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ error: "Kilométrage invalide" }, { status: 400 });
       }
       const row = await prisma.vehicle.update({
-        where: { id: s(body.id) }, data: { kilometrage: km },
+        where: { id: Number(body.id) }, data: { kilometrage: km },
       });
       return NextResponse.json({ ok: true, row });
     }

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { confirmer } from "@/lib/alertes";
 import {
   Receipt, Plus, Trash2, Loader2, Check, AlertTriangle, Download,
   TrendingDown, Split, RotateCcw,
@@ -139,7 +140,7 @@ function Charges({ accent, onFlash, reload, onDone }: {
   };
 
   const supprimer = async (c: Charge) => {
-    if (!confirm(`Supprimer la charge ${c.libelle ?? c.id} ?`)) return;
+    if (!(await confirmer(`Supprimer la charge ${c.libelle ?? c.id} ?`, { danger: true }))) return;
     const r = await fetch(`/api/charges?id=${c.id}`, { method: "DELETE" });
     const d = await r.json();
     onFlash(d.message ?? d.error, r.ok);
