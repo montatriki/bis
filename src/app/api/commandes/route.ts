@@ -73,6 +73,10 @@ export async function POST(req: NextRequest) {
   // dépôt. On rattache le document à cet emplacement pour que la validation
   // décrémente le bon stock.
   let vehicule: string | null = null;
+  // Tournée du jour : le document doit lui être rattaché, sinon il n'apparaît
+  // ni dans le journal de tournée ni dans la réconciliation de caisse — une
+  // vente encaissée restait invisible au commercial.
+  let dayId: number | null = null;
   if (auth.user.role === "COMMERCIAL") {
     const jour = new Date();
     jour.setHours(0, 0, 0, 0);
@@ -82,9 +86,10 @@ export async function POST(req: NextRequest) {
         dateOrdre: { gte: jour, lt: new Date(jour.getTime() + 86_400_000) },
         etat: { notIn: ["Annulée"] },
       },
-      select: { vehicule: true },
+      select: { id: true, vehicule: true },
       orderBy: { id: "desc" },
     });
+    dayId = mission?.id ?? null;
     vehicule =
       s(body?.vehicule) ||
       (await emplacementVehicule(auth.user.name, mission?.vehicule));
@@ -104,6 +109,7 @@ export async function POST(req: NextRequest) {
         codeCli,
         raisonSocial: s(body?.raisonSocial) || partner?.raisonSocial || null,
         vehicule,
+        dayId,
         adrCli: partner?.adresse ?? null,
         mf: partner?.matriculeF ?? null,
         thtBrut: totals.thtBrut,

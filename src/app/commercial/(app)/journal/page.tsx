@@ -40,6 +40,14 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function JournalPage() {
   const [date, setDate] = useState(iso(new Date()));
+  /** Tournées du commercial, pour la sélection par code mission (OM-2872) :
+   *  c'est le repère du terrain, plus sûr que de retrouver la bonne date. */
+  const [tournees, setTournees] = useState<
+    { id: number; code: string; dateOrdre: string | null; etat: string | null;
+      nbVentes: number; nbReglements: number; nbVisites: number }[]
+  >([]);
+  /** Mission affichée : celle du jour choisi, ou celle sélectionnée par code. */
+  const [missionId, setMissionId] = useState<number | null>(null);
   const [recon, setRecon] = useState<Recon | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [regs, setRegs] = useState<Reg[]>([]);
@@ -55,11 +63,22 @@ export default function JournalPage() {
     setTimeout(() => setToast(null), 6000);
   }, []);
 
-  const charger = useCallback(() => {
-    fetch(`/api/missions?vue=jour&date=${date}`)
+  useEffect(() => {
+    fetch("/api/missions?vue=mes-tournees")
       .then((r) => r.json())
+      .then((d) => setTournees(d.rows ?? []))
+      .catch(() => {});
+  }, []);
+
+  const charger = useCallback(() => {
+    // Une mission choisie par son code prime sur la date : c'est une sélection
+    // explicite du commercial.
+    const source = missionId
+      ? Promise.resolve({ mission: { id: missionId } })
+      : fetch(`/api/missions?vue=jour&date=${date}`).then((r) => r.json());
+    source
       .then(async (d) => {
-        if (!d.mission) { setRecon(null); setDocs([]); setRegs([]); return; }
+        if (!d.mission) { setRecon(null); setDocs([]); setRegs([]); setFrais([]); return; }
         const det = await fetch(`/api/missions?vue=detail&id=${d.mission.id}`).then((x) => x.json());
         setRecon(det.reconciliation ?? null);
         setDocs(det.documents ?? []);
@@ -69,7 +88,7 @@ export default function JournalPage() {
       })
       .catch(() => flash("Chargement impossible", false))
       .finally(() => setLoad(false));
-  }, [date, flash]);
+  }, [date, missionId, flash]);
 
   useEffect(charger, [charger]);
 
@@ -138,8 +157,39 @@ export default function JournalPage() {
               : "Aucune tournée pour cette date"}
           </p>
         </div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Sélection par code mission : le commercial le lit sur ses pièces
+              (OM-2872) et retrouve la tournée sans chercher la bonne date.
+              Le nombre de ventes est affiché pour repérer les tournées actives. */}
+          <select
+            value={missionId ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) { setMissionId(null); return; }
+              const id = Number(v);
+              setMissionId(id);
+              // La date suit la mission choisie, pour rester cohérente à l'écran.
+              const t = tournees.find((x) => x.id === id);
+              if (t?.dateOrdre) setDate(iso(new Date(t.dateOrdre)));
+            }}
+            className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white max-w-[15rem]"
+            title="Choisir une tournée par son code mission">
+            <option value="">Par date…</option>
+            {tournees.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.code} · {t.dateOrdre ? fmtDate(t.dateOrdre) : "—"}
+                {t.nbVentes > 0 ? ` · ${t.nbVentes} vente(s)` : ""}
+              </option>
+            ))}
+          </select>
+          {/* La date est neutralisée tant qu'une mission est choisie : les deux
+              filtres se contrediraient, et le total affiché est celui de la
+              mission. Revenir sur « Par date… » la réactive. */}
+          <input type="date" value={date} disabled={missionId != null}
+            onChange={(e) => { setMissionId(null); setDate(e.target.value); }}
+            title={missionId != null ? "Filtre par mission actif — choisir « Par date… » pour l'utiliser" : undefined}
+            className="px-3 py-2 rounded-xl border border-slate-200 text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
+        </div>
       </div>
 
       {toast && (

@@ -42,6 +42,8 @@ const PENALITE_VISITE_MANQUANTE_M = 15_000;
  * clients à sa porte vaut mieux que douze à une heure de route.
  */
 const RAYON_SUR_PLACE_M = 15_000;
+/** Au-delà, une position ne peut pas servir de départ (point réseau, pas GPS). */
+const PRECISION_DEPART_MAX_M = 300;
 
 /** Nombre de visites planifiées par défaut dans une journée. */
 const TAILLE_DEFAUT = 12;
@@ -254,6 +256,17 @@ export async function POST(req: NextRequest) {
   const lendemain = new Date(jour.getTime() + 86_400_000);
 
   const taille = Math.min(30, Math.max(3, Number(body?.taille) || TAILLE_DEFAUT));
+  // Un point de départ trop imprécis est refusé plutôt que remplacé par le
+  // dépôt : une position réseau (2–3 km) bâtissait une tournée sur Tunis
+  // centre alors que le commercial était à Radès, et le dépôt de Sousse
+  // serait pire encore. Le client renvoie alors le message au commercial.
+  const precisionDepart = Number(body?.depart?.precision);
+  if (Number.isFinite(precisionDepart) && precisionDepart > PRECISION_DEPART_MAX_M) {
+    return NextResponse.json(
+      { error: `Position trop imprécise (±${Math.round(precisionDepart)} m) — attendez le signal GPS` },
+      { status: 400 },
+    );
+  }
   const depart = coordValide(body?.depart?.lat, body?.depart?.lng)
     ? { lat: Number(body.depart.lat), lng: Number(body.depart.lng) }
     : DEPOT_DEFAUT;

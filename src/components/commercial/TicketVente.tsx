@@ -2,16 +2,18 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X, Loader2 } from "lucide-react";
-import { montantEnLettres } from "@/lib/traite-montant";
 
-// Ticket de vente imprimable — reprend la structure du ticket de l'ERP d'origine
-// (`impressions/vente/ticket/ticket.js`) :
-//   en-tête société (raison sociale, adresse, tél, MF, registre de commerce),
-//   références du document, tableau ARTICLE / Qté / PU TTC / MT TTC,
-//   puis Montant HT, Taux TVA, Net à payer et le montant en toutes lettres.
-//
-// L'impression sort sur rouleau 80 mm (imprimante ticket) : c'est le format
-// utilisé en tournée, et non l'A4 des factures.
+// Ticket de vente imprimable — copie conforme du ticket de l'application
+// mobile d'origine (`bis-dist/src/components/dernier-ticket/dernierTicketPopup.js`) :
+//   en-tête société (bloc HTML `entete_page` : le logo),
+//   Commercial / N° ticket / Date, libellé du document centré,
+//   cadre client (Client, Adresse, MF, RC),
+//   tableau ARTICLE 43 % · Qté 9 % · PU TTC 18 % · MT TTC 18 %,
+//   ligne « REM : x % » sous chaque article remisé,
+//   Montant HT, Taux tva, tva, Net à payer, mode(s) de paiement,
+//   cadres de signature « Sig.Commercial » / « Décharge client ».
+// L'impression ouvre une fenêtre dédiée avec la même feuille de style que
+// l'original : @page et body à 302,3 px (rouleau 80 mm).
 
 type Ligne = {
   id: number; refArt: string | null; designation: string | null;
@@ -19,31 +21,36 @@ type Ligne = {
   remise: number; ttcNet: number;
 };
 
+type Reglement = { id: number; montant: number; modePay: string | null };
+
 type Ticket = {
   refDoc: string; typeDoc: string | null; libDoc: string | null;
   dateDoc: string | null; raisonSocial: string | null; codeCli: number | null;
-  adresse: string | null; matriculeF: string | null;
+  adresse: string | null; matriculeF: string | null; registreComClient: string | null;
+  commercial: string | null;
   thtNet: number; totTva: number; ttcNet: number; timbre: number;
   totFodec: number; totalRegle: number; soldeDoc: number;
   modePayement: string | null; utilisateur: string | null; valide: boolean;
 };
 
-const fmt = (v: unknown) =>
-  Number(v ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const fx3 = (v: unknown) => Number(v ?? 0).toFixed(3);
 
-/** Quantités : entier quand c'est rond, sinon 3 décimales comme l'ERP. */
-const fmtQte = (v: unknown) => {
-  const n = Number(v ?? 0);
-  return Number.isInteger(n) ? String(n) : n.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
+/** Date du ticket, au format exact de l'original : `dd-MM-yyyy 'T' hh:mm:ss`. */
+const fmtDate = (v: unknown) => {
+  if (!v) return "";
+  const d = new Date(String(v));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} T ${p(d.getHours() % 12 || 12)}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
-const fmtDate = (v: unknown) =>
-  v
-    ? new Date(String(v)).toLocaleString("fr-FR", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-      })
-    : "—";
+/** Libellé lisible d'un type de document de vente. */
+function libelleType(type?: string | null) {
+  const t = String(type ?? "").toUpperCase();
+  return ({
+    TIC: "Ticket caisse", BL: "Bon de livraison", FAC: "Facture", FC: "Facture",
+    COM: "Bon de commande", DEV: "Devis", BR: "Bon de retour", AV: "Avoir",
+  } as Record<string, string>)[t] || "Ticket caisse";
+}
 
 /** `false` au rendu serveur, `true` une fois hydraté. */
 const sabonner = () => () => {};
@@ -51,8 +58,6 @@ const surClient = () => true;
 const surServeur = () => false;
 
 export default function TicketVente(props: { refDoc: string; onClose: () => void }) {
-  // Le ticket est greffé sur <body> : les règles d'impression masquent les
-  // enfants directs de <body>, un calque imbriqué dans la page serait emporté.
   const monte = useSyncExternalStore(sabonner, surClient, surServeur);
   if (!monte) return null;
   return createPortal(<Contenu {...props} />, document.body);
@@ -61,10 +66,11 @@ export default function TicketVente(props: { refDoc: string; onClose: () => void
 function Contenu({ refDoc, onClose }: { refDoc: string; onClose: () => void }) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [lignes, setLignes] = useState<Ligne[]>([]);
+  const [reglements, setReglements] = useState<Reglement[]>([]);
   const [societe, setSociete] = useState<Record<string, string>>({});
   const [charge, setCharge] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
-  const imprimeRef = useRef(false);
+  const impressionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let annule = false;
@@ -75,6 +81,7 @@ function Contenu({ refDoc, onClose }: { refDoc: string; onClose: () => void }) {
         if (!d.ticket) { setErreur(d.message ?? d.error ?? "Ticket introuvable"); return; }
         setTicket(d.ticket);
         setLignes(d.lignes ?? []);
+        setReglements(d.reglements ?? []);
         setSociete(d.societe ?? {});
       })
       .catch(() => { if (!annule) setErreur("Chargement impossible"); })
@@ -82,29 +89,41 @@ function Contenu({ refDoc, onClose }: { refDoc: string; onClose: () => void }) {
     return () => { annule = true; };
   }, [refDoc]);
 
-  // Nettoie la classe d'impression si la fenêtre est fermée pendant le dialogue.
-  useEffect(() => {
-    const apres = () => document.body.classList.remove("impression-ticket");
-    window.addEventListener("afterprint", apres);
-    return () => { window.removeEventListener("afterprint", apres); apres(); };
-  }, []);
-
+  // Impression : fenêtre dédiée, mêmes règles que l'original.
   const imprimer = () => {
-    if (imprimeRef.current) return;
-    imprimeRef.current = true;
-    document.body.classList.add("impression-ticket");
-    // Laisse le navigateur peindre avant d'ouvrir le dialogue d'impression.
-    requestAnimationFrame(() => {
-      window.print();
-      imprimeRef.current = false;
-    });
+    if (!impressionRef.current) return;
+    const contenu = impressionRef.current.innerHTML;
+    const fen = window.open("", "_blank");
+    if (!fen) return;
+    fen.document.write(
+      "<html><head><style>@page {width: 302.3px;}body {width: 302.3px;height:400px; padding: 10px;}</style></head><body>",
+    );
+    fen.document.write(contenu);
+    fen.document.write("</body></html>");
+    fen.document.close();
+    fen.print();
   };
 
+  // Taux affiché comme sur l'original (« Taux tva : 19% ») : le taux des
+  // lignes quand il est uniforme, 19 sinon.
+  const taux = (() => {
+    const t = [...new Set(lignes.map((l) => l.tauxTva).filter((v) => v > 0))];
+    return t.length === 1 ? t[0] : 19;
+  })();
+
+  /** PU TTC de la ligne, remise déduite — la colonne du ticket d'origine. */
+  const puTtc = (l: Ligne) => {
+    const brut = l.puHt * (1 + (l.tauxTva ?? 0) / 100);
+    return brut - (brut * (l.remise ?? 0)) / 100;
+  };
+
+  const ligne12 = { height: 20, display: "flex", alignItems: "center", fontSize: 12 } as const;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 print:bg-white print:p-0">
-      <div className="w-full max-w-sm my-6 print:my-0 print:max-w-none">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+      <div className="w-full max-w-md my-6">
         {/* Barre d'actions — jamais imprimée */}
-        <div className="flex items-center justify-between gap-2 mb-3 print:hidden">
+        <div className="flex items-center justify-between gap-2 mb-3">
           <div className="text-white font-bold text-sm">Ticket {refDoc}</div>
           <div className="flex items-center gap-2">
             <button onClick={imprimer} disabled={!ticket}
@@ -125,135 +144,154 @@ function Contenu({ refDoc, onClose }: { refDoc: string; onClose: () => void }) {
         )}
 
         {erreur && !charge && (
-          <div className="bg-white rounded-2xl p-6 text-center text-sm text-red-600 print:hidden">{erreur}</div>
+          <div className="bg-white rounded-2xl p-6 text-center text-sm text-red-600">{erreur}</div>
         )}
 
         {ticket && (
-          <div id="ticket-impression"
-            className="bg-white rounded-2xl p-5 text-[13px] text-slate-900 print:rounded-none print:p-2"
-            style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-
-            {/* En-tête société */}
-            <div className="text-center pb-2 mb-2 border-b border-dashed border-slate-400">
-              <div className="font-bold text-[15px] uppercase">{societe.nom || "—"}</div>
-              {societe.adresse && <div className="text-[11px]">{societe.adresse}</div>}
-              {societe.tel && <div className="text-[11px]">Tél. {societe.tel}</div>}
-              {societe.mf && <div className="text-[11px]">MF : {societe.mf}</div>}
-              {societe.registreCom && <div className="text-[11px]">RC : {societe.registreCom}</div>}
-            </div>
-
-            {/* Références du document */}
-            <div className="text-[11px] mb-2 space-y-0.5">
-              <Info label={ticket.libDoc || libelleType(ticket.typeDoc)} valeur={ticket.refDoc} gras />
-              <Info label="Date" valeur={fmtDate(ticket.dateDoc)} />
-              <Info label="Client" valeur={ticket.raisonSocial ?? "—"} />
-              {ticket.matriculeF && <Info label="MF client" valeur={ticket.matriculeF} />}
-              {ticket.utilisateur && <Info label="Vendeur" valeur={ticket.utilisateur} />}
-            </div>
-
-            {/* Tableau des articles : colonnes de l'ERP d'origine. */}
-            <table className="w-full border-t border-b border-slate-400 my-2 text-[11px]">
-              <thead>
-                <tr className="border-b border-slate-400">
-                  <th className="text-left font-bold py-1 w-[43%]">ARTICLE</th>
-                  <th className="text-center font-bold py-1 w-[13%]">Qté</th>
-                  <th className="text-right font-bold py-1 w-[22%]">PU TTC</th>
-                  <th className="text-right font-bold py-1 w-[22%]">MT TTC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.length === 0 && (
-                  <tr><td colSpan={4} className="py-3 text-center text-slate-400">
-                    Aucune ligne sur ce document.
-                  </td></tr>
-                )}
-                {lignes.map((l) => {
-                  // Le ticket raisonne en TTC : l'ERP affiche le prix payé,
-                  // TVA comprise, pas le HT du tarif.
-                  const puTtc = l.puHt * (1 + (l.tauxTva ?? 0) / 100);
-                  return (
-                    <tr key={l.id} className="align-top">
-                      <td className="py-0.5 pr-1">
-                        {l.designation ?? l.refArt ?? "—"}
-                        {l.remise > 0 && (
-                          <span className="block text-[10px] text-slate-500">Remise {fmtQte(l.remise)} %</span>
-                        )}
-                      </td>
-                      <td className="py-0.5 text-center">{fmtQte(l.qte)}</td>
-                      <td className="py-0.5 text-right">{fmt(puTtc)}</td>
-                      <td className="py-0.5 text-right font-semibold">{fmt(l.ttcNet)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {/* Totaux, dans l'ordre du ticket d'origine. */}
-            <div className="space-y-0.5 text-[12px]">
-              <Total label="Montant HT" valeur={ticket.thtNet} />
-              <Total label="Taux tva" valeur={ticket.totTva} />
-              {ticket.totFodec > 0 && <Total label="Fodec" valeur={ticket.totFodec} />}
-              {ticket.timbre > 0 && <Total label="Timbre" valeur={ticket.timbre} />}
-              <div className="flex justify-between font-bold text-[14px] pt-1 mt-1 border-t border-slate-400">
-                <span>Net à payer :</span><span>{fmt(ticket.ttcNet)}</span>
-              </div>
-              {ticket.totalRegle > 0 && <Total label="Réglé" valeur={ticket.totalRegle} />}
-              {ticket.soldeDoc > 0 && (
-                <div className="flex justify-between font-semibold">
-                  <span>Reste dû</span><span>{fmt(ticket.soldeDoc)}</span>
+          <div className="bg-white rounded-2xl overflow-hidden">
+            <div ref={impressionRef} style={{ width: "100%", color: "#000", background: "#fff", paddingTop: 8, paddingBottom: 8 }}>
+              {/* En-tête société : le bloc HTML de la fiche société (logo). */}
+              {societe.entete_page ? (
+                <div style={{ display: "flex", width: "100%", alignItems: "center", fontSize: 12 }}>
+                  <div style={{ width: "89%", marginLeft: 30 }}
+                    dangerouslySetInnerHTML={{ __html: societe.entete_page }} />
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", fontSize: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{societe.nom || ""}</div>
+                  {societe.adresse && <div>{societe.adresse}</div>}
+                  {societe.mf && <div>MF : {societe.mf}</div>}
                 </div>
               )}
-              {ticket.modePayement && (
-                <div className="flex justify-between text-[11px]">
-                  <span>Mode de paiement</span><span>{ticket.modePayement}</span>
+
+              {/* Commercial / N° ticket / Date — colonnes 20 % / 40 % de l'original. */}
+              {[
+                ["Commercial:", ticket.commercial ?? ticket.utilisateur ?? ""],
+                ["N° ticket :", ticket.refDoc],
+                ["Date :", fmtDate(ticket.dateDoc)],
+              ].map(([lib, val]) => (
+                <div key={lib} style={{ ...ligne12, width: "100%" }}>
+                  <div style={{ ...ligne12, width: "20%", paddingLeft: 30 }}>{lib}</div>
+                  <div style={{ ...ligne12, width: "40%" }}>
+                    <div style={{ display: "flex", alignItems: "center", paddingLeft: 5, width: "100%" }}>{val}</div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Libellé du document, centré. */}
+              <div style={{ ...ligne12, marginTop: 5, justifyContent: "center", marginLeft: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingLeft: 10, paddingRight: 10 }}>
+                  <b>{ticket.libDoc || libelleType(ticket.typeDoc)}</b>
+                </div>
+              </div>
+
+              {/* Cadre client. */}
+              <div style={{ border: "1px solid black", marginTop: 5, width: "90%", marginLeft: 25 }}>
+                <div style={ligne12}>
+                  <div style={{ ...ligne12, width: "20%", paddingLeft: 5 }}>Client :</div>
+                  <div style={ligne12}><div style={{ display: "flex", alignItems: "center", width: "100%" }}>{ticket.raisonSocial ?? ""}</div></div>
+                </div>
+                <div style={{ display: "flex", fontSize: 12 }}>
+                  <div style={{ display: "flex", width: "20%", paddingLeft: 5, fontSize: 12 }}>Adresse :</div>
+                  <div style={{ display: "flex", fontSize: 12, width: "80%" }}>
+                    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>{ticket.adresse ?? ""}</div>
+                  </div>
+                </div>
+                <div style={ligne12}>
+                  <div style={{ ...ligne12, width: "20%", paddingLeft: 5 }}>MF:</div>
+                  <div style={ligne12}><div style={{ display: "flex", alignItems: "center", width: "100%" }}>{ticket.matriculeF ?? ""}</div></div>
+                </div>
+                <div style={ligne12}>
+                  <div style={{ ...ligne12, width: "20%", paddingLeft: 5 }}>RC:</div>
+                  <div style={ligne12}><div style={{ display: "flex", alignItems: "center", width: "100%" }}>{ticket.registreComClient ?? ""}</div></div>
+                </div>
+              </div>
+
+              {/* Articles. */}
+              <div style={{ marginTop: 10, fontSize: 12 }}>
+                <div style={{ ...ligne12, width: "100%" }}>
+                  <div style={{ ...ligne12, width: "43%", paddingLeft: 30 }}><b>ARTICLE</b></div>
+                  <div style={{ ...ligne12, width: "9%" }}><div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}><b>Qté</b></div></div>
+                  <div style={{ ...ligne12, width: "18%" }}><div style={{ textAlign: "center", width: "100%" }}><b>PU TTC</b></div></div>
+                  <div style={{ ...ligne12, width: "18%" }}><div style={{ textAlign: "right", width: "100%" }}><b>MT TTC</b></div></div>
+                </div>
+                {lignes.map((l) => (
+                  <div key={l.id}>
+                    <div style={{ display: "flex", width: "100%", marginTop: 2, fontSize: 12 }}>
+                      <div style={{ display: "flex", width: "43%", alignItems: "center", paddingLeft: 30, fontSize: 12 }}>{l.designation ?? l.refArt ?? ""}</div>
+                      <div style={{ display: "flex", width: "9%", fontSize: 12 }}><div style={{ display: "flex", justifyContent: "center", width: "100%" }}>{l.qte}</div></div>
+                      <div style={{ display: "flex", width: "18%", fontSize: 12 }}><div style={{ textAlign: "center", width: "100%" }}>{fx3(puTtc(l))}</div></div>
+                      <div style={{ display: "flex", width: "18%", fontSize: 12 }}><div style={{ textAlign: "right", width: "100%" }}>{fx3(l.ttcNet)}</div></div>
+                    </div>
+                    {l.remise > 0 && (
+                      <div style={{ ...ligne12, width: "100%" }}>
+                        <div style={{ textAlign: "center", width: "52%", paddingLeft: 30 }} />
+                        <div style={{ textAlign: "center", width: "18%" }}><b>REM :</b></div>
+                        <div style={{ textAlign: "right", width: "18%" }}>{l.remise} %</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Filet puis totaux — colonnes 45 % / 25 % / 20 % de l'original. */}
+              <div style={{ height: 20, display: "flex", width: "96%", alignItems: "center" }}>
+                <div style={{ height: 1, display: "flex", borderTop: "1px solid black", alignItems: "center", marginLeft: 20, width: "100%" }} />
+              </div>
+              {[
+                ["Montant HT :", fx3(ticket.thtNet)],
+                ["Taux tva :", `${taux}%`],
+                ["tva :", fx3(ticket.totTva)],
+                ["Net à payer :", fx3(ticket.ttcNet)],
+              ].map(([lib, val]) => (
+                <div key={lib} style={{ ...ligne12, width: "100%" }}>
+                  <div style={{ ...ligne12, paddingLeft: 10, width: "45%" }} />
+                  <div style={{ ...ligne12, paddingLeft: 10, width: "25%" }}><div style={{ fontSize: 12, width: "100%" }}>{lib}</div></div>
+                  <div style={{ ...ligne12, width: "20%" }}><div style={{ textAlign: "right", width: "100%" }}>{val}</div></div>
+                </div>
+              ))}
+
+              {/* Règlements. */}
+              {reglements.length > 0 && (
+                <div style={{ ...ligne12, paddingLeft: 30 }}><b>Mode de paiement</b></div>
+              )}
+              {reglements.map((r) => (
+                <div key={r.id} style={{ ...ligne12, width: "100%" }}>
+                  <div style={{ ...ligne12, paddingLeft: 30, width: "25%" }}>{r.modePay}:</div>
+                  <div style={{ ...ligne12, paddingLeft: 20, width: "17%" }}>
+                    <div style={{ width: "100%", textAlign: "right" }}>{fx3(r.montant)}</div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Signatures. */}
+              <div style={{ marginTop: 5, width: "90%", marginLeft: 25, height: 80, display: "flex" }}>
+                <div style={{ height: 80, width: "50%", border: "1px solid black", fontSize: 12 }}>
+                  <div style={{ height: 20, display: "flex", width: "100%", alignItems: "center", justifyContent: "center", borderBottom: "1px solid black", fontSize: 12 }}>
+                    Sig.Commercial
+                  </div>
+                  <div style={{ height: 40 }} />
+                </div>
+                <div style={{ height: 80, width: "50%", borderRight: "1px solid black", borderTop: "1px solid black", borderBottom: "1px solid black", fontSize: 12 }}>
+                  <div style={{ height: 20, display: "flex", width: "100%", alignItems: "center", justifyContent: "center", borderBottom: "1px solid black", fontSize: 12 }}>
+                    Décharge client
+                  </div>
+                  <div style={{ height: 60 }} />
+                </div>
+              </div>
+
+              {/* Pied société éventuel. */}
+              {societe.pied_page && <div dangerouslySetInnerHTML={{ __html: societe.pied_page }} />}
+
+              {!ticket.valide && (
+                <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, textAlign: "center" }}>
+                  *** DOCUMENT EN BROUILLON — STOCK NON MOUVEMENTÉ ***
                 </div>
               )}
-            </div>
-
-            {/* Montant en toutes lettres — « arrêté le présent ticket ». */}
-            <div className="mt-2 pt-2 border-t border-dashed border-slate-400 text-[11px] italic">
-              Arrêté le présent {libelleType(ticket.typeDoc).toLowerCase()} à la somme de :{" "}
-              <span className="font-semibold not-italic">{montantEnLettres(ticket.ttcNet)}</span>.
-            </div>
-
-            {!ticket.valide && (
-              <div className="mt-2 text-[11px] font-bold text-center">
-                *** DOCUMENT EN BROUILLON — STOCK NON MOUVEMENTÉ ***
-              </div>
-            )}
-
-            <div className="mt-3 pt-2 border-t border-dashed border-slate-400 text-center text-[11px]">
-              Merci de votre confiance
             </div>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-/** Libellé lisible d'un type de document de vente. */
-function libelleType(type?: string | null) {
-  const t = String(type ?? "").toUpperCase();
-  return ({
-    TIC: "Ticket", BL: "Bon de livraison", FAC: "Facture", FC: "Facture",
-    COM: "Bon de commande", DEV: "Devis", BR: "Bon de retour", AV: "Avoir",
-  } as Record<string, string>)[t] || "Ticket";
-}
-
-function Info({ label, valeur, gras }: { label: string; valeur: string; gras?: boolean }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <span className="text-slate-600">{label}</span>
-      <span className={`text-right ${gras ? "font-bold font-mono" : ""}`}>{valeur}</span>
-    </div>
-  );
-}
-
-function Total({ label, valeur }: { label: string; valeur: number }) {
-  return (
-    <div className="flex justify-between">
-      <span>{label} :</span><span>{fmt(valeur)}</span>
     </div>
   );
 }

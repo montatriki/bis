@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
+import { cleCommercial } from "@/lib/perimetre-commercial";
 
 // Encaissements clients / décaissements fournisseurs.
 //
@@ -41,6 +42,24 @@ export async function POST(req: NextRequest) {
   const last = await prisma.erpReglement.findFirst({ orderBy: { id: "desc" }, select: { id: true } });
   const id = (last?.id ?? 0) + 1;
 
+  // Tournée du jour du commercial : elle rattache l'encaissement au journal de
+  // caisse. Fournie explicitement, ou déduite de la tournée en cours.
+  let dayIdTournee: number | null = body?.dayId ? Number(body.dayId) : null;
+  if (!dayIdTournee && auth.user.role === "COMMERCIAL") {
+    const jour = new Date();
+    jour.setHours(0, 0, 0, 0);
+    const mission = await prisma.erpMission.findFirst({
+      where: {
+        commercial: { startsWith: cleCommercial(auth.user.name), mode: "insensitive" },
+        dateOrdre: { gte: jour, lt: new Date(jour.getTime() + 86_400_000) },
+        etat: { notIn: ["Annulée"] },
+      },
+      select: { id: true },
+      orderBy: { id: "desc" },
+    });
+    dayIdTournee = mission?.id ?? null;
+  }
+
   const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.erpReglement.create({
       data: {
@@ -53,6 +72,10 @@ export async function POST(req: NextRequest) {
         // Document réglé : c'est ce lien qui permet au ticket imprimé
         // d'afficher le montant encaissé et au document de se solder.
         numDoc: body?.numDoc ? String(body.numDoc) : null,
+        // Tournée du jour : sans ce lien, l'encaissement n'apparaît pas dans le
+        // journal de caisse du commercial, qui compte par tournée — une vente
+        // encaissée s'affichait « reste à encaisser ».
+        dayId: dayIdTournee,
         echeance: echeance || null,
         // Un chèque ou une traite n'est encaissé qu'à son échéance : le
         // marquer « Encaissé » dès la remise fausserait la trésorerie et
@@ -82,6 +105,8 @@ export async function POST(req: NextRequest) {
     ok: true,
     message: `Règlement de ${montant} TND enregistré`,
     id,
+    commercial: auth.user.name,
+    datePay: new Date().toISOString(),
     soldeFin: updated?.soldeFin ?? 0,
   });
 }

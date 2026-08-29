@@ -36,13 +36,16 @@ export default function DernierTicketPage() {
   const [total, setTotal] = useState(0);
   const [historique, setHistorique] = useState<Liste[]>([]);
   const [idx, setIdx] = useState(0);
+  // Filtre client : 0 = tous. La navigation reste bornée au client choisi.
+  const [codeCli, setCodeCli] = useState(0);
+  const [clientsTicket, setClientsTicket] = useState<{ codeCli: number; raisonSocial: string; nb: number }[]>([]);
   const [load, setLoad] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   // Référence dont le ticket rouleau est ouvert (null = aucun).
   const [impression, setImpression] = useState<string | null>(null);
 
-  const charger = useCallback((refDoc?: string) => {
-    fetch(`/api/tickets?vue=dernier${refDoc ? `&refDoc=${encodeURIComponent(refDoc)}` : ""}`)
+  const charger = useCallback((refDoc?: string, cli?: number) => {
+    fetch(`/api/tickets?vue=dernier${refDoc ? `&refDoc=${encodeURIComponent(refDoc)}` : ""}${cli ? `&codeCli=${cli}` : ""}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) { setErreur(d.error); return; }
@@ -54,13 +57,27 @@ export default function DernierTicketPage() {
       .finally(() => setLoad(false));
   }, []);
 
+  /** Changement de filtre client : repart du dernier ticket de ce client. */
+  const changerClient = (v: number) => {
+    setCodeCli(v); setIdx(0); setPage(0); setHistorique([]); setLoad(true);
+  };
+
   useEffect(() => {
-    charger();
-    fetch("/api/tickets?vue=liste")
+    charger(undefined, codeCli);
+    const qs = codeCli ? `&codeCli=${codeCli}` : "";
+    fetch(`/api/tickets?vue=liste${qs}`)
       .then((r) => r.json())
       .then((d) => { setHistorique(d.rows ?? []); setPages(d.pages ?? 1); setTotal(d.total ?? 0); })
       .catch(() => {});
-  }, [charger]);
+  }, [charger, codeCli]);
+
+  // Les clients du commercial ayant des tickets, pour le filtre.
+  useEffect(() => {
+    fetch("/api/tickets?vue=clients")
+      .then((r) => r.json())
+      .then((d) => setClientsTicket(d.rows ?? []))
+      .catch(() => {});
+  }, []);
 
   // L'historique se charge par pages de 100 : un commercial en cumule plus de
   // 1 500, et la navigation s'arrêtait au centième ticket.
@@ -73,7 +90,7 @@ export default function DernierTicketPage() {
     if (suivant >= liste.length) {
       const suivante = page + 1;
       if (suivante >= pages) return;
-      const d = await fetch(`/api/tickets?vue=liste&page=${suivante}`)
+      const d = await fetch(`/api/tickets?vue=liste&page=${suivante}${codeCli ? `&codeCli=${codeCli}` : ""}`)
         .then((r) => r.json())
         .catch(() => null);
       if (!d?.rows?.length) return;
@@ -85,7 +102,7 @@ export default function DernierTicketPage() {
     const cible = liste[suivant];
     if (!cible) return;
     setIdx(suivant);
-    charger(cible.refDoc);
+    charger(cible.refDoc, codeCli);
   };
 
   if (load) {
@@ -94,9 +111,21 @@ export default function DernierTicketPage() {
 
   if (erreur || !ticket) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center">
-        <Receipt size={32} className="mx-auto mb-3 text-slate-200" />
-        <div className="text-sm text-slate-500">{erreur ?? "Aucun ticket émis pour le moment."}</div>
+      <div className="space-y-4">
+        {clientsTicket.length > 0 && (
+          <select value={codeCli}
+            onChange={(e) => changerClient(Number(e.target.value))}
+            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none max-w-56">
+            <option value={0}>Tous les clients</option>
+            {clientsTicket.map((c) => (
+              <option key={c.codeCli} value={c.codeCli}>{c.raisonSocial} · {c.nb} ticket{c.nb > 1 ? "s" : ""}</option>
+            ))}
+          </select>
+        )}
+        <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center">
+          <Receipt size={32} className="mx-auto mb-3 text-slate-200" />
+          <div className="text-sm text-slate-500">{erreur ?? "Aucun ticket émis pour le moment."}</div>
+        </div>
       </div>
     );
   }
@@ -110,7 +139,16 @@ export default function DernierTicketPage() {
             {historique.length > 0 && `Ticket ${idx + 1} sur ${total || historique.length}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Filtre client : voir le dernier ticket d'un client précis. */}
+          <select value={codeCli}
+            onChange={(e) => changerClient(Number(e.target.value))}
+            className="py-2 px-3 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none max-w-56">
+            <option value={0}>Tous les clients</option>
+            {clientsTicket.map((c) => (
+              <option key={c.codeCli} value={c.codeCli}>{c.raisonSocial} · {c.nb} ticket{c.nb > 1 ? "s" : ""}</option>
+            ))}
+          </select>
           <button onClick={() => naviguer(1)} disabled={idx + 1 >= (total || historique.length)}
             className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 disabled:opacity-40 flex items-center gap-1">
             <ChevronLeft size={15} /> Précédent

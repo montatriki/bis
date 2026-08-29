@@ -61,6 +61,9 @@ export default function NouveauClientModal({
   const [photoErreur, setPhotoErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Adresse déduite de la position : "en cours" pendant l'appel, "ok" quand
+  // les champs ont été remplis, "echec" si le service n'a pas répondu.
+  const [adresseAuto, setAdresseAuto] = useState<"aucune" | "en cours" | "ok" | "echec">("aucune");
 
   // Chaque ouverture repart d'un formulaire vierge et d'une position fraîche.
   // La remise à zéro passe par la chaîne asynchrone : un `setState` synchrone
@@ -81,6 +84,26 @@ export default function NouveauClientModal({
 
   const maj = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // À chaque nouvelle position (ouverture, clic sur « Actualiser »), l'adresse,
+  // la ville et le gouvernorat sont déduits des coordonnées — comme sur
+  // l'ancien mobile. Le commercial n'a plus qu'à saisir le nom et le téléphone.
+  const lat = position?.lat, lng = position?.lng;
+  useEffect(() => {
+    if (!ouvert || !coordValide(lat, lng)) return;
+    let annule = false;
+    Promise.resolve().then(() => { if (!annule) setAdresseAuto("en cours"); });
+    fetch(`/api/geo/adresse?lat=${lat}&lng=${lng}`)
+      .then(async (r) => ({ ok: r.ok, d: await r.json() }))
+      .then(({ ok, d }) => {
+        if (annule) return;
+        if (!ok || !d.adresse) { setAdresseAuto("echec"); return; }
+        setForm((f) => ({ ...f, adresse: d.adresse, ville: d.ville || f.ville, gouvernorat: d.gouvernorat || f.gouvernorat }));
+        setAdresseAuto("ok");
+      })
+      .catch(() => { if (!annule) setAdresseAuto("echec"); });
+    return () => { annule = true; };
+  }, [ouvert, lat, lng]);
 
   async function choisirPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -208,6 +231,13 @@ export default function NouveauClientModal({
                   <Champ label="Ville" value={form.ville} onChange={maj("ville")} placeholder="Sousse" />
                 </div>
                 <Champ label="Adresse" value={form.adresse} onChange={maj("adresse")} placeholder="Rue, quartier" />
+                {adresseAuto !== "aucune" && (
+                  <div className={`-mt-1.5 text-[11px] flex items-center gap-1.5 ${adresseAuto === "echec" ? "text-amber-600" : "text-[var(--text-secondary)]"}`}>
+                    {adresseAuto === "en cours" && <><Loader2 size={11} className="animate-spin" /> Recherche de l&apos;adresse à partir de la position…</>}
+                    {adresseAuto === "ok" && <><Check size={11} className="text-emerald-600" /> Adresse, ville et gouvernorat déduits de la position — modifiables.</>}
+                    {adresseAuto === "echec" && <><AlertTriangle size={11} /> Adresse introuvable pour cette position — saisissez-la à la main.</>}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Champ label="Gouvernorat" value={form.gouvernorat} onChange={maj("gouvernorat")} placeholder="Sousse" />
                   <Champ label="Matricule fiscal *" value={form.matriculeF} onChange={maj("matriculeF")} placeholder="1234567/A/M/000" />

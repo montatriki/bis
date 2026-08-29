@@ -52,8 +52,8 @@ export default function TourneeMap({
         });
         mapInstance.current = map;
         L.control.zoom({ position: "bottomright" }).addTo(map);
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-          maxZoom: 18, subdomains: "abcd",
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
         }).addTo(map);
         setTimeout(() => map.invalidateSize(), 60);
       }

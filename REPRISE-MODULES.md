@@ -1225,3 +1225,303 @@ montre que « mokhtar trabelsi », les notifications portent sur son camion.
 **exactement le même en production** (9 434 sur 18 023). Elle ne renseigne pas
 `totfodec` sur ces documents tout en l'incluant dans le TTC. Reprise fidèle au
 document près.
+
+## Tournée générée au mauvais endroit — position réseau prise pour du GPS
+
+Sur mobile à Radès, « Clients à proximité » montrait les bons clients (36 m,
+784 m) mais la tournée générée partait de Tunis/Bab Laassal et « Regénérer »
+redonnait la même. Le planificateur lui-même était juste : rejoué avec la
+vraie position, il retenait bien les 12 clients de Radès. **La position qu'on
+lui donnait était fausse.**
+
+### Mécanisme
+
+Sur téléphone, la première position livrée vient de l'antenne réseau
+(précision 2–3 km), le fix GPS (10–20 m) n'arrive qu'après. Trois défauts
+s'enchaînaient :
+
+1. `getCurrentPosition` / `watchPosition` acceptaient un point mis en cache
+   (`maximumAge` 60 s / 30 s) et **ne regardaient jamais `accuracy`** ;
+2. la génération automatique se déclenchait sur ce premier point grossier,
+   puis le verrou `autoGen` empêchait toute correction à l'arrivée du GPS ;
+3. « Regénérer » relisait `positionRef` — encore le point en cache.
+
+Reproduit exactement : position réseau (36.8065, 10.1815, ±3 000 m) →
+*Romdhani, Chop walid, Librairie R BISSE — Tunis* (la capture desktop) ;
+GPS (36.7637, 10.2769, ±15 m) → *Mohamed ghamgui, Ste ghannem, Chop houssem —
+Radès* (la capture mobile).
+
+### Correctif, aux trois niveaux
+
+- **Lecture GPS** (`client-actif.tsx`) : `maximumAge: 0` — un fix neuf, jamais
+  le cache ; et `watchPosition` **ne dégrade plus la précision** (un point à
+  3 km n'écrase pas un point à 15 m).
+- **Planning** : la génération automatique attend un fix ≤ 300 m ;
+  « Regénérer » demande un fix neuf via `positionFraiche()` et, faute de fix
+  exploitable, affiche « Position GPS trop imprécise — sortez à découvert »
+  **sans appeler le serveur** (qui serait retombé sur le dépôt de Sousse).
+- **Serveur** (`/api/tournee`) : un départ de précision > 300 m est **refusé**
+  (400 explicite) — rien ne peut contourner le client.
+
+### Vérifié
+
+| Test | Résultat |
+|---|---|
+| Départ réseau ±3 000 m | **400** « Position trop imprécise (±3000 m) » |
+| Départ GPS ±15 m | 12 clients de Radès |
+| Écran réel, géoloc forcée Radès, clic Regénérer | **Mohamed ghamgui 4 m, Ste ghannem 775 m…** — 0 erreur console |
+
+Aucun point GPS de Mokhtar n'était remonté depuis juin (les seuls en base sont
+des données de démo vers Béja) : la remontée fonctionne, mais une position
+est désormais refusée si elle est trop imprécise.
+
+## Carte du portefeuille sur « Mes clients » (commercial)
+
+Demande : voir sur `/commercial/clients` une carte de tous ses clients autour
+de sa position, comme celle du planning.
+
+- **API** `GET /api/clients?geo=1` : tous les clients géolocalisés du
+  portefeuille (sans la limite de 200 de la liste), champs minimaux ; les
+  coordonnées (0,0) de l'import sont écartées. Mokhtar : **714** clients.
+- **Composant** `src/components/map/PortefeuilleMap.tsx` (nouveau — le nom
+  `ClientsMap` était déjà pris par la page Carte GPS) : centré sur le
+  commercial (point violet « Vous êtes ici ») ; orange = solde dû, bleu = à
+  jour, jaune = client en visite ; le clic ouvre la fiche client. Le cadrage
+  n'est fait qu'une fois, l'utilisateur garde ensuite la main sur le zoom.
+- **Page** : carte repliable au-dessus de la liste, indépendante des filtres.
+
+### Au passage — fond de carte cassé partout
+
+Les tuiles Carto (`basemaps.cartocdn.com`) affichaient **« API KEY REQUIRED »**
+sur les 4 cartes (planning, Carte GPS, admin, portefeuille) : le fournisseur
+exige désormais une clé. Basculé sur les tuiles OpenStreetMap, sans clé.
+
+Vérifié (Playwright, Mokhtar, géoloc forcée Radès) : 715 marqueurs (714 +
+position), tuile OSM chargée, clic → fiche « Librerie najoua », 0 erreur.
+
+### Carte filtrée avec la liste
+
+Demande : choisir « Beja » doit ne montrer sur la carte que les clients de Beja
+et zoomer dessus. `GET /api/clients?geo=1` accepte désormais `gouvernorat` et
+`search` (mêmes règles que la liste) ; la page recharge les points à chaque
+changement de filtre (délai 250 ms comme la liste) ; la carte recadre sur les
+clients filtrés (zoom max 15), et revient sur la position du commercial quand
+le filtre est retiré. Vérifié : Tous → 714 points zoom 13 ; Beja → 5 points
+zoom 10 ; retour Tous → 714 points, recentré. 0 erreur.
+
+## Fiche client complète du commercial (`/commercial/clients/[id]`)
+
+Demande : dans la modale, un bouton Itinéraire, et le nom du client cliquable
+vers une fiche montrant les tickets, commandes et factures du mois.
+
+- **Modale** : nom cliquable → fiche ; boutons « Itinéraire » (Google Maps
+  vers les coordonnées du client, masqué si le client est à (0,0)/null) et
+  « Fiche complète du mois ».
+- **API** `GET /api/clients/fiche?codeCli=&mois=&annee=` : client, totaux du
+  mois (CA règle ERP Σ(BL,TIC,FC)−Σ(BR,AV) nature Vente, commandes, encaissé,
+  visites), et les documents **avec leurs lignes** (article, qté, PU HT,
+  remise, TTC), règlements (`erp_reglements` sens C), visites (`ligne_mission`).
+  Cloisonnement : 403 sur un client d'un autre commercial (vérifié : Fatnasi →
+  Jamil), 404 si inexistant.
+- **Page** : en-tête (adresse, tél, Itinéraire, Appeler, Passer commande,
+  débit/crédit/solde), sélecteur mois/année, 4 KPI, onglets Tickets /
+  Commandes / Factures / Retours-avoirs / Encaissements / Visites, chaque
+  document dépliable sur ses lignes avec pied HT/remise/TVA/TTC.
+
+Données : 69 tickets de 2026 (sur 3 761) n'ont aucune ligne en base — hérité
+de la production (ex. TIC254105, 1 100 TND) ; la fiche affiche « 0 article ».
+Vérifié (Mokhtar, AGIL BEJA SUD, août 2026) : CA 1 493,002 = 3 tickets,
+1 commande 140,990, 3 encaissements 3 132,433 ; lignes de TIC254012 affichées ;
+rendu mobile 390 px ; 0 erreur.
+
+### Compte client calculé, pas stocké (« scalable »)
+
+Demande : la fiche ne doit pas dépendre de valeurs figées en base.
+
+Constat : `partners.debit/credit/soldeFin` sont des **compteurs** entretenus
+au fil des écritures (validation de document, règlement) — et hérités de la
+production avec leurs dérives. La production elle-même a un extrait de compte
+recalculé en direct (`clients.service.js › getFournisseurMouvements`) :
+débit = tickets/BL non facturés + factures ; crédit = retours/avoirs non
+facturés + règlements ; solde = solde initial + débit − crédit.
+
+Vérifié sur la base : cette règle reproduit `soldeFin` pour **4 458 clients
+sur 4 530** (98,4 %). Les 72 autres (dont AGIL BEJA SUD : stocké 9 703,241,
+calculé 4 719,329) sont des compteurs désynchronisés en production.
+
+Fait dans `/api/clients/fiche` :
+- `compte` = débit / crédit / solde **recalculés à chaque appel** depuis
+  `documents_ext` + `erp_reglements` ; `soldeStocke` et `ecart` exposés — la
+  page affiche l'écart avec un avertissement « dérive héritée ».
+- `extrait` : mouvements du mois avec solde courant, à partir d'un solde
+  d'ouverture calculé sur tout l'historique → onglet « Extrait de compte ».
+- `periode.annees` : années déduites de la première transaction du client.
+
+Rien à entretenir : un ticket ou un règlement créé demain apparaît dans le
+compte sans qu'aucun compteur n'ait à être mis à jour.
+
+### « Les données ne viennent pas » — fiche ouverte sur un mois vide
+
+Chop habib Ksar sa3id (41105585) : la fiche affichait 0 partout. Les données
+existaient — un ticket et un règlement le 11/07/2026 — mais la fiche s'ouvrait
+sur le mois courant (août). Correctif : sans période imposée, l'API prend le
+mois courant **ou, s'il est vide, le dernier mois d'activité du client**
+(`periode.auto`, `periode.derniereActivite`) ; la page l'annonce dans un
+bandeau et le choix manuel du mois prime. Les visites sans date propre
+prennent la date de leur tournée (`mission.dateOrdre`) au lieu de disparaître.
+
+## Nouveau client : adresse déduite de la position (comme l'ancien mobile)
+
+Demande : au clic sur « Actualiser », l'adresse complète doit se remplir toute
+seule, au format de l'ancienne plateforme (« El Ghazela, Délégation Raoued,
+Gouvernorat Ariana, 1083, Tunisie »).
+
+L'ancien mobile (bundle `main.*.js`) appelle
+`nominatim.openstreetmap.org/reverse` et découpe : `adresse = display_name`,
+`ville = state_district` sans « Délégation », `gouvernorat = state` sans
+« Gouvernorat ». Reproduit à l'identique :
+
+- `GET /api/geo/adresse?lat=&lng=` : proxy Nominatim (User-Agent applicatif
+  exigé par le service, `accept-language=fr`, cache mémoire à ~10 m, délai
+  8 s, 502 explicite en cas d'indisponibilité).
+- `NouveauClientModal` : à chaque nouvelle position (ouverture ou
+  « Actualiser »), remplit adresse / ville / gouvernorat avec une indication
+  « déduits de la position — modifiables » ; en cas d'échec, message et saisie
+  manuelle.
+
+## Modifier un client depuis le terrain (commercial)
+
+Demande : l'écran « Modifier un client » de l'ancien mobile, avec correction
+de la position et recalcul de l'adresse.
+
+- **API** `PUT /api/clients` : raison sociale, code TVA / clé / catégorie,
+  registre de commerce, famille, adresse, téléphone, e-mail, coordonnées,
+  gouvernorat, ville. Un commercial ne modifie que son portefeuille (403
+  sinon) ; coordonnées (0,0) ou hors Tunisie refusées (400) ; débit / crédit /
+  solde / commercial affecté **jamais** modifiables par cette voie.
+- **`ModifierClientModal`** : formulaire pré-rempli ; « Utiliser ma position »
+  reprend la position GPS actuelle (fix neuf, `maximumAge: 0`) et en déduit
+  adresse / ville / gouvernorat via `/api/geo/adresse` ; corriger la
+  longitude / latitude à la main déclenche la même déduction. Ouvrir la fiche
+  ne réécrit jamais l'adresse existante.
+- Boutons « Modifier » sur chaque carte de « Mes clients » et dans la fiche
+  rapide ; liste et carte mises à jour sans rechargement. Les familles
+  viennent de `ref_tables` (famille-cli), les gouvernorats de la base.
+
+Vérifié (Mokhtar, ste medinart 41100133, base de dev, puis restauré) :
+pré-remplissage TVA 1428436/F · A · M · librairie ; « Utiliser ma position »
+avec un fix à Tunis → 36.8065 / 10.1815 et « 29, Avenue du Ghana, Lafayette,
+Les Jardins, Délégation Bab Bhar, Tunis, Gouvernorat Tunis, 1017, Tunisie »,
+ville Tunis, gouvernorat Tunis ; enregistrement ; carte mise à jour ; 403 sur
+un client de Jamil ; 400 sur (0,0). Le gouvernorat déduit prend la graphie
+déjà en base (« TUNIS ») pour rester filtrable.
+
+**Incident de test, corrigé** : le premier essai d'enregistrement a vidé
+Code TVA / Clé / Catégorie de ste medinart — la liste ne chargeait pas ces
+colonnes, la modale les renvoyait vides, le PUT les a enregistrées vides.
+Valeurs restaurées (`1428436/F`, `A`, `M`) ; la liste charge désormais
+`codeTva`, `cletva`, `categorieTva`, `registreCom`. Leçon : un formulaire de
+modification doit être alimenté par les mêmes colonnes qu'il renvoie.
+
+Note de test : Chrome émulé (Playwright) ne répond à `getCurrentPosition`
+que lorsqu'une nouvelle position est poussée — sur téléphone le GPS répond
+toujours ; le test simule donc un fix après le clic.
+
+## Carte GIS admin : la couche Zones se détaille au zoom
+
+Demande : dans « Supervision Cartographique GIS », onglet Zones, voir les
+clients en zoomant et ouvrir leur fiche d'un clic.
+
+- `TunisiaMap` : au-delà du zoom 11 (`ZOOM_CLIENTS`), la couche Zones remplace
+  les agrégats par gouvernorat par les **clients de la zone visible** (rouge =
+  solde débiteur, vert = soldé). Chaque bulle — couches Zones et Clients —
+  porte « Ouvrir la fiche client → » vers `/commercial/clients/[id]`. La bulle
+  des agrégats et la légende invitent à zoomer.
+- Le recadrage automatique n'a plus lieu qu'au changement de couche ou de
+  données (signature mémorisée) : zoomer ne déclenche plus de recadrage —
+  indispensable, le redessin est désormais lié au zoom.
+- `AppLayout` de la section commerciale : ADMIN et MANAGER admis (production :
+  l'admin utilise la plateforme mobile) ; chaque API garde son périmètre par
+  rôle. Avant, le lien renvoyait l'admin sur /login.
+
+Vérifié (admin) : 25 agrégats → zoom sur Tunis → 48 clients ; clic →
+« Librairie meher » → fiche `/commercial/clients/41102184`, indicateurs
+présents ; 0 erreur console.
+
+### Correction : la fiche depuis l'admin reste dans l'admin
+
+Retour utilisateur : le lien de la carte GIS ouvrait la fiche sur la
+plateforme commerciale — faux cadre pour un administrateur.
+
+- La fiche est extraite en composant partagé
+  `src/components/clients/FicheClient.tsx` (`onCommander` optionnel).
+- **Admin** : `/admin/modules/vente/clients/[id]` — sans « Passer commande »,
+  retour « Clients — module Vente ». Les bulles de la carte GIS (Zones
+  zoomée et Clients) pointent dessus.
+- **Tableau Vente › Clients** (`ModuleView`) : bouton **Fiche** dans la barre
+  d'action, actif sur la ligne sélectionnée.
+- **Commercial** : `/commercial/clients/[id]` enveloppe le même composant avec
+  « Passer commande » (client actif + catalogue). La garde de la section
+  commerciale revient à COMMERCIAL seul (l'ouverture ADMIN/MANAGER de la
+  veille est annulée — plus nécessaire).
+
+## Ticket de caisse : copie conforme de l'ancien mobile
+
+Retour utilisateur : le ticket imprimé ne ressemblait pas à celui de l'ancien
+projet. Source retrouvée (non minifiée) :
+`bis-dist/src/components/dernier-ticket/dernierTicketPopup.js`.
+
+Différences majeures corrigées dans `TicketVente` :
+- **En-tête = le bloc HTML `entete_page` de la fiche société** (logo SKY en
+  base64) — récupéré depuis la production (`POST /societe/societe`, lecture
+  seule) et importé dans `ref_tables` (`param` / `societe.entete_page`,
+  12 001 o). Repli texte si absent.
+- Lignes « Commercial: / N° ticket : / Date : » (date `dd-MM-yyyy T hh:mm:ss`),
+  « Ticket caisse » centré en gras (= `Lib_doc`).
+- **Cadre client bordé** : Client / Adresse / MF / RC.
+- Tableau ARTICLE 43 % · Qté 9 % · PU TTC 18 % centré · MT TTC 18 % droite ;
+  ligne « REM : x % » sous chaque article remisé ; PU TTC net de remise.
+- Totaux à droite (45/25/20 %) : Montant HT, « Taux tva : 19% » (taux des
+  lignes si uniforme), tva, Net à payer ; puis « Mode de paiement » et les
+  règlements du document (`erp_reglements`, déjà servis par l'API).
+- **Cadres de signature « Sig.Commercial / Décharge client »**.
+- Impression par fenêtre dédiée avec la feuille de style de l'original
+  (`@page`/body 302,3 px), plus par window.print de la page.
+- Disparus car absents de l'original : Fodec/Timbre en lignes séparées,
+  « Arrêté … en toutes lettres », « Merci de votre confiance », Reste dû.
+- `/api/tickets` : `registreComClient` ajouté.
+
+Vérifié (Mokhtar, TIC260003) : aperçu et fenêtre d'impression = logo SKY,
+en-tête société, Commercial/N°/Date, cadre client, 2 articles, HT 225.884,
+19 %, tva 43.347, Net 271.490, Espèce 271.490, signatures. 0 erreur.
+
+### Reçu de recouvrement : copie conforme, et il manquait tout
+
+Même demande que le ticket, pour le Recouvrement. Constat : notre écran
+n'imprimait **aucun reçu**. Source d'origine :
+`bis-dist/src/pages/stock/recouvrement.js` — même squelette que le ticket :
+logo (`entete_page`), « Commercial: / Date : », **Recouvrement** centré, cadre
+client (Client / Adresse / MF / RC), « Montant : », « Mode de paiement » avec
+les lignes de règlement, cadres « Sig.Commercial / Décharge client », pied.
+
+Fait :
+- `RecuReglement` (nouveau composant), affiché automatiquement après un
+  encaissement réussi — comme l'ancien mobile qui imprimait dans la foulée ;
+  impression en fenêtre dédiée 302,3 px.
+- `GET /api/tickets?vue=societe` : en-tête d'impression seul (pour les reçus).
+- `POST /api/reglements` renvoie `commercial` et `datePay` pour le reçu.
+
+Vérifié (Mokhtar, Librairie R BISSE nabil, 1,000 TND Espèces) : reçu complet
+avec logo, rattaché à la tournée du jour (dayId 2875), fenêtre d'impression
+ouverte, 0 erreur. Règlement de test supprimé et compteurs du client restaurés
+à l'identique (17|0|17).
+
+### Dernier ticket : filtre par client
+
+Demande : choisir un client et voir son dernier ticket. Ajouts :
+`GET /api/tickets` accepte `codeCli` (vues dernier + liste) et une vue
+`clients` (clients du commercial ayant des tickets, avec leur nombre, triés
+du plus servi au moins servi — 632 pour Mokhtar). Sur l'écran, un sélecteur
+« Tous les clients / <client> · N tickets » ; le choix recharge le dernier
+ticket du client et borne Précédent/Suivant à ses tickets. Le filtre reste
+visible quand le client n'a aucun ticket.

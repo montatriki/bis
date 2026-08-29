@@ -5,6 +5,7 @@ import { round3 } from "@/lib/vente-stats";
 import { filtrePortefeuille } from "@/lib/perimetre-commercial";
 import { rafraichirStockSiPerime } from "@/lib/sync-production";
 import { appliquerReleveMission, synchroniserKilometrages, vehiculesNonReferences } from "@/lib/kilometrage-vehicules";
+import { TYPES_CA } from "@/lib/vente-stats";
 import {
   ETATS_MISSION, ETATS_VISITE, cloturerTournee, creerTournee, estCloturee,
   reconcilierTournee, stockVehicule,
@@ -115,6 +116,53 @@ export async function GET(req: NextRequest) {
   }
 
   // Tournée du jour du commercial connecté — l'écran « Planning ».
+  // Liste des tournées du commercial, pour le sélecteur du journal de caisse.
+  // Le code mission (OM-2872) est le repère du terrain : chercher par date
+  // oblige à se souvenir du jour, alors que le code figure sur les pièces.
+  if (vue === "mes-tournees") {
+    const commercial = impose ?? s(sp.get("commercial"));
+    if (!commercial) {
+      return NextResponse.json({ error: "Commercial requis" }, { status: 400 });
+    }
+    const missions = await prisma.erpMission.findMany({
+      where: { commercial: { contains: commercial, mode: "insensitive" } },
+      orderBy: [{ dateOrdre: "desc" }, { id: "desc" }],
+      take: 200,
+      select: {
+        id: true, dateOrdre: true, etat: true, vehicule: true,
+        _count: { select: { reglements: true, lignes: true } },
+      },
+    });
+
+    // Ne compter que les **ventes**. Une tournée porte aussi des transferts de
+    // stock (TR, DEC, REM) : les inclure annonçait « 8 vente(s) » sur une
+    // tournée qui n'en a aucune, en contradiction avec l'écran.
+    const parMission = await prisma.erpDocument.groupBy({
+      by: ["dayId"],
+      where: {
+        dayId: { in: missions.map((m) => m.id) },
+        nature: "Vente",
+        typeDoc: { in: [...TYPES_CA] },
+      },
+      _count: { _all: true },
+    });
+    const ventes = new Map(parMission.map((g) => [g.dayId, g._count._all]));
+
+    return NextResponse.json({
+      rows: missions.map((m) => ({
+        id: m.id,
+        code: `OM-${m.id}`,
+        dateOrdre: m.dateOrdre,
+        etat: m.etat,
+        vehicule: m.vehicule,
+        nbVentes: ventes.get(m.id) ?? 0,
+        nbReglements: m._count.reglements,
+        nbVisites: m._count.lignes,
+      })),
+      total: missions.length,
+    });
+  }
+
   if (vue === "jour") {
     const commercial = impose ?? s(sp.get("commercial"));
     if (!commercial) {

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Search, Plus, Pencil, Trash2, Printer, Download, RefreshCw, X,
+  Search, Plus, Pencil, Trash2, Printer, Download, RefreshCw, X, IdCard,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, FileText, ArrowRightLeft, Network,
 } from "lucide-react";
 import { findModule, findSub, writeResource, newRecordDefaults, type Column, type View } from "@/lib/erp-modules";
@@ -435,6 +435,13 @@ export default function ModuleView({ moduleSlug, subSlug }: { moduleSlug: string
                   <button title="Supprimer" disabled={!selected} onClick={remove}
                     className="p-2 rounded-xl border border-[var(--border-primary)] text-red-600 hover:bg-red-50 disabled:opacity-30"><Trash2 size={15} /></button>
                 </>
+              )}
+              {moduleSlug === "vente" && subSlug === "clients" && (
+                <Link href={selected ? `/admin/modules/vente/clients/${selected}` : "#"} title="Fiche client (activité du mois)"
+                  aria-disabled={!selected}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border-primary)] text-sm font-semibold text-emerald-700 hover:bg-emerald-50 ${selected ? "" : "opacity-30 pointer-events-none"}`}>
+                  <IdCard size={15} /> Fiche
+                </Link>
               )}
               {view.kind === "articles" && (
                 <>

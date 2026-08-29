@@ -21,6 +21,16 @@ export async function GET(req: NextRequest) {
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
 
+  // Identité d'impression de la société, seule : sert aux reçus (recouvrement).
+  if (req.nextUrl.searchParams.get("vue") === "societe") {
+    const params = await prisma.refTable.findMany({ where: { kind: "param", code: { startsWith: "societe." } } });
+    const ste: Record<string, string> = {};
+    for (const p of params) ste[(p.code ?? "").replace("societe.", "")] = p.label ?? "";
+    if (!ste.nom) ste.nom = "STE SKY EDITION ET DISTRIBUTION";
+    return NextResponse.json({ societe: ste });
+  }
+
+
   const sp = req.nextUrl.searchParams;
   const vue = sp.get("vue") ?? "dernier";
 
@@ -34,8 +44,11 @@ export async function GET(req: NextRequest) {
   // les documents portent « MOKHTAR ». Un `contains` du nom complet ne
   // trouverait rien et masquerait tous les tickets du commercial.
   const cle = cleCommercial(auteur);
+  // Filtre client optionnel : « le dernier ticket de CE client ».
+  const codeCli = Number(sp.get("codeCli")) || 0;
   const filtre = {
     typeDoc: { in: TYPES_TICKET },
+    ...(codeCli > 0 ? { codeCli } : {}),
     ...(cle
       ? {
           OR: [
@@ -93,7 +106,7 @@ export async function GET(req: NextRequest) {
     const client = doc.codeCli
       ? await prisma.partner.findUnique({
           where: { id: doc.codeCli },
-          select: { adresse: true, matriculeF: true, tel: true, ville: true },
+          select: { adresse: true, matriculeF: true, tel: true, ville: true, registreCom: true },
         })
       : null;
 
@@ -102,6 +115,7 @@ export async function GET(req: NextRequest) {
         ...doc,
         adresse: client?.adresse ?? null,
         matriculeF: client?.matriculeF ?? null,
+        registreComClient: client?.registreCom ?? null,
         telClient: client?.tel ?? null,
         villeClient: client?.ville ?? null,
       },
@@ -111,6 +125,20 @@ export async function GET(req: NextRequest) {
       nbLignes: lignes.length,
       societe: ste,
     });
+  }
+
+  // clients — les clients du commercial ayant au moins un ticket, pour le
+  // filtre de l'écran « Dernier ticket ». Triés du plus servi au moins servi.
+  if (vue === "clients") {
+    const groupes = await prisma.erpDocument.groupBy({
+      by: ["codeCli", "raisonSocial"],
+      where: { ...filtre, codeCli: { not: null } },
+      _count: { refDoc: true },
+    });
+    const rows = groupes
+      .map((g) => ({ codeCli: g.codeCli, raisonSocial: (g.raisonSocial ?? "").trim() || `Client ${g.codeCli}`, nb: g._count.refDoc }))
+      .sort((a, b) => b.nb - a.nb);
+    return NextResponse.json({ rows });
   }
 
   // liste — paginée : un commercial cumule plus de 1 500 tickets, une liste

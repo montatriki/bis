@@ -39,6 +39,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ client, docs });
   }
 
+  // Mode carte : tous les clients géolocalisés du portefeuille, champs
+  // minimaux, sans limite — la carte doit montrer l'ensemble, pas une page.
+  if (sp.get("geo") === "1") {
+    const govGeo = (sp.get("gouvernorat") ?? "").trim();
+    const rechGeo = (sp.get("search") ?? "").trim();
+    const rows = await prisma.partner.findMany({
+      where: {
+        nature: "C", ...(filtrePortefeuille(auth.user) ?? {}),
+        latitude: { not: null }, longitude: { not: null },
+        // Mêmes filtres que la liste : la carte montre ce que la liste montre.
+        ...(govGeo && govGeo !== "Tous" ? { gouvernorat: { equals: govGeo, mode: "insensitive" as const } } : {}),
+        ...(rechGeo
+          ? { OR: [{ raisonSocial: { contains: rechGeo, mode: "insensitive" as const } }, { ville: { contains: rechGeo, mode: "insensitive" as const } }] }
+          : {}),
+      },
+      select: { id: true, raisonSocial: true, ville: true, latitude: true, longitude: true, soldeFin: true, tel: true },
+    });
+    // (0,0) est la valeur « non renseignée » héritée de l'import : pas un point.
+    return NextResponse.json({ rows: rows.filter((c) => !(c.latitude === 0 && c.longitude === 0)) });
+  }
+
   const search = (sp.get("search") ?? "").trim();
   const gouvernorat = (sp.get("gouvernorat") ?? "").trim();
   const creances = sp.get("creances") === "1";
@@ -60,7 +81,7 @@ export async function GET(req: NextRequest) {
       : {}),
   };
 
-  const [rows, total, agg, gouvernorats] = await Promise.all([
+  const [rows, total, agg, gouvernorats, familles] = await Promise.all([
     prisma.partner.findMany({
       where,
       orderBy: creances ? { soldeFin: "desc" } : { raisonSocial: "asc" },
@@ -69,6 +90,7 @@ export async function GET(req: NextRequest) {
         id: true, raisonSocial: true, ville: true, gouvernorat: true, tel: true, email: true,
         adresse: true, famille: true, sousFamille: true, soldeFin: true, debit: true, credit: true,
         plafond: true, latitude: true, longitude: true, matriculeF: true,
+        codeTva: true, cletva: true, categorieTva: true, registreCom: true,
       },
     }),
     prisma.partner.count({ where }),
@@ -79,6 +101,7 @@ export async function GET(req: NextRequest) {
       select: { gouvernorat: true },
       orderBy: { gouvernorat: "asc" },
     }),
+    prisma.refTable.findMany({ where: { kind: "famille-cli" }, select: { label: true }, orderBy: { label: "asc" } }),
   ]);
 
   // Les données importées mélangent les casses ("TUNIS" / "Tunis") : on
@@ -96,7 +119,65 @@ export async function GET(req: NextRequest) {
     total,
     totalCreances: round3(agg._sum.soldeFin ?? 0),
     gouvernorats: [...vus.values()].sort((a, b) => a.localeCompare(b, "fr")),
+    familles: familles.map((f) => f.label).filter(Boolean),
   });
+}
+
+// PUT /api/clients { id, raisonSocial?, adresse?, tel?, email?, ville?, gouvernorat?,
+//                    famille?, matriculeF?, codeTva?, cletva?, categorieTva?, registreCom?,
+//                    latitude?, longitude? }
+//
+// Mise à jour d'un client depuis le terrain — l'écran « Modifier un client »
+// de l'ancien mobile. Un commercial ne modifie que son portefeuille. Les
+// soldes (débit, crédit, solde) et le commercial affecté ne passent jamais
+// par ici : ils sont pilotés par les documents, les règlements et l'admin.
+export async function PUT(req: NextRequest) {
+  const auth = await requireSession(["COMMERCIAL", "MANAGER", "ADMIN"]);
+  if (!auth.ok) return auth.res;
+  const body = await req.json().catch(() => ({}));
+  const id = Number(body?.id);
+  if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ error: "Client invalide" }, { status: 400 });
+
+  const client = await prisma.partner.findUnique({ where: { id } });
+  if (!client || client.nature !== "C") return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
+  if (auth.user.role === "COMMERCIAL" && !memeCommercial(client.commercial, auth.user.name)) {
+    return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
+  }
+
+  const texte = (k: string) => (body?.[k] === undefined ? undefined : String(body[k] ?? "").trim() || null);
+  const raisonSocial = texte("raisonSocial");
+  if (raisonSocial === null) return NextResponse.json({ error: "La raison sociale est obligatoire" }, { status: 400 });
+
+  // Coordonnées : les deux ou aucune ; (0,0) et hors Tunisie sont refusés.
+  let latitude: number | null | undefined, longitude: number | null | undefined;
+  if (body?.latitude !== undefined || body?.longitude !== undefined) {
+    const lat = Number(body?.latitude), lng = Number(body?.longitude);
+    if (body.latitude === null || body.latitude === "") { latitude = null; longitude = null; }
+    else if (!coordValide(lat, lng)) return NextResponse.json({ error: "Coordonnées GPS invalides" }, { status: 400 });
+    else { latitude = lat; longitude = lng; }
+  }
+
+  const tel = body?.tel === undefined ? undefined : (normaliserTel(body.tel) || null);
+
+  const row = await prisma.partner.update({
+    where: { id },
+    data: {
+      raisonSocial: raisonSocial ?? undefined,
+      adresse: texte("adresse"), tel, email: texte("email"),
+      ville: texte("ville"), gouvernorat: texte("gouvernorat"),
+      famille: texte("famille"), matriculeF: texte("matriculeF"),
+      codeTva: texte("codeTva"), cletva: texte("cletva"), categorieTva: texte("categorieTva"),
+      registreCom: texte("registreCom"),
+      latitude, longitude,
+    },
+    select: {
+      id: true, raisonSocial: true, ville: true, gouvernorat: true, tel: true, email: true,
+      adresse: true, famille: true, sousFamille: true, soldeFin: true, debit: true, credit: true,
+      plafond: true, latitude: true, longitude: true, matriculeF: true,
+      codeTva: true, cletva: true, categorieTva: true, registreCom: true,
+    },
+  });
+  return NextResponse.json({ ok: true, client: row });
 }
 
 /** Taille maximale de la photo du point de vente (data URL), ~600 Ko. */

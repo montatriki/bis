@@ -52,6 +52,9 @@ const ETAT_CFG: Record<string, { bg: string; text: string; border: string; dot: 
   "Absent":    { bg: "bg-red-50",     text: "text-red-600",     border: "border-red-200",     dot: "bg-red-500" },
 };
 
+/** Précision GPS au-delà de laquelle un point ne sert pas de départ de tournée. */
+const PRECISION_MAX_M = 300;
+
 export default function PlanningPage() {
   const router = useRouter();
   const { client: clientActif, choisir, position } = useClientActif();
@@ -79,6 +82,30 @@ export default function PlanningPage() {
   const positionRef = useRef<typeof position>(null);
   useEffect(() => { positionRef.current = position; }, [position]);
 
+  /**
+   * Fix GPS neuf, ou à défaut la dernière position connue si elle est assez
+   * précise. Un point réseau grossier n'est jamais retenu comme départ.
+   */
+  const positionFraiche = useCallback(
+    () =>
+      new Promise<{ lat: number; lng: number } | null>((resolve) => {
+        const secours = () => {
+          const c = positionRef.current;
+          resolve(c && (c.precision == null || c.precision <= PRECISION_MAX_M) ? { lat: c.lat, lng: c.lng } : null);
+        };
+        if (typeof navigator === "undefined" || !navigator.geolocation) return secours();
+        navigator.geolocation.getCurrentPosition(
+          (g) => {
+            if (g.coords.accuracy != null && g.coords.accuracy > PRECISION_MAX_M) return secours();
+            resolve({ lat: g.coords.latitude, lng: g.coords.longitude });
+          },
+          secours,
+          { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
+        );
+      }),
+    [],
+  );
+
   const charger = useCallback(() => {
     const numero = ++requete.current;
     // La position du commercial sert à mesurer le vrai trajet d'approche :
@@ -101,11 +128,16 @@ export default function PlanningPage() {
   /** Génère le plan du jour depuis la position courante, sinon depuis le dépôt. */
   async function genererTournee() {
     setGen(true);
-    // La position est lue **au moment de l'appel** : la génération automatique
-    // est différée d'un tour, et la closure figeait la valeur du rendu où le
-    // GPS n'avait pas encore répondu — le plan repartait alors du dépôt et
-    // envoyait le commercial à 186 km.
-    const p = positionRef.current;
+    // « Regénérer » demande un fix **neuf** au GPS plutôt que de relire la
+    // dernière position connue : celle-ci pouvait être un point réseau mis en
+    // cache, et le bouton redonnait alors la même tournée fausse.
+    const p = await positionFraiche();
+    // Sans fix exploitable, on n'appelle pas le serveur : il retomberait sur
+    // le dépôt et bâtirait un plan à des dizaines de kilomètres.
+    if (!p) {
+      setGen(false);
+      return flash("Position GPS trop imprécise — sortez à découvert et réessayez", false);
+    }
     const r = await fetch("/api/tournee", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -130,6 +162,10 @@ export default function PlanningPage() {
   useEffect(() => {
     if (load || gen || autoGen.current) return;
     if (!position) return;                       // sans position, on ne devine pas
+    // Une position réseau (précision de plusieurs km) n'est pas un point de
+    // départ : le plan se bâtissait dessus, puis le verrou `autoGen` empêchait
+    // toute correction quand le vrai GPS arrivait. On attend un fix exploitable.
+    if (position.precision != null && position.precision > PRECISION_MAX_M) return;
     if (date !== new Date().toISOString().slice(0, 10)) return;  // seulement aujourd'hui
     if (tournee && (tournee.etapes?.length ?? 0) > 0) return;    // un plan existe déjà
     autoGen.current = true;

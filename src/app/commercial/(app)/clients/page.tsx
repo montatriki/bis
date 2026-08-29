@@ -2,14 +2,26 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import type { PointClient } from "@/components/map/PortefeuilleMap";
 import {
-  Search, X, FileText, AlertTriangle, MapPin, Loader2, MessageCircle, Building2,
+  Search, X, FileText, AlertTriangle, MapPin, Loader2, MessageCircle, Building2, Navigation, Pencil,
   Crosshair, Check, UserPlus,
 } from "lucide-react";
 import RiskBadge from "@/components/ui/RiskBadge";
 import { useClientActif } from "@/lib/client-actif";
 import { formatDistance } from "@/lib/geo";
 import NouveauClientModal from "@/components/commercial/NouveauClientModal";
+import ModifierClientModal, { type ClientModifiable } from "@/components/commercial/ModifierClientModal";
+
+const PortefeuilleMap = dynamic(() => import("@/components/map/PortefeuilleMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full bg-slate-100 rounded-2xl animate-pulse flex items-center justify-center text-slate-400 text-sm">
+      Chargement de la carte…
+    </div>
+  ),
+});
 
 type Client = {
   id: number; raisonSocial: string; ville: string | null; gouvernorat: string | null;
@@ -17,6 +29,7 @@ type Client = {
   famille: string | null; sousFamille: string | null;
   soldeFin: number; debit: number; credit: number; plafond: number | null;
   matriculeF: string | null;
+  codeTva?: string | null; cletva?: string | null; categorieTva?: string | null; registreCom?: string | null;
   latitude: number | null; longitude: number | null;
 };
 type Doc = {
@@ -54,6 +67,8 @@ export default function ClientsPage() {
   const [aConfirmer, setAConfirmer] = useState<{ client: Client; distance: number | null; motif: string } | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [gouvernorats, setGouvernorats] = useState<string[]>([]);
+  const [familles, setFamilles] = useState<string[]>([]);
+  const [aModifier, setAModifier] = useState<Client | null>(null);
   const [total, setTotal] = useState(0);
   const [totalCreances, setTotalCreances] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,6 +76,42 @@ export default function ClientsPage() {
   const [detail, setDetail] = useState<Client | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
+  // Carte : l'ensemble du portefeuille géolocalisé, indépendant du filtre de la liste.
+  const [clientsGeo, setClientsGeo] = useState<PointClient[]>([]);
+  const [carteOuverte, setCarteOuverte] = useState(true);
+
+  const filtreActif = search.trim() !== "" || gov !== "Tous";
+
+  useEffect(() => {
+    let cancelled = false;
+    // Même délai que la liste : on ne redessine pas 714 points à chaque lettre tapée.
+    const t = setTimeout(() => {
+    const qs = new URLSearchParams({ geo: "1" });
+    if (search) qs.set("search", search);
+    if (gov !== "Tous") qs.set("gouvernorat", gov);
+    fetch(`/api/clients?${qs}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setClientsGeo((d.rows ?? []).map((c: { id: number; raisonSocial: string | null; ville: string | null; latitude: number; longitude: number; soldeFin: number; tel: string | null }) => ({
+          id: c.id, nom: (c.raisonSocial || "").trim() || `Client ${c.id}`, ville: c.ville,
+          latitude: c.latitude, longitude: c.longitude, soldeFin: c.soldeFin, tel: c.tel,
+        })));
+      })
+      .catch(() => {});
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [search, gov]);
+
+  /** Un clic sur la carte ouvre la fiche : on prend la version complète si la liste l'a, sinon on la charge. */
+  const ouvrirDepuisCarte = (g: PointClient) => {
+    const local = clients.find((c) => c.id === g.id);
+    if (local) { openDetail(local); return; }
+    fetch(`/api/clients?codeCli=${g.id}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.client) openDetail(d.client); })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +127,7 @@ export default function ClientsPage() {
           setTotal(d.total ?? 0);
           setTotalCreances(d.totalCreances ?? 0);
           if (d.gouvernorats?.length) setGouvernorats(d.gouvernorats);
+          if (d.familles?.length) setFamilles(d.familles);
           setLoading(false);
         })
         .catch(() => { if (!cancelled) setLoading(false); });
@@ -168,6 +220,29 @@ export default function ClientsPage() {
         </select>
       </div>
 
+      {/* Carte du portefeuille autour de la position du commercial */}
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+        <button onClick={() => setCarteOuverte((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-[var(--text-primary)]">
+          <span className="flex items-center gap-2"><MapPin size={15} className="text-violet-600" /> Carte de mes clients</span>
+          <span className="text-xs font-medium text-[var(--text-secondary)]">
+            {clientsGeo.length} géolocalisé{clientsGeo.length > 1 ? "s" : ""}{filtreActif ? " (filtre)" : ""}
+            {position ? "" : " · position GPS en attente"} · {carteOuverte ? "Masquer" : "Afficher"}
+          </span>
+        </button>
+        {carteOuverte && (
+          <div className="h-80 sm:h-96 border-t border-[var(--border-primary)]">
+            <PortefeuilleMap
+              clients={clientsGeo}
+              position={position ? { lat: position.lat, lng: position.lng } : null}
+              actifId={clientActif?.id ?? null}
+              filtre={filtreActif}
+              onSelect={ouvrirDepuisCarte}
+            />
+          </div>
+        )}
+      </div>
+
       {loading && <div className="py-16 text-center text-[var(--text-secondary)]"><Loader2 className="animate-spin inline" size={22} /></div>}
       {!loading && clients.length === 0 && (
         <div className="py-16 text-center text-sm text-[var(--text-secondary)]">Aucun client trouvé.</div>
@@ -242,6 +317,10 @@ export default function ClientsPage() {
                   className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/25 py-2 rounded-xl hover:bg-blue-100 transition font-medium">
                   <FileText size={12} /> Fiche
                 </button>
+                <button onClick={() => setAModifier(c)} title="Modifier le client"
+                  className="flex items-center justify-center gap-1.5 text-xs bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-primary)] px-3 py-2 rounded-xl hover:text-[var(--text-primary)] transition font-medium">
+                  <Pencil size={12} /> Modifier
+                </button>
                 {tel ? (
                   <a href={`https://wa.me/${tel.startsWith("216") ? tel : `216${tel}`}?text=${msg}`}
                     target="_blank" rel="noopener noreferrer"
@@ -269,7 +348,11 @@ export default function ClientsPage() {
               <div className="bg-slate-800 text-white p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-bold text-lg truncate">{nomClient(detail)}</div>
+                    <button onClick={() => router.push(`/commercial/clients/${detail.id}`)}
+                      title="Ouvrir la fiche complète"
+                      className="font-bold text-lg truncate text-left hover:underline underline-offset-4 decoration-blue-400 max-w-full">
+                      {nomClient(detail)}
+                    </button>
                     <div className="text-slate-400 text-xs mt-0.5">
                       Code {detail.id}{detail.matriculeF ? ` · MF ${detail.matriculeF}` : ""}
                     </div>
@@ -280,6 +363,22 @@ export default function ClientsPage() {
                   <div className="flex items-center gap-1.5"><MapPin size={11} /> {detail.adresse || detail.ville || "—"}{detail.gouvernorat ? ` — ${detail.gouvernorat}` : ""}</div>
                   {detail.tel && <div>Tél : {detail.tel}</div>}
                   {detail.famille && <div className="flex items-center gap-1.5"><Building2 size={11} /> {detail.famille}{detail.sousFamille ? ` / ${detail.sousFamille}` : ""}</div>}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {detail.latitude != null && detail.longitude != null && !(detail.latitude === 0 && detail.longitude === 0) && (
+                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${detail.latitude},${detail.longitude}`} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition">
+                      <Navigation size={12} /> Itinéraire
+                    </a>
+                  )}
+                  <button onClick={() => router.push(`/commercial/clients/${detail.id}`)}
+                    className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition">
+                    <FileText size={12} /> Fiche complète du mois
+                  </button>
+                  <button onClick={() => { setAModifier(detail); openDetail(null); }}
+                    className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition">
+                    <Pencil size={12} /> Modifier
+                  </button>
                 </div>
               </div>
 
@@ -372,6 +471,23 @@ export default function ClientsPage() {
       </AnimatePresence>
 
       {/* Création d'un nouveau point de vente */}
+      <ModifierClientModal
+        client={aModifier}
+        familles={familles}
+        gouvernorats={gouvernorats}
+        onFermer={() => setAModifier(null)}
+        onModifie={(m: ClientModifiable) => {
+          // La liste et la carte reflètent la modification sans rechargement.
+          setClients((liste) => liste.map((c) => (c.id === m.id ? { ...c, ...m } : c)));
+          setClientsGeo((pts) => {
+            const sans = pts.filter((p) => p.id !== m.id);
+            return m.latitude != null && m.longitude != null && !(m.latitude === 0 && m.longitude === 0)
+              ? [...sans, { id: m.id, nom: (m.raisonSocial || "").trim() || `Client ${m.id}`, ville: m.ville, latitude: m.latitude, longitude: m.longitude, soldeFin: clients.find((c) => c.id === m.id)?.soldeFin ?? 0, tel: m.tel }]
+              : sans;
+          });
+          setAModifier(null);
+        }}
+      />
       <NouveauClientModal
         ouvert={nouveau}
         onFermer={() => setNouveau(false)}

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, FileText, CreditCard, Banknote, Loader2, MessageCircle } from "lucide-react";
+import RecuReglement, { type DonneesRecu } from "@/components/commercial/RecuReglement";
 
 type Client = {
   id: number; raisonSocial: string; ville: string | null; gouvernorat: string | null;
@@ -31,6 +32,9 @@ export default function RecouvrementPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  // Reçu de recouvrement affiché après un encaissement réussi — comme
+  // l'ancien mobile, qui imprimait le reçu dans la foulée.
+  const [recu, setRecu] = useState<DonneesRecu | null>(null);
 
   // Clients avec solde débiteur, triés par créance décroissante.
   useEffect(() => {
@@ -80,6 +84,12 @@ export default function RecouvrementPage() {
     setSaving(false);
     if (r.ok) {
       setShowPayModal(false);
+      setRecu({
+        codeCli: selected.id,
+        commercial: r.commercial ?? "",
+        datePay: r.datePay ?? new Date().toISOString(),
+        montant, mode,
+      });
       selectClient(null);
       setToast(`Encaissement de ${fmt(montant)} TND enregistré`);
       setTimeout(() => setToast(null), 3000);
@@ -254,6 +264,8 @@ export default function RecouvrementPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {recu && <RecuReglement donnees={recu} onClose={() => setRecu(null)} />}
     </div>
   );
 }

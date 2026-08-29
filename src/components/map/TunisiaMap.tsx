@@ -46,6 +46,9 @@ const fmt = (v: unknown) => new Intl.NumberFormat("fr-TN", { maximumFractionDigi
 const esc = (v: unknown) =>
   String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
+/** Zoom à partir duquel la couche Zones remplace les agrégats par les clients. */
+const ZOOM_CLIENTS = 11;
+
 export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
   const mapRef = useRef<HTMLDivElement>(null);
   // `any` assumé : Leaflet est chargé dynamiquement (pas de rendu serveur).
@@ -58,6 +61,12 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
   const [clients, setClients] = useState<ClientGeo[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
+  // Niveau de zoom courant : la couche Zones change de nature en zoomant.
+  const [zoomCarte, setZoomCarte] = useState(7);
+  // Signature du dernier cadrage : on ne recadre qu'au changement de couche ou
+  // de données — jamais parce que l'utilisateur a zoomé (le redessin déclenché
+  // par le zoom rendrait sinon la carte incontrôlable).
+  const cadragePour = useRef<string>("");
   const [tournees, setTournees] = useState<Tournee[]>([]);
   // La carte se construit de façon asynchrone (`import("leaflet")`). Sans ce
   // témoin, l'effet de dessin s'exécutait avant que la carte n'existe, sortait
@@ -93,12 +102,13 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
       });
       mapInstance.current = map;
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        maxZoom: 18, subdomains: "abcd",
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
       }).addTo(map);
       // `featureGroup` et non `layerGroup` : seul le premier expose
       // `getBounds()`, indispensable pour cadrer la carte sur les données.
       calque.current = L.featureGroup().addTo(map);
+      map.on("zoomend", () => setZoomCarte(map.getZoom()));
       setCarteVivante(true);
       // Leaflet mesure mal un conteneur encore masqué à l'initialisation.
       setTimeout(() => map.invalidateSize(), 250);
@@ -282,12 +292,34 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
                 <div style="font-weight:800;font-size:12px">${esc(c.raisonSocial || `Client ${c.id}`)}</div>
                 <div style="font-size:11px;opacity:.8">${esc([c.ville, c.gouvernorat].filter(Boolean).join(" · "))}</div>
                 <div style="font-size:11px;margin-top:4px;color:${couleur}">Solde : <b>${fmt(c.soldeFin)} TND</b></div>
+                <a href="/admin/modules/vente/clients/${c.id}" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:#1d4ed8">Ouvrir la fiche client →</a>
               </div>`,
             );
         }
       }
 
-      if (couche === "zones") {
+      if (couche === "zones" && map.getZoom() >= ZOOM_CLIENTS) {
+        // Assez zoomé pour distinguer les points de vente : les agrégats par
+        // gouvernorat laissent place aux clients de la zone visible, et la
+        // bulle mène à la fiche.
+        const visibles = map.getBounds().pad(0.3);
+        for (const c of clients) {
+          if (!visibles.contains([c.latitude, c.longitude])) continue;
+          const couleur = c.soldeFin > 0 ? "#b84a39" : "#6e8b3d";
+          L.circleMarker([c.latitude, c.longitude], {
+            radius: 6, color: "#fff", weight: 1.5, fillColor: couleur, fillOpacity: 0.9,
+          })
+            .addTo(groupe)
+            .bindPopup(
+              `<div style="min-width:190px;font-family:Outfit,Inter,sans-serif;color:#36220f;padding:2px">
+                <div style="font-weight:800;font-size:12px">${esc(c.raisonSocial || `Client ${c.id}`)}</div>
+                <div style="font-size:11px;opacity:.8">${esc([c.ville, c.gouvernorat].filter(Boolean).join(" · "))}</div>
+                <div style="font-size:11px;margin-top:4px;color:${couleur}">Solde : <b>${fmt(c.soldeFin)} TND</b></div>
+                <a href="/admin/modules/vente/clients/${c.id}" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:#1d4ed8">Ouvrir la fiche client →</a>
+              </div>`,
+            );
+        }
+      } else if (couche === "zones") {
         const maxNb = Math.max(1, ...zones.map((z) => z.nb));
         for (const z of zones) {
           // Rayon proportionnel à la racine du volume : l'aire du disque reste
@@ -304,6 +336,7 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
                 <div style="font-size:11px;margin-top:4px"><b>${fmt(z.nb)}</b> client(s)</div>
                 <div style="font-size:11px">${fmt(z.debiteurs)} avec solde débiteur</div>
                 <div style="font-size:11px;color:#b84a39">Créances : <b>${fmt(z.solde)} TND</b></div>
+                <div style="font-size:10px;margin-top:4px;opacity:.7">Zoomez sur la zone pour voir chaque client</div>
               </div>`,
             );
           L.marker([z.latitude, z.longitude], { icon: pastille("#b56e2d", 24, String(z.nb)) }).addTo(groupe);
@@ -343,7 +376,10 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
         );
       }
       console.log("[GIS] couche=",couche,"couches=",groupe.getLayers?.().length,"bornes valides=",bornes?.isValid?.(),"taille=",map.getSize?.());
-      if (bornes?.isValid()) {
+      const signature = `${couche}|${vehicules.length}|${clients.length}|${zones.length}|${tournees.length}`;
+      const memeVue = cadragePour.current === signature;
+      cadragePour.current = signature;
+      if (!memeVue && bornes?.isValid()) {
         // Le conteneur n'a pas toujours sa taille définitive à cet instant
         // (panneau encore replié, police en cours de chargement) : Leaflet
         // cadrerait alors sur une surface nulle et resterait sur la vue
@@ -357,7 +393,7 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
         setTimeout(cadrer, 400);
       }
     });
-  }, [couche, vehicules, clients, zones, tournees, carteVivante]);
+  }, [couche, vehicules, clients, zones, tournees, carteVivante, zoomCarte]);
 
   const legende =
     couche === "trafic"
@@ -372,7 +408,12 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
             { color: "#b84a39", label: "Solde débiteur" },
             { color: "#6e8b3d", label: "Compte soldé" },
           ]
-        : [{ color: "#b56e2d", label: "Volume de clients par gouvernorat" }];
+        : zoomCarte >= ZOOM_CLIENTS
+          ? [
+              { color: "#b84a39", label: "Solde débiteur — cliquez pour la fiche" },
+              { color: "#6e8b3d", label: "Compte soldé — cliquez pour la fiche" },
+            ]
+          : [{ color: "#b56e2d", label: "Volume de clients par gouvernorat — zoomez pour voir chaque client" }];
 
   // Ce que la couche montre réellement : des tournées, pas des punaises.
   const etapesTotal = tournees.reduce((n, t) => n + t.etapes.length, 0);

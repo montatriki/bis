@@ -149,7 +149,11 @@ export function ClientActifProvider({ children }: { children: React.ReactNode })
         setErreurGps(messages[e.code] ?? "Position introuvable");
         setGpsEnCours(false);
       },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
+      // `maximumAge: 0` : on exige un fix neuf. Avec 60 s, le navigateur
+      // servait un point mis en cache — souvent la position **réseau** de
+      // l'antenne, à plusieurs kilomètres — et le commercial voyait des
+      // clients de Tunis alors qu'il était à Radès.
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 },
     );
   }, [remonterPosition]);
 
@@ -168,7 +172,14 @@ export function ClientActifProvider({ children }: { children: React.ReactNode })
           precision: p.coords.accuracy,
           horodatage: p.timestamp,
         };
-        setPosition(pos);
+        // Un point plus imprécis que le précédent n'apporte rien : sur mobile,
+        // la position réseau (2–3 km) arrive avant le GPS (10–20 m) et
+        // pouvait ensuite le remplacer. On ne dégrade jamais la précision.
+        setPosition((avant) =>
+          avant && avant.precision != null && pos.precision > avant.precision * 1.5 && pos.precision > 200
+            ? avant
+            : pos,
+        );
         remonterPosition(pos);
         setErreurGps(null);
       },
@@ -176,7 +187,7 @@ export function ClientActifProvider({ children }: { children: React.ReactNode })
         // Perte ponctuelle du signal : on garde le dernier point connu plutôt
         // que d'effacer la position et de bloquer le pointage.
       },
-      { enableHighAccuracy: true, maximumAge: 30_000, timeout: 30_000 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 },
     );
     return () => navigator.geolocation.clearWatch(veille);
   }, [remonterPosition]);
