@@ -64,6 +64,9 @@ const LIEN: Record<string, string> = {
  */
 const empreinteDe = (n: { id: string; message: string }) => `${n.id}|${n.message}`;
 
+/** Emplacement de référence pour la rupture des non-commerciaux. */
+const DEPOT_PRINCIPAL = "Dépôt principale";
+
 export async function GET() {
   const auth = await requireSession();
   if (!auth.ok) return auth.res;
@@ -101,9 +104,14 @@ export async function GET() {
     // Rupture : le camion du commercial, le catalogue pour les autres.
     estClient
       ? Promise.resolve(0)
-      : emplacement
-        ? prisma.stockDepot.count({ where: { emplacement, quantite: { lte: 0 } } })
-        : prisma.article.count({ where: { archiver: 0, vendable: 1, enStock: { lte: 0 } } }),
+      : prisma.stockDepot.count({
+          // Stock négatif = vente à découvert : la seule vraie anomalie. Un
+          // camion ne porte qu'une fraction du catalogue, donc « tout ce qui
+          // est à zéro » y remonterait 500+ articles jamais chargés et noierait
+          // le signal. On alerte donc sur le stock passé sous zéro.
+          // (`article.enStock` est une valeur héritée figée, pas le stock réel.)
+          where: { emplacement: emplacement ?? DEPOT_PRINCIPAL, quantite: { lt: 0 } },
+        }),
     prisma.erpDocument.findMany({
       where: filtreImpayes,
       orderBy: { dateDoc: "asc" },
@@ -152,10 +160,10 @@ export async function GET() {
   if (ruptures > 0) {
     notifs.push({
       id: "sys-ruptures",
-      title: emplacement ? "Rupture dans votre camion" : "Articles en rupture",
+      title: emplacement ? "Stock négatif dans votre camion" : "Stock négatif au dépôt",
       message: emplacement
-        ? `${ruptures} référence(s) épuisée(s) dans ${emplacement}`
-        : `${ruptures} article(s) à zéro en stock`,
+        ? `${ruptures} référence(s) en négatif dans ${emplacement} (vendues à découvert)`
+        : `${ruptures} article(s) en stock négatif au dépôt principal`,
       type: "STOCK",
       isRead: false,
       createdAt: maintenant,

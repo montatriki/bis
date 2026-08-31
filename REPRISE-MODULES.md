@@ -1525,3 +1525,64 @@ du plus servi au moins servi — 632 pour Mokhtar). Sur l'écran, un sélecteur
 « Tous les clients / <client> · N tickets » ; le choix recharge le dernier
 ticket du client et borne Précédent/Suivant à ses tickets. Le filtre reste
 visible quand le client n'a aucun ticket.
+
+## Resynchronisation complète depuis la production (31/08/2026)
+
+Demande : remettre toute la base à l'état actuel de la production (nouveaux
+tickets, missions, stock des véhicules).
+
+La prod est MySQL, accessible seulement via son API JSON (port 3306 fermé).
+Chaque table est exposée par `POST /<route>/` = `SELECT * FROM <table>`.
+`scripts/resync-prod.py` : tire les données (en-têtes ventes/achats en masse,
+lignes document par document via get-articles-vente/-achat, missions,
+ligne_mission, reg_clients, articles, clients, vehicules, frais_mission,
+stock get-all-articles-by-depot), puis reconstruit les tables métier en
+conservant les identifiants porteurs (id_day, refDoc, refArt, ID_reg décalé
+pour ne pas heurter les règlements fournisseur). Écrit UNIQUEMENT en local.
+Sauvegarde préalable : `db/backups/bechir1-avant-resync-*.dump`.
+
+Chargé : partners(C) 4 540, articles 588, documents 28 847, lignes 194 271,
+missions 2 667 (id→2890), ligne_mission 19 624, règlements client 13 961,
+stock_depots 5 927, véhicules 7.
+
+Vérifié :
+- **CA = 4 948 027,15 TND**, identique à la prod au centime (règle
+  Σ(BL,TIC,FC)−Σ(BR,AV) nature Vente).
+- Dernier ticket **TIC254182 du 31/08 17:25** (= le plus récent de la prod).
+- Codes mission OM-2888… remontent ; stock par emplacement pour chaque
+  véhicule ; dashboard admin et écran Mokhtar OK, 0 erreur.
+- Dépôts orphelins (véhicules supprimés, code_depot 4/5/6/8/11/12/16 absents
+  de `magasins`) : leur stock non nul est conservé sous « Dépôt N », le bruit
+  à zéro est écarté — comme la prod qui ne les liste pas.
+
+Séquences recalées (05-sequences.sql + ligne_mission/frais/vehicles).
+Les tables non métier (objectifs, param, compta, GPAO, GRH, positions GPS)
+sont conservées telles quelles.
+
+## Notifications — correction après resync (données par utilisateur)
+
+La resync avait cassé deux choses :
+
+1. **`commercials.vehicleId` vidé** : le lien commercial→véhicule n'était plus
+   rétabli, donc `emplacementVehicule()` ne trouvait aucun camion et tous les
+   commerciaux recevaient l'alerte stock du **catalogue** (« 288 à zéro »).
+   Rétabli depuis la source de vérité (Code_mag du compte prod) :
+   Mokhtar→248TU6787, Foued→243TU3251, Heni→238TU1019, Sihem→243TU7638,
+   Aziz→206TU7140.
+
+2. **Alerte rupture branchée sur `article.enStock`** (valeur héritée figée)
+   au lieu du stock réel de `stock_depots`. Reformulée en **stock négatif**
+   (vente à découvert = vraie anomalie), comme la prod (`en_stock<=st_min`) :
+   « tout ce qui est à zéro » remontait 500+ articles jamais chargés dans un
+   camion et noyait le signal.
+
+Résultat par rôle (vérifié) :
+- Admin/Manager : 122 négatifs au dépôt principal + 14 échéances véhicules
+  (parc entier) + impayés. Plus rien « à valider » (resync = tous validés).
+- Mokhtar : 6 négatifs dans SON camion 248TU6787, SON véhicule seul
+  (assurance/vignette expirées), ses impayés.
+- Foued : 0 négatif → pas d'alerte stock ; son véhicule ; ses impayés.
+- Client : ses impayés uniquement.
+
+Le périmètre par rôle de `/api/notifications` était déjà correct ; seules les
+deux dépendances de données ci-dessus étaient à réparer.
