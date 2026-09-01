@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
-import { filtrePortefeuille } from "@/lib/perimetre-commercial";
+import { filtrePortefeuille, cleCommercial } from "@/lib/perimetre-commercial";
 import { rafraichirStockSiPerime } from "@/lib/sync-production";
 import { appliquerReleveMission, synchroniserKilometrages, vehiculesNonReferences } from "@/lib/kilometrage-vehicules";
 import { TYPES_CA } from "@/lib/vente-stats";
@@ -181,15 +181,29 @@ export async function GET(req: NextRequest) {
     });
     const plaqueAffectee = affectation?.vehicle?.plate.trim() ?? null;
 
-    const mission = await prisma.erpMission.findFirst({
+    // Rapprochement par prénom (les missions portent « mokhtar trabelsi »).
+    const cle = cleCommercial(commercial);
+    const lignesOrd = { orderBy: [{ numOrdre: "asc" as const }, { id: "asc" as const }] };
+    // Une date explicite fige la recherche sur ce jour ; sans date, on retombe
+    // sur la tournée « En cours » quand rien n'est daté d'aujourd'hui (l'ordre
+    // du jour n'est créé qu'au matin).
+    const dateImposee = dateDe(sp.get("date")) != null;
+    let mission = await prisma.erpMission.findFirst({
       where: {
-        commercial: { contains: commercial, mode: "insensitive" },
+        commercial: { startsWith: cle, mode: "insensitive" },
         dateOrdre: { gte: jour, lt: lendemain },
         etat: { notIn: ["Annulée"] },
       },
-      include: { lignes: { orderBy: [{ numOrdre: "asc" }, { id: "asc" }] } },
+      include: { lignes: lignesOrd },
       orderBy: { id: "desc" },
     });
+    if (!mission && !dateImposee) {
+      mission = await prisma.erpMission.findFirst({
+        where: { commercial: { startsWith: cle, mode: "insensitive" }, etat: "En cours" },
+        include: { lignes: lignesOrd },
+        orderBy: { dateOrdre: "desc" },
+      });
+    }
 
     if (!mission) {
       return NextResponse.json({

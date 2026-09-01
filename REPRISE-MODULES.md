@@ -1586,3 +1586,20 @@ Résultat par rôle (vérifié) :
 
 Le périmètre par rôle de `/api/notifications` était déjà correct ; seules les
 deux dépendances de données ci-dessus étaient à réparer.
+
+## Code mission vide après resync — mission « En cours » vs date du jour
+
+Le bandeau du menu commercial affichait « CODE MISSION — » : `/api/tournee`
+(et `/api/missions?vue=jour`) ne cherchait la mission que pour la **date du
+jour**. Les données resynchronisées s'arrêtent au 31/08 ; on est le 01/09,
+donc aucune mission « aujourd'hui ». Or la tournée 2888 de Mokhtar est « En
+cours » (non clôturée) : c'est sa tournée active.
+
+Correctif (les deux routes) : à défaut de mission datée d'aujourd'hui, on
+retombe sur la mission **« En cours »** du commercial (la plus récente). Une
+date explicite (filtre du journal) fige toujours la recherche sur ce jour.
+`vue=jour` passe aussi au rapprochement par prénom (`cleCommercial`) comme
+`/api/tournee`, au lieu d'un `contains` du nom complet.
+
+Vérifié : bandeau → OM-2888, véhicule 248TU6787, 12 clients planifiés ;
+journal vue=jour → mission OM-2888, 12 visites. 0 erreur.

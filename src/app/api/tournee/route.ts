@@ -116,16 +116,34 @@ async function chargerTournee(
 ) {
   const lendemain = new Date(jour.getTime() + 86_400_000);
 
-  const mission = await prisma.erpMission.findFirst({
+  // Prénom : les missions portent « MOKHTAR », la session « Mokhtar Trabelsi ».
+  const cle = cleCommercial(commercial);
+  const lignesOrd = { orderBy: [{ numOrdre: "asc" as const }, { id: "asc" as const }] };
+
+  // 1) La mission datée d'aujourd'hui.
+  let mission = await prisma.erpMission.findFirst({
     where: {
-      // Prénom : les missions portent « MOKHTAR », la session « Mokhtar Trabelsi ».
-      commercial: { startsWith: cleCommercial(commercial), mode: "insensitive" },
+      commercial: { startsWith: cle, mode: "insensitive" },
       dateOrdre: { gte: jour, lt: lendemain },
       etat: { notIn: ["Annulée"] },
     },
-    include: { lignes: { orderBy: [{ numOrdre: "asc" }, { id: "asc" }] } },
+    include: { lignes: lignesOrd },
     orderBy: { id: "desc" },
   });
+
+  // 2) Sinon, la tournée encore « En cours » : une mission ouverte hier reste
+  //    la tournée active tant qu'elle n'est pas clôturée (l'admin crée l'ordre
+  //    du jour le matin ; entre-temps, le commercial travaille la précédente).
+  if (!mission) {
+    mission = await prisma.erpMission.findFirst({
+      where: {
+        commercial: { startsWith: cle, mode: "insensitive" },
+        etat: "En cours",
+      },
+      include: { lignes: lignesOrd },
+      orderBy: { dateOrdre: "desc" },
+    });
+  }
 
   if (!mission || mission.lignes.length === 0) {
     return { mission, etapes: [] as Etape[] };
