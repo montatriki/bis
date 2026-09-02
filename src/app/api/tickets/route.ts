@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       ? await prisma.erpDocument.findUnique({ where: { refDoc } })
       : await prisma.erpDocument.findFirst({
           where: filtre,
-          orderBy: [{ dateDoc: "desc" }, { refDoc: "desc" }],
+          orderBy: [{ dateDoc: { sort: "desc", nulls: "last" } }, { refDoc: "desc" }],
         });
 
     if (!doc) {
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
   const [rows, total] = await Promise.all([
     prisma.erpDocument.findMany({
       where: filtre,
-      orderBy: [{ dateDoc: "desc" }, { refDoc: "desc" }],
+      orderBy: [{ dateDoc: { sort: "desc", nulls: "last" } }, { refDoc: "desc" }],
       skip: page * PAGE,
       take: PAGE,
       select: {

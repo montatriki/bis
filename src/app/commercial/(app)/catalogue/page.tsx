@@ -146,7 +146,18 @@ export default function CataloguePage() {
         // Remise éventuellement saisie avant l'ajout.
         remise: Number(remises[a.refArt]?.pct) || 0,
       }),
-    }).catch(() => {});
+    })
+      .then((r) => r.json())
+      // Le ticket est émis depuis le panier serveur : la quantité affichée
+      // doit être la sienne, pas une estimation locale qui pourrait dériver.
+      .then((d) => { if (d?.row?.qte != null) recalerQty(a.refArt, Number(d.row.qte)); })
+      .catch(() => {});
+  }
+  /** Aligne la quantité locale d'une ligne sur celle confirmée par le serveur. */
+  function recalerQty(ref: string, qte: number) {
+    setCart((prev) =>
+      prev.map((i) => (i.article.refArt === ref ? { ...i, qty: qte } : i)).filter((i) => i.qty > 0),
+    );
   }
   function updateQty(ref: string, delta: number) {
     const actuelle = cart.find((i) => i.article.refArt === ref)?.qty ?? 0;
@@ -157,7 +168,10 @@ export default function CataloguePage() {
     fetch("/api/panier", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refArt: ref, qte: suivante }),
-    }).catch(() => {});
+    })
+      .then((r) => r.json())
+      .then((d) => { if (d?.row?.qte != null) recalerQty(ref, Number(d.row.qte)); })
+      .catch(() => {});
   }
   const getQty = (ref: string) => cart.find((i) => i.article.refArt === ref)?.qty ?? 0;
 
@@ -169,7 +183,12 @@ export default function CataloguePage() {
    * Le plafond `remiseMax` de l'article est appliqué à la saisie ; le serveur
    * le revérifie, un contrôle d'interface ne protégeant rien à lui seul.
    */
-  function majRemise(a: Article, champ: "pct" | "net", valeur: string) {
+  function majRemise(a: Article, champ: "pct" | "net", brut: string) {
+    // Pendant la frappe, on ne fait que relier les deux champs. La validation
+    // (plafond, prix au-dessus du tarif) attend la sortie du champ : valider à
+    // chaque touche vidait la saisie sur une valeur intermédiaire — taper « 5 »
+    // pour écrire « 50.000 » donnait 90 % de remise, refusée, champ effacé.
+    const valeur = brut.replace(",", ".");
     const ttc = a.prixTtc || 0;
     let pct = "", net = "";
     if (champ === "pct") {
@@ -184,26 +203,49 @@ export default function CataloguePage() {
         : (100 - (n * 100) / ttc).toFixed(2);
     }
     setRemises((r) => ({ ...r, [a.refArt]: { pct, net } }));
+  }
 
+  /**
+   * Validation de la remise, à la sortie du champ (ou sur Entrée) : plafond de
+   * l'article, prix jamais au-dessus du tarif ; puis report sur le panier.
+   * Le serveur revérifie, un contrôle d'interface ne protégeant rien à lui seul.
+   */
+  function validerRemise(a: Article) {
+    const saisie = remises[a.refArt];
+    const pct = saisie?.pct ?? "";
     const taux = Number(pct);
-    if (!Number.isFinite(taux) || pct === "") return;
-    // Plafond de l'article : au-delà, la remise est refusée (le serveur
-    // renvoie l'alerte et remet la ligne à zéro).
-    if (a.remiseMax && a.remiseMax > 0 && taux > a.remiseMax) {
-      setToast(`Remise maximale de ${a.remiseMax} % pour ${a.refArt}`);
+    const remettre = (msg: string) => {
+      setToast(msg);
       setTimeout(() => setToast(null), 3500);
       setRemises((r) => ({ ...r, [a.refArt]: { pct: "", net: "" } }));
+      setCart((prev) => prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: 0 } : i)));
+      if (getQty(a.refArt) > 0) {
+        fetch("/api/panier", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 0, remise: 0 }),
+        }).catch(() => {});
+      }
+    };
+    if (pct === "" || !Number.isFinite(taux)) {
+      // Champ vidé : plus de remise.
+      if (saisie && (saisie.pct !== "" || saisie.net !== "")) remettre("Remise retirée");
       return;
     }
+    if (taux < 0) return remettre(`Prix au-dessus du tarif catalogue (${fmt(a.prixTtc)} TND)`);
+    if (a.remiseMax && a.remiseMax > 0 && taux > a.remiseMax) {
+      return remettre(`Remise maximale de ${a.remiseMax} % pour ${a.refArt}`);
+    }
+    const arrondi = Number(taux.toFixed(2));
+    setRemises((r) => ({ ...r, [a.refArt]: { pct: String(arrondi), net: ((a.prixTtc || 0) * (1 - arrondi / 100)).toFixed(3) } }));
     setCart((prev) =>
-      prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: taux } : i)),
+      prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: arrondi } : i)),
     );
     // La remise n'est envoyée que si la ligne est déjà au panier : sinon elle
     // sera transmise à l'ajout.
     if (getQty(a.refArt) > 0) {
       fetch("/api/panier", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 0, remise: taux }),
+        body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 0, remise: arrondi }),
       }).catch(() => {});
     }
   }
@@ -463,18 +505,23 @@ export default function CataloguePage() {
                              bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg
                              text-[var(--text-secondary)] opacity-70 cursor-not-allowed" />
                 <span className="text-[11px] font-bold text-[var(--text-secondary)] px-0.5">%</span>
-                <input type="number" inputMode="decimal" min={0} max={100} step="0.01"
+                <input type="text" inputMode="decimal"
                   value={remises[a.refArt]?.pct ?? ""}
                   onChange={(e) => majRemise(a, "pct", e.target.value)}
+                  onBlur={() => validerRemise(a)}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                   placeholder="0"
                   aria-label={`Remise en pourcentage pour ${a.designation}`}
                   className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
                              bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg
                              focus:outline-none focus:border-blue-500" />
                 <span className="text-[11px] font-bold text-[var(--text-secondary)] px-0.5">$</span>
-                <input type="number" inputMode="decimal" min={0} step="0.001"
+                <input type="text" inputMode="decimal"
                   value={remises[a.refArt]?.net ?? fmtNombre(a.prixTtc)}
                   onChange={(e) => majRemise(a, "net", e.target.value)}
+                  onBlur={() => validerRemise(a)}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                  onFocus={(e) => e.target.select()}
                   aria-label={`Prix net TTC pour ${a.designation}`}
                   className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
                              bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg

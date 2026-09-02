@@ -244,7 +244,7 @@ export async function GET(req: NextRequest) {
       // Documents en attente de validation, les plus récents d'abord.
       prisma.erpDocument.findMany({
         where: { nature: "Vente", valide: false, typeDoc: { in: [...TYPES_CA] } },
-        orderBy: { dateDoc: "desc" },
+        orderBy: { dateDoc: { sort: "desc", nulls: "last" } },
         take: 10,
         select: { refDoc: true, typeDoc: true, raisonSocial: true, ttcNet: true, dateDoc: true, commercial: true, utilisateur: true },
       }),

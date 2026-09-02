@@ -133,8 +133,13 @@ export async function POST(req: NextRequest) {
     const refArt = s(body.refArt);
     if (!refArt) return NextResponse.json({ error: "Article requis" }, { status: 400 });
 
-    const qte = num(body.qte) || 1;
-    if (qte <= 0) return NextResponse.json({ error: "Quantité invalide" }, { status: 400 });
+    // Quantité absente → 1 (un tap au catalogue). Quantité 0 explicite →
+    // mise à jour de la remise seule, sans toucher à la quantité. Avant, le
+    // 0 devenait 1 et s'AJOUTAIT à la ligne à chaque frappe de remise :
+    // « 16.92 » tapé = +5 unités invisibles sur le ticket émis.
+    const qte = body.qte === undefined || body.qte === null || body.qte === "" ? 1 : num(body.qte);
+    if (!Number.isFinite(qte) || qte < 0) return NextResponse.json({ error: "Quantité invalide" }, { status: 400 });
+    const remiseSeule = qte === 0;
 
     // Prix et libellé viennent du référentiel, jamais du corps de requête :
     // un client ne doit pas pouvoir fixer son propre tarif.
@@ -168,12 +173,15 @@ export async function POST(req: NextRequest) {
     if (remise > 100) { remiseRefusee = "Remise supérieure à 100 %"; remise = 0; }
 
     const existante = p.lignes.find((l) => l.refArt === refArt);
+    if (remiseSeule && !existante) {
+      return NextResponse.json({ error: "Article absent du panier" }, { status: 404 });
+    }
     // Ajouter un article déjà au panier cumule les quantités, comme dans A.
     const row = existante
       ? await prisma.panierLigne.update({
           where: { id: existante.id },
           data: {
-            qte: round3(existante.qte + qte),
+            ...(remiseSeule ? {} : { qte: round3(existante.qte + qte) }),
             // Une remise transmise remplace la précédente ; sans elle, celle
             // déjà accordée sur la ligne est conservée.
             ...(body.remise != null || body.net != null ? { remise } : {}),

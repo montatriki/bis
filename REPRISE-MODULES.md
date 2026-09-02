@@ -1603,3 +1603,81 @@ date explicite (filtre du journal) fige toujours la recherche sur ce jour.
 
 Vérifié : bandeau → OM-2888, véhicule 248TU6787, 12 clients planifiés ;
 journal vue=jour → mission OM-2888, 12 visites. 0 erreur.
+
+## Quantités fausses sur le ticket (12 / 9 / 10 au lieu de 2 / 1 / 1)
+
+Ticket réel TIC254186 : FARTOUNA ×2, mini box ×1, rolly poly ×1. Notre
+TIC260001 : ×12, ×9, ×10. Reproduit par l'API : 2 taps + saisie de la remise
+« 16.92 » → quantité serveur **7**.
+
+Cause : à chaque frappe dans le champ remise, le catalogue envoyait
+`POST /api/panier {vue:"ligne", qte:0, remise}` ; le serveur faisait
+`num(body.qte) || 1` → le 0 devenait **1** et s'**ajoutait** à la ligne. Cinq
+frappes = +5 unités, invisibles à l'écran (état local intact) mais présentes
+sur le ticket, émis depuis le panier serveur.
+
+Correctifs :
+- serveur : `qte` absent → 1 ; `qte: 0` explicite → **remise seule**, la
+  quantité n'est pas touchée (404 si la ligne n'existe pas) ;
+- catalogue : la quantité locale se recale sur `row.qte` renvoyé par le
+  serveur (ajout et ±), plus de dérive possible ;
+- `TicketCorps` : corps du ticket partagé entre l'impression (`TicketVente`)
+  et l'aperçu de « Dernier ticket » — ce qu'on voit est ce qu'on imprime.
+
+Vérifié (écran, Mokhtar) : 2 ajouts + « 16.92 » tapé → qte 2, 64,802 TND —
+la ligne exacte du ticket réel.
+
+### Effets de bord de la resync, corrigés au passage
+- Tri `dateDoc desc` : un BL à date vide (« 0000-00-00 » → NULL) passait en
+  tête (NULLs premiers en Postgres). `nulls: "last"` sur tickets et dashboard.
+- **Deux jeux de lignes de stock par camion** : la synchro continue de l'app
+  (`sync-production.ts`, toutes les 5 min depuis les écrans de stock) écrit
+  sous les libellés de `ref_tables` kind=depot (anciens : « AZIZ 248TU6787 »),
+  la resync sous ceux de la prod (« 248TU6787 »). Le catalogue prenait le
+  mauvais (« À bord : 13 » au lieu de 20). Libellés `ref_tables` alignés sur
+  `magasins` de la prod, lignes renommées en place, synchro forcée : 10
+  dépôts, un seul jeu. `resync-prod.py` aligne désormais lui-même
+  `ref_tables` et ignore les dépôts absents de `magasins` (comme la synchro).
+- Incident : le scratchpad ayant été vidé, une suppression a retiré les lignes
+  aux nouveaux libellés au lieu des anciens ; sans conséquence, la synchro
+  continue a tout reconstruit depuis la prod. `scripts/pull-prod.sh` recréé
+  (tirage reproductible) ; `resync-prod.py` documente ses entrées.
+
+### Resync : `kind` des articles perdu → « Stock camion » vide
+`resync-prod.py` écrivait `kind = "article"` pour tous ; l'écran « Stock
+camion » (`stockVehicule`) ne montre que `kind = "P"` (produit fini, règle
+de l'ERP : `prouit_fini = 1`). Rétabli depuis la prod avec la règle des
+importeurs d'origine (`prisma/import-articles.ts`) : CH si charge, SF si
+semi-fini, MP si matière première, sinon P → 423 P / 160 MP / 4 CH / 1 SF.
+`resync-prod.py` applique désormais cette règle.
+
+**Référence** : les importeurs de la première migration existent toujours dans
+`prisma/import-external.ts` et `prisma/import-articles.ts` — mapping
+colonne par colonne faisant foi pour toute resync future.
+
+### Nettoyage des pièces de test (décision utilisateur)
+Supprimés : TIC260001 (brouillon, quantités du bug) et TIC260002 (validé),
+leurs 6 lignes, les 2 règlements (170,201 + 111), 3 mouvements de stock,
+paniers de test, mission locale 2891 (auto-générée par le planning, absente
+de la prod) et ses 12 visites, paniers orphelins. Compteurs clients remis :
+Librairie R BISSE nabil 0/0/0, Ste anouar express grombalia crédit −170,201.
+Séquence missions recalée (max prod = 2890). Bandeau → OM-2888.
+
+À décider : les tournées sont créées en prod par l'admin ; notre planning
+peut en générer une localement (« Regénérer »), qui prend le pas sur celle
+de la prod dans le bandeau et dont l'id peut entrer en collision avec le
+prochain id prod. Piste : synchroniser les missions depuis la prod en continu
+(comme le stock) et ne générer localement qu'à défaut.
+
+## Catalogue : le champ prix « bloquait » la saisie
+
+`majRemise` validait à chaque frappe : plafond de remise dépassé sur une
+valeur intermédiaire (« 5 » pour écrire « 50.000 » = 90 % de remise) → champ
+vidé, toast. Impossible de taper un prix chiffre par chiffre ; un prix
+au-dessus du tarif donnait une remise négative acceptée.
+
+Correctif : pendant la frappe, seuls les deux champs (% ↔ prix net) sont
+reliés ; la validation (plafond de l'article, prix jamais au-dessus du tarif)
+et l'envoi au panier se font à la **sortie du champ** ou sur **Entrée**
+(`validerRemise`). Champs `type="text"` + `inputMode="decimal"`, virgule
+acceptée, sélection du contenu au focus.

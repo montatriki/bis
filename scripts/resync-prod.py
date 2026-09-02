@@ -85,7 +85,9 @@ def import_articles():
             num(a.get("ma_tarif1")), num(a.get("Taux_tva")), num(a.get("Taux_fodec")),
             num(a.get("stock_ini")), num(a.get("entrer")), num(a.get("sortie")), num(a.get("en_stock")),
             int(num(a.get("vendable"),1)), int(num(a.get("achetable"),1)), int(num(a.get("service"))),
-            int(num(a.get("archiver"))), s(a.get("ref_origine")), "article",
+            int(num(a.get("archiver"))), s(a.get("ref_origine")),
+            # Même règle que prisma/import-articles.ts : SF / MP / CH, sinon P (produit fini).
+            "SF" if num(a.get("produit_semi_fini")) else "MP" if num(a.get("Matiere_premiere")) else "CH" if num(a.get("charge")) else "P",
             None,None,None,None,None, num(a.get("commission")), num(a.get("conversion"),1),
             int(num(a.get("prouit_fini"))), int(num(a.get("fifo"))), num(a.get("Taux_fodec")),
             int(num(a.get("ger_serie"))), int(num(a.get("ges_lot"))), int(num(a.get("lifo"))),
@@ -238,13 +240,18 @@ def import_stock(valid_arts):
     for x in st:
         ref = s(x.get("reference_article"))
         cd = x.get("code_depot")
-        emp = CODE2EMP.get(cd) or (f"Dépôt {cd}" if cd else None)
+        # Seuls les dépôts de la table `magasins` existent : la synchro continue
+        # de l'application (`src/lib/sync-production.ts`) n'entretient que ceux
+        # de `ref_tables` kind=depot, dont les libellés doivent être identiques.
+        emp = CODE2EMP.get(cd)
         if not ref or not emp or ref not in valid_arts: continue
-        if num(x.get("en_stock")) == 0 and cd not in CODE2EMP: continue  # bruit des dépôts orphelins
         k=(ref,emp)
         if k in seen: continue
         seen.add(k)
         rows.append((ref, emp, num(x.get("en_stock")), num(x.get("pmp")), NOW))
+    for code, lib in CODE2EMP.items():
+        cur.execute("UPDATE ref_tables SET label=%s WHERE kind='depot' AND code=%s", (lib, str(code)))
+        cur.execute("INSERT INTO ref_tables (kind,code,label) SELECT 'depot',%s,%s WHERE NOT EXISTS (SELECT 1 FROM ref_tables WHERE kind='depot' AND code=%s)", (str(code), lib, str(code)))
     cur.execute("DELETE FROM stock_depots")
     exec_many("""INSERT INTO stock_depots ("refArt",emplacement,quantite,pmp,"updatedAt") VALUES %s""", rows)
     rap["stock_depots"] = len(rows)
