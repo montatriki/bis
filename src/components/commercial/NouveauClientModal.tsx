@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Camera, MapPin, Loader2, Check, Crosshair, RefreshCw, AlertTriangle } from "lucide-react";
 import { usePositionGps } from "@/lib/client-actif";
 import { coordValide } from "@/lib/geo";
+import { compresserImage } from "@/lib/image";
 
 // Création d'un point de vente depuis le terrain.
 //
@@ -17,31 +18,6 @@ export type ClientCree = {
   latitude: number | null; longitude: number | null;
 };
 
-/** Côté max de la photo après redimensionnement, en pixels. */
-const PHOTO_COTE_MAX = 1000;
-/** Qualité JPEG : compromis lisibilité / poids pour un envoi en 3G. */
-const PHOTO_QUALITE = 0.7;
-
-/**
- * Redimensionne et compresse une photo en data URL JPEG.
- * Une photo de smartphone fait plusieurs Mo : la stocker telle quelle
- * saturerait la base et la connexion du commercial.
- */
-async function compresserImage(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const ratio = Math.min(1, PHOTO_COTE_MAX / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * ratio);
-  const h = Math.round(bitmap.height * ratio);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas indisponible");
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-  return canvas.toDataURL("image/jpeg", PHOTO_QUALITE);
-}
 
 export default function NouveauClientModal({
   ouvert, onFermer, onCree,

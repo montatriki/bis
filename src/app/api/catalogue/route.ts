@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { requireSession } from "@/lib/session";
 import { cleCommercial, emplacementVehicule } from "@/lib/perimetre-commercial";
 
@@ -120,8 +121,17 @@ export async function GET(req: NextRequest) {
 
     const dansCamion = new Map(enCamion.map((r) => [r.refArt, r.quantite]));
 
+    // Présence d'une photo, sans transporter l'image : la carte la charge à
+    // part (`/api/articles/photo`) quand elle existe.
+    const refs = rows.map((a) => a.refArt);
+    const avecPhoto = refs.length
+      ? new Set((await prisma.$queryRaw<{ refArt: string }[]>`
+          SELECT "refArt" FROM "articles_ext" WHERE "refArt" IN (${Prisma.join(refs)}) AND photo IS NOT NULL`).map((r) => r.refArt))
+      : new Set<string>();
+
     const withTtc = rows.map((a) => ({
       ...a,
+      aPhoto: avecPhoto.has(a.refArt),
       // `enStock` = disponible à la vente : ce qui reste à bord une fois
       // déduit ce que le commercial a déjà mis au panier.
       enStock: qteParRef.get(a.refArt) ?? 0,

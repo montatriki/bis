@@ -113,9 +113,34 @@ export async function emplacementVehicule(
  *
  * `null` = aucune restriction (ADMIN / MANAGER voient tout le portefeuille).
  */
+/** Nom de commercial normalisé : accents, casse et espaces multiples ignorés. */
+export function nomCommercialNormalise(nom?: string | null): string {
+  return String(nom ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Le tiers appartient-il au portefeuille du commercial ? Correspondance
+ * **exacte** du nom, comme « Mes clients » de l'ERP d'origine : en
+ * production, Mokhtar a 182 clients (« mokhtar trabelsi ») ; les 548 tiers
+ * étiquetés « MOKHTAR » (ancienne étiquette) ne sont dans le portefeuille de
+ * personne. Un rapprochement par prénom les lui attribuait — et donnait à
+ * Heni Rekik les clients de HENI LAJMI.
+ */
+export function memePortefeuille(valeur?: string | null, attendu?: string | null): boolean {
+  const a = nomCommercialNormalise(valeur);
+  return a !== "" && a === nomCommercialNormalise(attendu);
+}
+
 export function filtrePortefeuille(user: { role: string; name: string }) {
   if (user.role !== "COMMERCIAL") return null;
-  const cle = cleCommercial(user.name);
-  if (!cle) return null;
-  return { commercial: { startsWith: cle, mode: "insensitive" as const } };
+  const nom = String(user.name ?? "").trim();
+  if (!nom) return null;
+  // `equals` insensible à la casse ; les valeurs de la prod n'ont ni accent
+  // ni espace parasite sur les commerciaux actifs (vérifié : 5/5).
+  return { commercial: { equals: nom, mode: "insensitive" as const } };
 }

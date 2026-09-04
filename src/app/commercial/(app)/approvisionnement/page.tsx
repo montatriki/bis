@@ -1,4 +1,5 @@
 "use client";
+import { dateLocaleIso } from "@/lib/date-locale";
 import { useState, useEffect, useCallback } from "react";
 import { PackagePlus, Loader2, Check, AlertTriangle, Search, Send, Trash2, Truck } from "lucide-react";
 import { confirmer } from "@/lib/alertes";
@@ -177,7 +178,7 @@ function Formulaire({ onFlash, onClose }: {
   useEffect(() => {
     Promise.all([
       fetch("/api/mouvements-depot?vue=emplacements").then((r) => r.json()),
-      fetch(`/api/missions?vue=jour&date=${new Date().toISOString().slice(0, 10)}`).then((r) => r.json()),
+      fetch(`/api/missions?vue=jour&date=${dateLocaleIso()}`).then((r) => r.json()),
     ])
       .then(([e, j]) => {
         setDepots(e.depots ?? []);

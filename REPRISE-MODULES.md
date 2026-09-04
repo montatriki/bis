@@ -1681,3 +1681,236 @@ reliés ; la validation (plafond de l'article, prix jamais au-dessus du tarif)
 et l'envoi au panier se font à la **sortie du champ** ou sur **Entrée**
 (`validerRemise`). Champs `type="text"` + `inputMode="decimal"`, virgule
 acceptée, sélection du contenu au focus.
+
+### Prix vidé en passant à la carte suivante
+Suite du précédent : un prix refusé à la sortie du champ (remise au-delà du
+plafond de l'article, ou prix au-dessus du tarif) laissait le champ **vide**
+et le total de ligne à **0,000**. Désormais tout refus ou effacement
+**rétablit le prix catalogue** (la clé de saisie est retirée, le champ
+réaffiche le tarif), le message dit pourquoi et à quel prix on revient, et le
+total de ligne ne se calcule jamais sur un champ vide.
+Vérifié (coffret 10 en1, TTC 25, plafond 15 %) : 18 → refus, champ 25.000,
+total 25,000, message ; effacé → 25.000 ; 22 → 12 % accepté, panier serveur
+remise=12.
+
+### Prix tapé 30 → affiché 30,002
+La remise était arrondie à 2 décimales (44,44 %) puis le prix recalculé
+depuis cet arrondi (54 × 0,5556 = 30,002). Désormais le **champ saisi fait
+foi** : un prix tapé reste exact (3 décimales), la remise s'en déduit avec
+toute sa précision, et le serveur reçoit le prix net (`body.net`) plutôt que
+le pourcentage ; un pourcentage tapé reste un pourcentage (2 décimales) et
+c'est le prix qui s'en déduit.
+
+## Photo d'article : fiche admin → catalogue commercial
+
+- Migration `20260902090000_article_photo` : `articles_ext.photo TEXT`
+  (data URL JPEG compressée, 1000 px max, ≤ 600 Ko — `src/lib/image.ts`,
+  utilitaire partagé avec la création de client).
+- **Fiche article** (`ArticleForm`) : bloc photo avec aperçu, « Prendre une
+  photo » (`capture="environment"` = appareil arrière sur mobile),
+  « Importer », « Retirer ». `photo` absent = inchangée, data URL = nouvelle,
+  `null` = retirée (`photoArticle()` dans `/api/erp`, validation format/taille).
+- **`GET /api/articles/photo?refArt=`** sert l'image (cache 5 min) : les
+  listes et le catalogue ne transportent qu'un indicateur `aPhoto` (requête
+  `photo IS NOT NULL` sur les refs affichées), jamais les octets.
+- **Catalogue commercial** : carte avec la photo en 160 px, `object-cover`,
+  léger zoom au survol et voile dégradé ; pictogramme sinon.
+
+### Fiche article : refonte de la présentation (admin)
+L'en-tête passait sous la barre du haut (z-index), sections serrées sans
+hiérarchie, pas de mobile. Refonte de `ArticleForm` — logique, champs et
+calculs inchangés :
+- fenêtre `z-[100]`, pleine hauteur sur mobile / carte 94 vh sur bureau,
+  **en-tête et pied fixes**, corps défilant ;
+- en-tête dégradé aux couleurs du module : photo mise en avant (changer /
+  appareil photo / importer / retirer), désignation éditable en titre, badges
+  (réf., type, vendable, achetable, archivé, code-barres), 4 tuiles (PU achat,
+  prix HT, prix TTC, stock final) ;
+- 7 sections en grille responsive (1 → 2 → 3 colonnes) avec icône, titre et
+  sous-titre ; champs avec suffixe (TND, %), focus à la couleur du module ;
+  interrupteurs à bascule à la place des cases ; type d'article en boutons ;
+- pied avec rappel des règles et boutons Annuler / Enregistrer.
+
+## Resynchronisation complète n° 2 (02/09/2026) — outillage durci
+
+`scripts/pull-prod.sh` puis `scripts/resync-prod.py`. Évolutions du script :
+- **véhicules, articles, clients, missions en mise à jour sur place**
+  (upsert) au lieu de supprimer/réinsérer : les FK survivent
+  (`commercials.vehicleId`, `gps_positions.vehicleId`), les **photos**
+  d'articles et de clients et `creePar` sont préservés ; les missions absentes
+  de la prod sont retirées (tournées locales de test) ;
+- **affectation commercial→véhicule rétablie automatiquement** depuis le
+  `Code_mag` du compte de production (`affecter_vehicules`) ;
+- `ref_tables` dépôts alignés sur `magasins`, `kind` des articles selon les
+  drapeaux prod, dépôts orphelins ignorés (comme la synchro continue).
+
+Résultat : partners 4 543, articles 588, documents 28 892 (+45), lignes
+194 698, missions 2 672 (id→2895), règlements 13 990, stock 5 880, véhicules 7,
+5 commerciaux affectés. **CA 4 966 485,01 = prod au centime**, dernier ticket
+TIC254207 (02/09 15:56). Sauvegarde préalable `db/backups/…-224114.dump`.
+
+### Journal de tournée : chargement affiché en négatif et signalé en anomalie
+Le 02/09, Mokhtar n'a fait **aucune vente** en prod : son seul document est
+CMI243450, le **bon de chargement du camion** (COM, 5 526,96 TTC — son HT
+4 699,196 = la valeur du stock camion). Le journal l'affichait « −5 526,960 »
+(convention : tout document en négatif) et le comptait comme « hors règle
+de CA », alors que c'est une opération normale de tournée.
+
+Correctifs :
+- `reconcilierTournee` : nouvelle catégorie **chargements** (COM, DEV), hors
+  CA mais hors alerte ; l'alerte ne vise plus que les types inattendus, en les
+  nommant.
+- Journal : chaque opération est typée — **Vente** (bleu, montant tel quel),
+  **Retour** (rouge, −), **Encaissement** (vert, +), **Chargement** (gris,
+  « hors CA ») — et la carte CA mentionne « n chargement(s) hors CA ».
+- Journal : plus de date forcée à l'ouverture (la date UTC du navigateur
+  faisait rater la tournée selon l'heure) — le serveur choisit la tournée du
+  jour, sinon celle « En cours » ; une date n'est envoyée que si elle est
+  choisie. Les encaissements importés sans nom de tiers prennent le nom du
+  client par son code (`vue=detail`).
+Vérifié : OM-2894 → 1 chargement 5 526,960 « hors CA », aucune alerte ;
+OM-2888 → 9 ventes 2 623,412, chargement 4 305 hors CA, encaissé 227.
+
+## Portefeuille client : correspondance exacte, comme « Mes clients » de la prod
+
+Contrôle direct sur la plateforme d'origine (mobile, compte Mokhtar, lecture
+seule) : journal de caisse du 02/09 = code mission 2894, CA 0, règlements 0
+(identique à nous) ; stock camion identique ; planning 0 client planifié
+(identique). **Écart** : recouvrement « Mes clients (182) », créances
+77 182,742 — chez nous 724 clients.
+
+Cause : `filtrePortefeuille` rapprochait par **prénom** (`startsWith
+"mokhtar"`), ce qui attribuait à Mokhtar les 548 tiers étiquetés « MOKHTAR »
+(ancienne étiquette, dans le portefeuille de personne en prod) — et à Heni
+Rekik les clients de HENI LAJMI. La prod filtre sur le nom **exact** du
+commercial du compte.
+
+Correctif (`perimetre-commercial.ts`) : `filtrePortefeuille` = `equals`
+insensible à la casse sur le nom complet ; `memePortefeuille()` (exact,
+normalisé) pour les contrôles d'accès aux fiches clients. Le rapprochement
+par prénom (`memeCommercial`) reste réservé aux documents et missions, dont
+`utilisateur` vaut « MOKHTAR ». Toutes les vues par portefeuille suivent
+(liste, carte, proches, notifications, créances, rapports, dashboard).
+
+### Journal vide « Aucune tournée pour cette date » — dates converties en UTC
+Choisir une tournée dans le sélecteur fixait la date via
+`toISOString().slice(0,10)` : la tournée du 02/09 (minuit local = 01/09
+23:00 UTC) devenait « 2026-09-01 », et repasser sur « Par date… » rechargeait
+la veille → rien. Même piège dans planning, stock camion et bon
+d'approvisionnement (« date du jour » = veille entre 0 h et 1 h en Tunisie).
+`src/lib/date-locale.ts` (`dateLocaleIso`) remplace les 5 occurrences.
+Vérifié (navigateur en-US, fuseau Africa/Tunis) : ouverture → OM-2894 ;
+choix OM-2894 → champ 2026-09-02 ; retour « Par date… » → OM-2894 ; 31/08 →
+OM-2888 (9 ventes, 2 623,412).
+
+### Journal « par date » : tournées sur plusieurs jours
+Ticket réel TIC254192 du 01/09 (1 039,400) ; notre journal du 01/09 disait
+« Aucune tournée ». Les 8 tickets du 01/09 sont bien rattachés à la tournée
+**2888**, datée du 31/08 mais ouverte du 31/08 11:56 au 02/09 10:46 : dans
+l'ERP d'origine une tournée s'étend sur plusieurs jours, et le journal de
+caisse s'affiche « Du … Au … ». La recherche par date ne regardait que
+`dateOrdre`. Désormais (`vue=jour` et `/api/tournee`) : tournée datée du
+jour, sinon celle dont la période du→au couvre le jour.
+
+### Toutes les heures importées décalées d'une heure
+La prod enregistre l'heure locale de Tunis (UTC+1, pas d'heure d'été) ; notre
+base (`timestamp` sans fuseau) est lue comme de l'UTC par Prisma et le
+navigateur (UTC+1) rajoute une heure : TIC254192 émis à 13:52 s'affichait
+14:52, la tournée 2888 « du 31/08 12:56 » au lieu de 11:56. Correctif à la
+source : horodatages de la prod ramenés en UTC (−1 h) — en base (documents,
+règlements, missions du/au/dateOrdre, visites, dateCreation des tiers prod) et
+dans `resync-prod.py` (`DECALAGE_PROD_H`). Les données créées par notre
+application sont déjà en UTC : tout s'affiche désormais à l'heure réelle.
+Appliqué en rejouant l'import (la mise à jour SQL directe en masse a été
+refusée par le garde-fou) ; années sur deux chiffres de la prod
+(« 25-07-04 ») gérées. Vérifié : TIC254192 = 12:52 UTC → 13:52 affiché ;
+tournée 2888 « du 31/08 11:56 au 02/09 10:46 » comme en prod ; CA inchangé.
+Reste hors périmètre : les règlements fournisseurs (sens F, 718 lignes,
+import initial) gardent l'ancien décalage d'une heure.
+
+### Journal : clic sur un document → ticket imprimable
+Chaque ligne de document du journal (vente, retour, chargement) ouvre
+`TicketVente` — le même ticket que celui émis après commande (articles,
+remises, totaux, impression rouleau 80 mm au gabarit de la prod). Icône
+imprimante en bout de ligne ; les encaissements ne sont pas cliquables.
+Vérifié : TIC254192 → 11 articles / remises, HT 865,666, TVA 173,734, net
+1 039,400 (= ticket papier), fenêtre d'impression ouverte.
+
+### Dernier ticket : clés React en double dans le filtre client
+`vue=clients` regroupait par (codeCli, raisonSocial du ticket) : un client
+dont le nom varie d'un ticket à l'autre (« Client passagé » / « Client
+passager ») apparaissait plusieurs fois avec la même clé (41102063).
+Regroupement par code client seul, nom pris sur la fiche client, tickets
+cumulés (41102063 → 100 tickets). 601 clients, 0 doublon, 0 erreur console.
+
+## Resynchronisation complète n° 3 (03/09/2026 00:12)
+
+Sauvegarde `db/backups/bechir1-avant-resync-20260903-001208.dump`, tirage
+complet, import avec les heures ramenées en UTC. Première tentative annulée
+par une coupure SSL de la base distante en plein insert (rollback implicite,
+base intacte) → keepalives TCP ajoutés à la connexion du script ; seconde
+tentative OK. Résultat : documents 28 842, lignes 194 698, règlements C
+13 990 (5 058 891,13), missions 2 672, partners 4 543, stock 5 880 puis synchro
+continue à l'instant. **CA 4 966 485,01 = prod au centime**, dernier document
+CMI243452 (02/09 16:33), affectations véhicules 5/5, portefeuille Mokhtar 182.
+
+## Bandeau « Client en cours » : fiche rapide + correction de position
+
+Le nom du client dans le bandeau est cliquable (souligné pointillé + chevron)
+et ouvre `ClientActifModal`, au gabarit de la fiche d'étape du planning :
+adresse, solde dû, **Appeler**, **Itinéraire**, **Travailler sur ce client**
+(catalogue), **Fiche complète du mois**. Section « Position du client » :
+état (enregistrée / absente, distance au commercial, précision GPS) et bouton
+**« Corriger la position → ma position GPS »** : confirmation SweetAlert,
+refus si GPS > 100 m, `PUT /api/clients {id, latitude, longitude}` — seule
+la position change (adresse et reste intacts) — puis le bandeau passe en
+« sur place » (client actif rechargé avec les nouvelles coordonnées).
+
+### Dernier ticket : recherche de client
+La liste déroulante (600+ clients) est remplacée par `FiltreClient` : champ
+de recherche (nom ou code, accents ignorés), résultats avec nombre de tickets
+(30 max, invitation à affiner), « Tous les clients », croix pour retirer le
+filtre. Même comportement qu'avant une fois le client choisi (dernier ticket
+du client, navigation bornée à ses tickets).
+Suite : entrée **« Client en cours »** (bandeau) en tête des résultats, même
+sans ticket (« Aucun ticket pour X. » si c'est le cas) ; Précédent/Suivant
+bornés au client choisi ; mise en page mobile revue (recherche pleine
+largeur, Précédent/Suivant/Imprimer sur une ligne, ticket dans un conteneur
+à défilement horizontal, largeur mini 340 px — plus de texte superposé).
+`TicketCorps` accepte `aere` : à l'écran (aperçu Dernier ticket) les
+libellés Commercial / N° ticket / Date ont une colonne élargie ; l'impression
+garde le gabarit exact de la prod (où « Commercialmokhtar trabelsi » est
+d'ailleurs collé sur le ticket papier).
+
+### « Aucun ticket pour Librairie R BISSE nabil » — vérifié en prod : exact
+Client 41102077, étiqueté « MOKHTAR », solde 0. Vérifié sur la production par
+trois sources (table entete_vente complète, route
+`get-all-entete-reglement-by-codecli` de l'ancien mobile, table reg_clients) :
+**0 document, 0 règlement**. Les seuls tickets jamais émis pour ce client
+étaient nos pièces de test (TIC260002, encaissement 1 TND), supprimées à la
+demande de l'utilisateur. L'état vide le dit désormais explicitement et
+propose « Commander pour ce client ».
+
+### Client en cours périmé (« solde 17 TND » fantôme)
+La sélection mémorisée dans le navigateur (`localStorage`) gardait le solde
+et les coordonnées d'avant la resync (le 17 TND venait de nos tests
+supprimés). `ClientActifProvider` rafraîchit désormais le client mémorisé
+depuis `/api/clients?codeCli=` à l'ouverture (solde, adresse, position, tél.)
+et l'oublie s'il n'est plus accessible (403/404). Dernier ticket : « Voir tous
+les tickets » dans l'état vide. Vérifié en prod pour 41102077 : aucune
+activité d'aucune sorte (ventes, achats/retours, visites, réclamations,
+débit/crédit 0) — fiche créée le 07/05/2024.
+
+## Synchronisation CONTINUE des opérations (04/09/2026)
+
+Constat : entre deux resync manuelles, la prod avance (29 pièces de plus le
+04/09 au matin, dont 2 tickets de Mokhtar) — « les données manquent ».
+`src/lib/sync-operations.ts` (même principe que le stock) : ventes + achats
+(en-têtes en masse, lignes document par document pour les nouvelles pièces,
+mise à jour des existantes si solde/réglé/état/tournée bougent), règlements
+clients (par ID_reg), tournées et visites (par id), clients (par code, photo
+et créateur préservés). Heures prod → UTC. Déclenchée en arrière-plan par les
+routes tickets, missions, tournée, clients, dashboard quand les données ont
+plus de 10 min ; `GET/POST /api/sync-operations` pour l'état / le forçage.
+1re passe : +48 pièces, 544 lignes, 9 règlements, 2 tournées, 11 visites,
+2 clients en 33 s.

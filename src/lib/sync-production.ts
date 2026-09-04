@@ -36,7 +36,7 @@ type LigneDepot = {
   pu_achat?: number | string | null;
 };
 
-async function jeton(): Promise<string> {
+export async function jeton(): Promise<string> {
   const r = await fetch(`${API}/users/generateToken`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,7 +49,7 @@ async function jeton(): Promise<string> {
   return t;
 }
 
-async function lire<T>(chemin: string, token: string): Promise<T> {
+export async function lire<T>(chemin: string, token: string): Promise<T> {
   const r = await fetch(`${API}/${chemin}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: token },

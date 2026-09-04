@@ -77,17 +77,43 @@ export function ClientActifProvider({ children }: { children: React.ReactNode })
   // l'initialisation de l'état plutôt que dans un effet : `localStorage` est
   // disponible immédiatement côté client, et cela évite un rendu en cascade.
   useEffect(() => {
+    let annule = false;
     const restaurer = () => {
+      let memo: ClientActif | null = null;
       try {
         const brut = localStorage.getItem(CLE);
-        if (brut) setClient(JSON.parse(brut));
+        if (brut) { memo = JSON.parse(brut) as ClientActif; setClient(memo); }
       } catch {
         // Sélection illisible : on repart d'une tournée vierge.
       }
       setPret(true);
+      // La sélection mémorisée date de la veille ou d'avant une resync : on la
+      // rafraîchit depuis la base (solde, adresse, position). Un solde de
+      // 17 TND effacé depuis restait sinon affiché dans le bandeau. Si le
+      // client n'est plus accessible (hors portefeuille, supprimé), on l'oublie.
+      if (memo?.id) {
+        fetch(`/api/clients?codeCli=${memo.id}`)
+          .then(async (r) => ({ ok: r.ok, status: r.status, d: await r.json().catch(() => ({})) }))
+          .then(({ ok, status, d }) => {
+            if (annule) return;
+            if (!ok) { if (status === 403 || status === 404) { setClient(null); try { localStorage.removeItem(CLE); } catch { /* ignore */ } } return; }
+            const c = d.client;
+            if (!c) return;
+            const frais: ClientActif = {
+              ...memo!,
+              raisonSocial: c.raisonSocial ?? memo!.raisonSocial,
+              ville: c.ville ?? null, gouvernorat: c.gouvernorat ?? null, adresse: c.adresse ?? null,
+              tel: c.tel ?? null, soldeFin: Number(c.soldeFin ?? 0), plafond: c.plafond ?? null,
+              latitude: c.latitude ?? null, longitude: c.longitude ?? null,
+            };
+            setClient(frais);
+            try { localStorage.setItem(CLE, JSON.stringify(frais)); } catch { /* quota plein */ }
+          })
+          .catch(() => { /* hors ligne : on garde la sélection mémorisée */ });
+      }
     };
     const t = setTimeout(restaurer, 0);
-    return () => clearTimeout(t);
+    return () => { annule = true; clearTimeout(t); };
   }, []);
 
   // Dernière position transmise au serveur : on n'envoie que les déplacements

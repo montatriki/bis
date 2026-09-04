@@ -1,4 +1,5 @@
 "use client";
+import { dateLocaleIso } from "@/lib/date-locale";
 import { useState, useEffect, useCallback } from "react";
 import { Package, RotateCcw, ArrowLeftRight, Loader2, Check, AlertTriangle, Truck, RefreshCw } from "lucide-react";
 
@@ -69,7 +70,7 @@ export default function RetourStockPage() {
   useEffect(() => {
     Promise.all([
       fetch("/api/mouvements-depot?vue=emplacements").then((r) => r.json()),
-      fetch(`/api/missions?vue=jour&date=${new Date().toISOString().slice(0, 10)}`).then((r) => r.json()),
+      fetch(`/api/missions?vue=jour&date=${dateLocaleIso()}`).then((r) => r.json()),
     ])
       .then(([e, j]) => {
         setVehicules(e.vehicules ?? []);

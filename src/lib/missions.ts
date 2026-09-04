@@ -170,6 +170,8 @@ export type ReconciliationTournee = {
     id: number; commercial: string | null; vehicule: string | null;
     dateOrdre: Date | null; etat: string | null; objectifCA: number;
     kmDepart: number; kmArrive: number;
+    /** Période d'ouverture de la tournée (l'ERP d'origine : « Du … Au … »). */
+    du: Date | null; au: Date | null;
   };
   visites: {
     total: number; visitees: number; reportees: number; absentes: number; restantes: number;
@@ -177,6 +179,8 @@ export type ReconciliationTournee = {
   };
   ventes: { nb: number; montant: number };
   retours: { nb: number; montant: number };
+  /** Commandes / bons de chargement (COM, DEV) : hors CA, mais pas une anomalie. */
+  chargements: { nb: number; montant: number };
   caNet: number;
   /** Réalisation de l'objectif de la tournée, ou null si aucun objectif fixé. */
   tauxObjectif: number | null;
@@ -221,9 +225,15 @@ export async function reconcilierTournee(dayId: number): Promise<ReconciliationT
 
   const ventes = documents.filter((d) => (TYPES_VENTE as readonly string[]).includes(String(d.typeDoc ?? "").toUpperCase()));
   const retours = documents.filter((d) => (TYPES_RETOUR as readonly string[]).includes(String(d.typeDoc ?? "").toUpperCase()));
-  const horsRegle = documents.filter((d) => signeCA(d.typeDoc) === 0);
+  // Commandes et bons de chargement (CMI = chargement du camion) : ils vivent
+  // légitimement sur une tournée sans entrer dans le CA — ce n'est pas une
+  // anomalie, on les compte à part. Seuls les types vraiment inattendus
+  // sont signalés.
+  const TYPES_CHARGEMENT = ["COM", "DEV"];
+  const chargements = documents.filter((d) => TYPES_CHARGEMENT.includes(String(d.typeDoc ?? "").toUpperCase()));
+  const horsRegle = documents.filter((d) => signeCA(d.typeDoc) === 0 && !TYPES_CHARGEMENT.includes(String(d.typeDoc ?? "").toUpperCase()));
   if (horsRegle.length > 0) {
-    alertes.push(`${horsRegle.length} document(s) hors règle de CA (ni vente ni retour) — non comptés`);
+    alertes.push(`${horsRegle.length} document(s) d'un type inattendu (${[...new Set(horsRegle.map((d) => d.typeDoc))].join(", ")}) — non comptés dans le CA`);
   }
 
   const montantVentes = round3(ventes.reduce((t, d) => t + (d.ttcNet ?? 0), 0));
@@ -271,7 +281,7 @@ export async function reconcilierTournee(dayId: number): Promise<ReconciliationT
     mission: {
       id: mission.id, commercial: mission.commercial, vehicule: mission.vehicule,
       dateOrdre: mission.dateOrdre, etat: mission.etat, objectifCA: mission.objectifCA,
-      kmDepart: mission.kmDepart, kmArrive: mission.kmArrive,
+      kmDepart: mission.kmDepart, kmArrive: mission.kmArrive, du: mission.du, au: mission.au,
     },
     visites: {
       total, visitees, reportees, absentes,
@@ -280,6 +290,7 @@ export async function reconcilierTournee(dayId: number): Promise<ReconciliationT
     },
     ventes: { nb: ventes.length, montant: montantVentes },
     retours: { nb: retours.length, montant: montantRetours },
+    chargements: { nb: chargements.length, montant: round3(chargements.reduce((t, d) => t + (d.ttcNet ?? 0), 0)) },
     caNet,
     tauxObjectif: mission.objectifCA > 0 ? round3((caNet / mission.objectifCA) * 100) : null,
     encaissements: {

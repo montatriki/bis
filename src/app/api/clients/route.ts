@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { rafraichirOperationsSiPerime } from "@/lib/sync-operations";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
 import { coordValide, distanceM } from "@/lib/geo";
-import { filtrePortefeuille, memeCommercial } from "@/lib/perimetre-commercial";
+import { filtrePortefeuille, memePortefeuille } from "@/lib/perimetre-commercial";
 
 // Clients réels (table `partners`, nature C) pour les écrans commerciaux.
 //
@@ -14,6 +15,9 @@ import { filtrePortefeuille, memeCommercial } from "@/lib/perimetre-commercial";
 export async function GET(req: NextRequest) {
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+  // Production vivante : si les opérations datent, une mise à jour part en
+  // arrière-plan — cette requête sert l'état connu, la suivante le frais.
+  void rafraichirOperationsSiPerime();
 
   const sp = req.nextUrl.searchParams;
 
@@ -33,7 +37,7 @@ export async function GET(req: NextRequest) {
     if (!client) return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
     // Un commercial ne peut pas ouvrir la fiche d'un client d'un collègue en
     // devinant son code.
-    if (auth.user.role === "COMMERCIAL" && !memeCommercial(client.commercial, auth.user.name)) {
+    if (auth.user.role === "COMMERCIAL" && !memePortefeuille(client.commercial, auth.user.name)) {
       return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
     }
     return NextResponse.json({ client, docs });
@@ -140,7 +144,7 @@ export async function PUT(req: NextRequest) {
 
   const client = await prisma.partner.findUnique({ where: { id } });
   if (!client || client.nature !== "C") return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
-  if (auth.user.role === "COMMERCIAL" && !memeCommercial(client.commercial, auth.user.name)) {
+  if (auth.user.role === "COMMERCIAL" && !memePortefeuille(client.commercial, auth.user.name)) {
     return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
   }
 

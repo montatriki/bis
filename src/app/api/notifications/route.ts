@@ -83,11 +83,14 @@ export async function GET() {
   const perimetre = filtrePortefeuille({ role, name: auth.user.name });
 
   // Un client ne voit que ce qui le concerne : ses propres documents impayés.
+  // Seules les ventes (ticket, BL, facture) font une créance : une commande
+  // ou un bon de chargement (COM/CMI) avec un solde n'est pas un impayé.
+  const baseImpayes = { nature: "Vente", typeDoc: { in: ["TIC", "BL", "FC"] }, soldeDoc: { gt: 0 } };
   const filtreImpayes = estClient
-    ? { nature: "Vente", soldeDoc: { gt: 0 }, codeCli: auth.user.codeTiers ?? -1 }
+    ? { ...baseImpayes, codeCli: auth.user.codeTiers ?? -1 }
     : perimetre
-      ? { nature: "Vente", soldeDoc: { gt: 0 }, ...perimetre }
-      : { nature: "Vente", soldeDoc: { gt: 0 } };
+      ? { ...baseImpayes, ...perimetre }
+      : baseImpayes;
 
   // Le stock qui compte pour un commercial est celui de son camion ; pour les
   // autres, la rupture au catalogue.

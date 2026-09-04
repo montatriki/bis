@@ -40,7 +40,9 @@ function libelleType(type?: string | null) {
 
 const TicketCorps = forwardRef<HTMLDivElement, {
   ticket: TicketData; lignes: LigneTicket[]; reglements: ReglementTicket[]; societe: Record<string, string>;
-}>(function TicketCorps({ ticket, lignes, reglements, societe }, ref) {
+  /** Aperçu à l'écran : colonnes de libellés élargies (le gabarit rouleau colle « Commercial: » au nom). L'impression reste au gabarit exact. */
+  aere?: boolean;
+}>(function TicketCorps({ ticket, lignes, reglements, societe, aere = false }, ref) {
   // Taux affiché comme sur l'original (« Taux tva : 19% ») : le taux des
   // lignes quand il est uniforme, 19 sinon.
   const taux = (() => {
@@ -79,9 +81,9 @@ const TicketCorps = forwardRef<HTMLDivElement, {
                 ["Date :", fmtDate(ticket.dateDoc)],
               ].map(([lib, val]) => (
                 <div key={lib} style={{ ...ligne12, width: "100%" }}>
-                  <div style={{ ...ligne12, width: "20%", paddingLeft: 30 }}>{lib}</div>
-                  <div style={{ ...ligne12, width: "40%" }}>
-                    <div style={{ display: "flex", alignItems: "center", paddingLeft: 5, width: "100%" }}>{val}</div>
+                  <div style={{ ...ligne12, width: aere ? "32%" : "20%", minWidth: aere ? 92 : undefined, paddingLeft: aere ? 12 : 30, whiteSpace: "nowrap" }}>{lib}</div>
+                  <div style={{ ...ligne12, width: aere ? "68%" : "40%" }}>
+                    <div style={{ display: "flex", alignItems: "center", paddingLeft: 5, width: "100%", whiteSpace: "nowrap" }}>{val}</div>
                   </div>
                 </div>
               ))}

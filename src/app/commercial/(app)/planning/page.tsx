@@ -1,4 +1,5 @@
 "use client";
+import { dateLocaleIso } from "@/lib/date-locale";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -43,7 +44,7 @@ type Tournee = {
 };
 
 const fmt0 = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n ?? 0);
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => dateLocaleIso(d);
 
 const ETAT_CFG: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   "Visité":    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
@@ -166,7 +167,7 @@ export default function PlanningPage() {
     // départ : le plan se bâtissait dessus, puis le verrou `autoGen` empêchait
     // toute correction quand le vrai GPS arrivait. On attend un fix exploitable.
     if (position.precision != null && position.precision > PRECISION_MAX_M) return;
-    if (date !== new Date().toISOString().slice(0, 10)) return;  // seulement aujourd'hui
+    if (date !== dateLocaleIso()) return;  // seulement aujourd'hui
     if (tournee && (tournee.etapes?.length ?? 0) > 0) return;    // un plan existe déjà
     autoGen.current = true;
     // Différé d'un tour : la génération met à jour l'état, l'appeler dans le

@@ -934,12 +934,23 @@ async function recomputePartnerSolde(tiersCode: number | null | undefined, sens:
 }
 
 // Full Fiche-article payload mapping (used by POST + PUT)
+/** Photo d'article : data URL image, 600 Ko max ; `undefined` = inchangée, `null` = retirée. */
+function photoArticle(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === "") return null;
+  const p = String(v);
+  if (!p.startsWith("data:image/")) throw new Error("Format de photo non supporté");
+  if (p.length > 600_000) throw new Error("Photo trop volumineuse (max 600 Ko)");
+  return p;
+}
+
 function articleData(body: Record<string, unknown>, refArt: string) {
   const tva = num(body.tauxTva);
   const puAchatTtc = num(body.puAchatTtc) || Number((num(body.puAchat) * (1 + tva / 100)).toFixed(3));
   const enStock = num(body.enStock) || (num(body.stockIni) + num(body.entrer) - num(body.sortie));
   return {
     puAchatTtc, enStock,
+    photo: photoArticle(body.photo),
     refArt, kind: s(body.kind) || "P",
     fab: s(body.fab), refOrigine: s(body.refOrigine), codeBarre: s(body.codeBarre),
     designation: s(body.designation) || "—", caract: s(body.caract),

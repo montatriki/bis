@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { rafraichirOperationsSiPerime } from "@/lib/sync-operations";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
 import { filtrePortefeuille, cleCommercial } from "@/lib/perimetre-commercial";
@@ -47,6 +48,9 @@ function perimetre(user: { role: string; name: string }): string | null {
 export async function GET(req: NextRequest) {
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+  // Production vivante : si les opérations datent, une mise à jour part en
+  // arrière-plan — cette requête sert l'état connu, la suivante le frais.
+  void rafraichirOperationsSiPerime();
 
   const sp = req.nextUrl.searchParams;
   const vue = sp.get("vue") ?? "liste";
@@ -188,15 +192,30 @@ export async function GET(req: NextRequest) {
     // sur la tournée « En cours » quand rien n'est daté d'aujourd'hui (l'ordre
     // du jour n'est créé qu'au matin).
     const dateImposee = dateDe(sp.get("date")) != null;
+    // Une tournée de l'ERP d'origine s'étend sur plusieurs jours (2888 : datée
+    // du 31/08, ouverte du 31/08 11:56 au 02/09 10:46 — les ventes du 01/09 lui
+    // appartiennent). On retient donc la tournée datée du jour, ou à défaut
+    // celle dont la période couvre ce jour.
+    const couvreLeJour = {
+      commercial: { startsWith: cle, mode: "insensitive" as const },
+      etat: { notIn: ["Annulée"] },
+      OR: [
+        { dateOrdre: { gte: jour, lt: lendemain } },
+        { du: { lt: lendemain }, OR: [{ au: null }, { au: { gte: jour } }] },
+      ],
+    };
     let mission = await prisma.erpMission.findFirst({
-      where: {
-        commercial: { startsWith: cle, mode: "insensitive" },
-        dateOrdre: { gte: jour, lt: lendemain },
-        etat: { notIn: ["Annulée"] },
-      },
+      where: { ...couvreLeJour, dateOrdre: { gte: jour, lt: lendemain } },
       include: { lignes: lignesOrd },
       orderBy: { id: "desc" },
     });
+    if (!mission) {
+      mission = await prisma.erpMission.findFirst({
+        where: couvreLeJour,
+        include: { lignes: lignesOrd },
+        orderBy: { dateOrdre: "desc" },
+      });
+    }
     if (!mission && !dateImposee) {
       mission = await prisma.erpMission.findFirst({
         where: { commercial: { startsWith: cle, mode: "insensitive" }, etat: "En cours" },
@@ -269,13 +288,21 @@ export async function GET(req: NextRequest) {
       }),
       prisma.erpReglement.findMany({
         where: { dayId: id },
-        select: { id: true, datePay: true, tiersNom: true, montant: true, modePay: true, etat: true },
+        select: { id: true, datePay: true, tiersNom: true, tiersCode: true, montant: true, modePay: true, etat: true },
         orderBy: { datePay: "asc" },
       }),
       prisma.reclamation.findMany({ where: { dayId: id }, orderBy: { dateReclam: "desc" } }),
     ]);
 
-    return NextResponse.json({ reconciliation: recon, lignes, documents, reglements, reclamations });
+    // Les règlements importés de la production ne portent pas le nom du
+    // tiers : on le prend sur la fiche client, par son code.
+    const codesSansNom = [...new Set(reglements.filter((r) => !r.tiersNom && r.tiersCode != null).map((r) => r.tiersCode as number))];
+    const noms = codesSansNom.length
+      ? new Map((await prisma.partner.findMany({ where: { id: { in: codesSansNom } }, select: { id: true, raisonSocial: true } })).map((p) => [p.id, p.raisonSocial]))
+      : new Map<number, string | null>();
+    const reglementsNommes = reglements.map((r) => ({ ...r, tiersNom: r.tiersNom ?? (r.tiersCode != null ? noms.get(r.tiersCode) ?? null : null) }));
+
+    return NextResponse.json({ reconciliation: recon, lignes, documents, reglements: reglementsNommes, reclamations });
   }
 
   if (vue === "stock-vehicule") {

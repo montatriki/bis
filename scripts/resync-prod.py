@@ -5,7 +5,7 @@
 # ID_reg des règlements, refDoc/refArt) pour préserver les rattachements.
 #
 # Écrit UNIQUEMENT dans la base locale (DATABASE_URL). Ne touche jamais la prod.
-import json, os, glob, sys
+import json, os, glob, sys, re, datetime
 import psycopg2, psycopg2.extras
 
 SCR = os.environ["SCR"]
@@ -21,14 +21,40 @@ def num(v, d=0.0):
         if v in (None, "", "0000-00-00"): return d
         return float(v)
     except (ValueError, TypeError): return d
+# La production enregistre l'heure LOCALE de Tunis (UTC+1 toute l'année, sans
+# heure d'été). Notre base la lit comme de l'UTC et le navigateur (UTC+1)
+# rajoutait une heure : un ticket de 13:52 s'affichait 14:52. On ramène donc
+# chaque horodatage importé en UTC en retirant ce décalage.
+DECALAGE_PROD_H = 1
 def dt(v):
-    # MySQL '0000-00-00' → NULL ; sinon la chaîne telle quelle (Postgres la lit).
+    # MySQL '0000-00-00' → NULL ; sinon horodatage ramené en UTC.
     if not v or str(v).startswith("0000-00-00"): return None
-    return str(v)
+    t = str(v).strip()
+    # Année sur deux chiffres (« 25-07-04 00:00:00 ») : la prod en contient.
+    if re.match(r"^\d{2}-\d{2}-\d{2}", t): t = "20" + t
+    try:
+        d = datetime.datetime.fromisoformat(t[:19]) if len(t) >= 19 else datetime.datetime.fromisoformat(t[:10])
+    except ValueError:
+        return None
+    if d.year < 1900: return None
+    return (d - datetime.timedelta(hours=DECALAGE_PROD_H)).strftime("%Y-%m-%d %H:%M:%S")
 def bol(v): return bool(num(v, 0))
 
-conn = psycopg2.connect(DB); conn.autocommit = False
+# Base distante : la transaction dure plusieurs minutes, on maintient la
+# connexion vivante (une coupure SSL en plein milieu a déjà tout annulé).
+conn = psycopg2.connect(DB, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5,
+                        options="-c statement_timeout=0"); conn.autocommit = False
 cur = conn.cursor()
+def upsert(sql, cle, exclus=()):
+    """Transforme un INSERT … ON CONFLICT (cle) DO NOTHING en mise à jour sur
+    place : les lignes existantes sont rafraîchies (sauf `exclus`, données
+    locales à préserver : photos…), les nouvelles ajoutées. Ne supprime rien —
+    les FK (affectation véhicule, positions GPS) restent intactes."""
+    cols = [c.strip() for c in re.search(r'\(([^)]*)\)\s*VALUES', sql, re.S).group(1).split(",")]
+    cles = {k.strip() for k in cle.split(",")}
+    setc = ", ".join(f"{c}=EXCLUDED.{c}" for c in cols if c not in cles and c.strip('"') not in exclus)
+    return sql.replace("DO NOTHING", f"DO UPDATE SET {setc}")
+
 def exec_many(sql, rows, page=2000):
     for i in range(0, len(rows), page):
         psycopg2.extras.execute_values(cur, sql, rows[i:i+page], page_size=page)
@@ -61,12 +87,11 @@ def import_clients():
             int(num(c.get("bloq"))), int(num(c.get("exo"))), int(num(c.get("assuj"))), 0,
             s(c.get("registre_com")), dt(c.get("date_creation")), None, None, num(c.get("charge")),
         ))
-    cur.execute("DELETE FROM partners WHERE nature='C'")
-    exec_many("""INSERT INTO partners (id,nature,"raisonSocial",adresse,tel,fax,email,ville,gouvernorat,
+    exec_many(upsert("""INSERT INTO partners (id,nature,"raisonSocial",adresse,tel,fax,email,ville,gouvernorat,
         "codeTva",cletva,"categorieTva","matriculeF",famille,"sousFamille",
         "soldeIni",debit,credit,"soldeFin",plafond,"remiseDef",commercial,longitude,latitude,
         archiver,exo,assuj,"isEmploye","registreCom","dateCreation","creePar",photo,charge) VALUES %s
-        ON CONFLICT (id) DO NOTHING""", rows)
+        ON CONFLICT (id) DO NOTHING""", "id", ("photo", "creePar")), rows)
     rap["partners(C)"] = len(rows)
 
 # ── articles_ext ─────────────────────────────────────────────────────────────
@@ -95,13 +120,12 @@ def import_articles():
             int(num(a.get("remiseparqte"))), s(a.get("id_sous_categorie")),
             num(a.get("st_max")), num(a.get("st_min")), s(a.get("unite_entree")),
         ))
-    cur.execute("DELETE FROM articles_ext")
-    exec_many("""INSERT INTO articles_ext ("refArt","codeBarre",designation,caract,catalogue,"codeCatalogue",
+    exec_many(upsert("""INSERT INTO articles_ext ("refArt","codeBarre",designation,caract,catalogue,"codeCatalogue",
         famille,"sousFamille",unite,"puAchat","puAchatTtc",pmp,dpa,"puInv","tarif1Ht","tarif2Ht","tarif3Ht",
         "maTarif1","tauxTva","tauxFodec","stockIni",entrer,sortie,"enStock",vendable,achetable,service,archiver,
         "refOrigine",kind,"cmpteAchatImp","cmpteAchatLoc","cmpteVente","cmpteVenteExo","cmpteVenteExp",
         commission,conversion,fab,fifo,"fodecAchat","gerSerie","gesLot",lifo,"margePct",marque,"remiseMax",
-        "remiseParQte","sousCategorie","stMax","stMin","uniteEntree") VALUES %s ON CONFLICT ("refArt") DO NOTHING""", rows)
+        "remiseParQte","sousCategorie","stMax","stMin","uniteEntree") VALUES %s ON CONFLICT ("refArt") DO NOTHING""", '"refArt"'), rows)
     rap["articles_ext"] = len(rows)
 
 # ── documents_ext (ventes + achats) ──────────────────────────────────────────
@@ -169,10 +193,12 @@ def import_missions():
             dt(m.get("date_ordre")), int(num(m.get("km_depart"))), int(num(m.get("km_arrive"))),
             s(m.get("etat")), dt(m.get("du")), dt(m.get("au")), 0.0,
         ))
-    cur.execute("DELETE FROM erp_missions")
-    exec_many("""INSERT INTO erp_missions (id,utilisateur,commercial,vehicule,"dateOrdre","kmDepart","kmArrive",
-        etat,du,au,"objectifCA") VALUES %s ON CONFLICT (id) DO NOTHING""", rows)
-    rap["erp_missions"] = len(rows)
+    exec_many(upsert("""INSERT INTO erp_missions (id,utilisateur,commercial,vehicule,"dateOrdre","kmDepart","kmArrive",
+        etat,du,au,"objectifCA") VALUES %s ON CONFLICT (id) DO NOTHING""", "id", ("objectifCA",)), rows)
+    # Missions locales absentes de la prod (générées par le planning en test) : retirées.
+    ids = [r[0] for r in rows if r[0] is not None]
+    cur.execute("DELETE FROM erp_missions WHERE NOT (id = ANY(%s))", (ids,))
+    rap["erp_missions"] = len(rows); rap["missions locales retirées"] = cur.rowcount
 
 # ── ligne_mission (id conservé) ──────────────────────────────────────────────
 def import_ligne_mission(valid_days):
@@ -269,11 +295,30 @@ def import_vehicules():
             dt(v.get("date_debut_assurance")), dt(v.get("date_liv_visite")), dt(v.get("date_pay_taxe")),
             num(v.get("MoyKM")), num(v.get("consom_moy_j")), num(v.get("consom_carbur")),
         ))
-    cur.execute("DELETE FROM vehicles")
-    exec_many("""INSERT INTO vehicles (id,plate,brand,model,year,status,"insuranceExpiry","controlExpiry",
+    exec_many(upsert("""INSERT INTO vehicles (id,plate,brand,model,year,status,"insuranceExpiry","controlExpiry",
         "taxExpiry",chassis,"typeVehicule",couleur,assureur,"insuranceStart","controlStart","taxPaidAt",
-        "kmMoyen","consoMoyenneJour","consoCarburant") VALUES %s ON CONFLICT (id) DO NOTHING""", rows)
+        "kmMoyen","consoMoyenneJour","consoCarburant") VALUES %s ON CONFLICT (id) DO NOTHING""", "id"), rows)
     rap["vehicles"] = len(rows)
+    affecter_vehicules()
+
+# ── commercials.vehicleId : depuis le Code_mag du compte de production ─────
+def affecter_vehicules():
+    users = load("src-users")
+    code_par_nom = {}
+    for u in users:
+        nom = (u.get("commercial") or "").strip().lower()
+        if nom and u.get("Code_mag"): code_par_nom.setdefault(nom, u["Code_mag"])
+    cur.execute('SELECT c.id, u.name FROM commercials c JOIN users u ON u.id=c."userId"')
+    nb = 0
+    for cid, name in cur.fetchall():
+        nom = (name or "").strip().lower()
+        code = code_par_nom.get(nom) or next((c for n_, c in code_par_nom.items() if n_.split()[0] == nom.split()[0]), None) if nom else None
+        lib = CODE2EMP.get(code) if code else None
+        m = re.search(r"\d{2,3}TU\d{3,4}", lib or "")
+        if not m: continue
+        cur.execute('UPDATE commercials SET "vehicleId"=(SELECT id FROM vehicles WHERE plate=%s) WHERE id=%s AND EXISTS (SELECT 1 FROM vehicles WHERE plate=%s)', (m.group(0), cid, m.group(0)))
+        nb += cur.rowcount
+    rap["commercials→vehicule"] = nb
 
 try:
     import_clients()

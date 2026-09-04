@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { rafraichirOperationsSiPerime } from "@/lib/sync-operations";
 import { filtrePortefeuille } from "@/lib/perimetre-commercial";
 import { requireSession } from "@/lib/session";
 import { TYPES_CA, signeCA, periode, MOIS_COURTS, round3 } from "@/lib/vente-stats";
@@ -89,6 +90,8 @@ export async function GET(req: NextRequest) {
   // pas à connaître le CA de la société. Son espace dédié est `/api/espace-client`.
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+  // Production vivante : mise à jour en arrière-plan si les opérations datent.
+  void rafraichirOperationsSiPerime();
 
   const sp = req.nextUrl.searchParams;
   const scope = sp.get("scope") ?? "admin";

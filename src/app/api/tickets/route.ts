@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { rafraichirOperationsSiPerime } from "@/lib/sync-operations";
 import { requireSession } from "@/lib/session";
 import { cleCommercial, memeCommercial } from "@/lib/perimetre-commercial";
 import { round3 } from "@/lib/vente-stats";
@@ -20,6 +21,9 @@ const TYPES_TICKET = ["TIC", "BL", "FC"];
 export async function GET(req: NextRequest) {
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+  // Production vivante : si les opérations datent, une mise à jour part en
+  // arrière-plan — cette requête sert l'état connu, la suivante le frais.
+  void rafraichirOperationsSiPerime();
 
   // Identité d'impression de la société, seule : sert aux reçus (recouvrement).
   if (req.nextUrl.searchParams.get("vue") === "societe") {
@@ -130,14 +134,23 @@ export async function GET(req: NextRequest) {
   // clients — les clients du commercial ayant au moins un ticket, pour le
   // filtre de l'écran « Dernier ticket ». Triés du plus servi au moins servi.
   if (vue === "clients") {
+    // Un seul groupe par code client : la raison sociale figurant sur les
+    // tickets varie dans le temps (orthographe, casse) et dédoublait le même
+    // client dans la liste — clés React en double, entrées redondantes. Le nom
+    // affiché est celui de la fiche client, à jour.
     const groupes = await prisma.erpDocument.groupBy({
-      by: ["codeCli", "raisonSocial"],
+      by: ["codeCli"],
       where: { ...filtre, codeCli: { not: null } },
       _count: { refDoc: true },
     });
+    const codes = groupes.map((g) => g.codeCli as number);
+    const noms = new Map(
+      (await prisma.partner.findMany({ where: { id: { in: codes } }, select: { id: true, raisonSocial: true } }))
+        .map((p) => [p.id, (p.raisonSocial ?? "").trim()]),
+    );
     const rows = groupes
-      .map((g) => ({ codeCli: g.codeCli, raisonSocial: (g.raisonSocial ?? "").trim() || `Client ${g.codeCli}`, nb: g._count.refDoc }))
-      .sort((a, b) => b.nb - a.nb);
+      .map((g) => ({ codeCli: g.codeCli as number, raisonSocial: noms.get(g.codeCli as number) || `Client ${g.codeCli}`, nb: g._count.refDoc }))
+      .sort((a, b) => b.nb - a.nb || a.raisonSocial.localeCompare(b.raisonSocial, "fr"));
     return NextResponse.json({ rows });
   }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { rafraichirOperationsSiPerime } from "@/lib/sync-operations";
 import { requireSession } from "@/lib/session";
 import { cleCommercial, memeCommercial } from "@/lib/perimetre-commercial";
 import { coordValide, distanceM } from "@/lib/geo";
@@ -121,15 +122,30 @@ async function chargerTournee(
   const lignesOrd = { orderBy: [{ numOrdre: "asc" as const }, { id: "asc" as const }] };
 
   // 1) La mission datée d'aujourd'hui.
+  // Une tournée de l'ERP d'origine s'étend sur plusieurs jours (2888 : datée
+  // du 31/08, ouverte du 31/08 11:56 au 02/09 10:46 — les ventes du 01/09 lui
+  // appartiennent). On retient donc la tournée datée du jour, ou à défaut
+  // celle dont la période couvre ce jour.
+  const couvreLeJour = {
+    commercial: { startsWith: cle, mode: "insensitive" as const },
+    etat: { notIn: ["Annulée"] },
+    OR: [
+      { dateOrdre: { gte: jour, lt: lendemain } },
+      { du: { lt: lendemain }, OR: [{ au: null }, { au: { gte: jour } }] },
+    ],
+  };
   let mission = await prisma.erpMission.findFirst({
-    where: {
-      commercial: { startsWith: cle, mode: "insensitive" },
-      dateOrdre: { gte: jour, lt: lendemain },
-      etat: { notIn: ["Annulée"] },
-    },
+    where: { ...couvreLeJour, dateOrdre: { gte: jour, lt: lendemain } },
     include: { lignes: lignesOrd },
     orderBy: { id: "desc" },
   });
+  if (!mission) {
+    mission = await prisma.erpMission.findFirst({
+      where: couvreLeJour,
+      include: { lignes: lignesOrd },
+      orderBy: { dateOrdre: "desc" },
+    });
+  }
 
   // 2) Sinon, la tournée encore « En cours » : une mission ouverte hier reste
   //    la tournée active tant qu'elle n'est pas clôturée (l'admin crée l'ordre
@@ -201,6 +217,9 @@ async function chargerTournee(
 export async function GET(req: NextRequest) {
   const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
   if (!auth.ok) return auth.res;
+  // Production vivante : si les opérations datent, une mise à jour part en
+  // arrière-plan — cette requête sert l'état connu, la suivante le frais.
+  void rafraichirOperationsSiPerime();
 
   const sp = req.nextUrl.searchParams;
   const commercial = perimetre(auth.user) ?? s(sp.get("commercial"));

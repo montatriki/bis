@@ -18,6 +18,7 @@ type Article = {
   tarif1Ht: number; tauxTva: number; tauxFodec?: number; prixTtc: number;
   /** Remise maximale autorisee sur l'article, en % (0 = pas de plafond). */
   remiseMax?: number;
+  aPhoto?: boolean;
 };
 type CartItem = { article: Article; qty: number; remise?: number };
 
@@ -48,7 +49,7 @@ export default function CataloguePage() {
   // Remise en cours de saisie, par article. Comme dans l'ERP d'origine, le
   // commercial peut entrer soit le pourcentage, soit le prix net : les deux
   // champs restent lies.
-  const [remises, setRemises] = useState<Record<string, { pct: string; net: string }>>({});
+  const [remises, setRemises] = useState<Record<string, { pct: string; net: string; champ?: "pct" | "net" }>>({});
   // Étape de règlement, entre le panier et l'émission du ticket : c'est la
   // séquence de l'application d'origine — on choisit le mode, on saisit le
   // montant encaissé, puis le ticket est émis et imprimé.
@@ -130,7 +131,10 @@ export default function CataloguePage() {
   function addToCart(a: Article) {
     // La remise saisie doit suivre l'article dans le panier local, sinon le
     // total affiché repart du prix catalogue.
-    const remise = Number(remises[a.refArt]?.pct) || 0;
+    const saisie = remises[a.refArt];
+    const remise = saisie?.champ === "net" && saisie.net && a.prixTtc
+      ? 100 - (Number(saisie.net) * 100) / a.prixTtc
+      : Number(saisie?.pct) || 0;
     setCart((prev) => {
       const ex = prev.find((i) => i.article.refArt === a.refArt);
       if (ex) {
@@ -143,8 +147,11 @@ export default function CataloguePage() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         vue: "ligne", refArt: a.refArt, qte: 1,
-        // Remise éventuellement saisie avant l'ajout.
-        remise: Number(remises[a.refArt]?.pct) || 0,
+        // Remise éventuellement saisie avant l'ajout — par prix net si c'est
+        // le prix qui a été tapé, pour qu'il reste exact.
+        ...(remises[a.refArt]?.champ === "net" && remises[a.refArt]?.net
+          ? { net: Number(remises[a.refArt]!.net) }
+          : { remise: Number(remises[a.refArt]?.pct) || 0 }),
       }),
     })
       .then((r) => r.json())
@@ -202,7 +209,7 @@ export default function CataloguePage() {
         ? ""
         : (100 - (n * 100) / ttc).toFixed(2);
     }
-    setRemises((r) => ({ ...r, [a.refArt]: { pct, net } }));
+    setRemises((r) => ({ ...r, [a.refArt]: { pct, net, champ } }));
   }
 
   /**
@@ -214,10 +221,12 @@ export default function CataloguePage() {
     const saisie = remises[a.refArt];
     const pct = saisie?.pct ?? "";
     const taux = Number(pct);
+    // Retour au prix catalogue : la clé est retirée, les champs réaffichent
+    // le tarif (et non un vide qui faisait tomber le total de ligne à 0,000).
     const remettre = (msg: string) => {
       setToast(msg);
       setTimeout(() => setToast(null), 3500);
-      setRemises((r) => ({ ...r, [a.refArt]: { pct: "", net: "" } }));
+      setRemises((r) => { const n = { ...r }; delete n[a.refArt]; return n; });
       setCart((prev) => prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: 0 } : i)));
       if (getQty(a.refArt) > 0) {
         fetch("/api/panier", {
@@ -227,25 +236,31 @@ export default function CataloguePage() {
       }
     };
     if (pct === "" || !Number.isFinite(taux)) {
-      // Champ vidé : plus de remise.
-      if (saisie && (saisie.pct !== "" || saisie.net !== "")) remettre("Remise retirée");
+      // Champ vidé ou illisible : retour au prix catalogue, sans remise.
+      if (saisie) remettre(`Prix catalogue rétabli : ${fmt(a.prixTtc)} TND`);
       return;
     }
-    if (taux < 0) return remettre(`Prix au-dessus du tarif catalogue (${fmt(a.prixTtc)} TND)`);
+    if (taux < 0) return remettre(`Prix au-dessus du tarif catalogue — remis à ${fmt(a.prixTtc)} TND`);
     if (a.remiseMax && a.remiseMax > 0 && taux > a.remiseMax) {
-      return remettre(`Remise maximale de ${a.remiseMax} % pour ${a.refArt}`);
+      return remettre(`Remise maximale de ${a.remiseMax} % pour ${a.designation} — prix remis à ${fmt(a.prixTtc)} TND`);
     }
-    const arrondi = Number(taux.toFixed(2));
-    setRemises((r) => ({ ...r, [a.refArt]: { pct: String(arrondi), net: ((a.prixTtc || 0) * (1 - arrondi / 100)).toFixed(3) } }));
+    // Le champ saisi fait foi. Un prix tapé (30) reste 30,000 : la remise
+    // s'en déduit avec toute sa précision (44,444…%) et le serveur reçoit le
+    // prix net. Recalculer le prix depuis la remise arrondie donnait 30,002.
+    const ttc = a.prixTtc || 0;
+    const parPrix = saisie?.champ === "net";
+    const net = parPrix ? Number(Number(saisie!.net).toFixed(3)) : Number((ttc * (1 - Number(taux.toFixed(2)) / 100)).toFixed(3));
+    const precis = parPrix && ttc > 0 ? 100 - (net * 100) / ttc : Number(taux.toFixed(2));
+    setRemises((r) => ({ ...r, [a.refArt]: { pct: precis.toFixed(2), net: net.toFixed(3), champ: saisie?.champ } }));
     setCart((prev) =>
-      prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: arrondi } : i)),
+      prev.map((i) => (i.article.refArt === a.refArt ? { ...i, remise: precis } : i)),
     );
     // La remise n'est envoyée que si la ligne est déjà au panier : sinon elle
     // sera transmise à l'ajout.
     if (getQty(a.refArt) > 0) {
       fetch("/api/panier", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 0, remise: arrondi }),
+        body: JSON.stringify({ vue: "ligne", refArt: a.refArt, qte: 0, ...(parPrix ? { net } : { remise: precis }) }),
       }).catch(() => {});
     }
   }
@@ -452,9 +467,19 @@ export default function CataloguePage() {
           return (
             <motion.div key={a.refArt} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm p-4 hover:shadow-md transition"
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.02, 0.3) }}>
-              <div className="w-full h-24 bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-card)] rounded-xl flex items-center justify-center mb-3">
-                <Package size={30} className="text-slate-300" />
-              </div>
+              {/* Photo de l'article (fiche admin), sinon pictogramme. */}
+              {a.aPhoto ? (
+                <div className="relative w-full h-40 rounded-xl overflow-hidden mb-3 bg-[var(--bg-primary)] shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/articles/photo?refArt=${encodeURIComponent(a.refArt)}`} alt={a.designation}
+                    loading="lazy" className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
+                  <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
+                </div>
+              ) : (
+                <div className="w-full h-24 bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-card)] rounded-xl flex items-center justify-center mb-3">
+                  <Package size={30} className="text-slate-300" />
+                </div>
+              )}
               <div className="font-semibold text-[var(--text-primary)] text-sm leading-tight mb-1 line-clamp-2" title={a.designation}>
                 {a.designation}
               </div>
@@ -548,7 +573,7 @@ export default function CataloguePage() {
                   {/* Total de la ligne : prix net × quantité, comme dans l'ERP
                       d'origine (`option.net * option.qteCmd`). */}
                   <div className="flex-1 min-w-0 text-right pr-1.5 text-xs font-bold tabular-nums text-[var(--text-primary)]">
-                    {fmt(Number(remises[a.refArt]?.net ?? a.prixTtc) * qty)}
+                    {fmt((remises[a.refArt]?.net && Number.isFinite(Number(remises[a.refArt]?.net)) ? Number(remises[a.refArt]?.net) : a.prixTtc) * qty)}
                   </div>
                 </div>
               )}

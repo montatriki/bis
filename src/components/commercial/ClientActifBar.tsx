@@ -6,6 +6,7 @@ import {
   MapPin, Crosshair, Loader2, X, Check, AlertTriangle, ChevronRight, Users, Route,
 } from "lucide-react";
 import { useClientActif, type ClientActif } from "@/lib/client-actif";
+import ClientActifModal from "./ClientActifModal";
 import { distanceM, formatDistance, type Proximite } from "@/lib/geo";
 
 // Bandeau « client en cours » affiché en tête de tous les écrans commerciaux.
@@ -35,6 +36,8 @@ export default function ClientActifBar() {
   const [proches, setProches] = useState<ClientProche[]>([]);
   const [chargement, setChargement] = useState(false);
   const [panneau, setPanneau] = useState(false);
+  // Fiche rapide du client en cours (tap sur son nom).
+  const [fiche, setFiche] = useState(false);
   // La détection automatique ne doit s'appliquer qu'une fois par tournée.
   const [autoFait, setAutoFait] = useState(false);
 
@@ -167,6 +170,9 @@ export default function ClientActifBar() {
 
   return (
     <>
+      <AnimatePresence>
+        {fiche && <ClientActifModal client={client} onClose={() => setFiche(false)} />}
+      </AnimatePresence>
       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-600 flex items-center justify-center flex-shrink-0 font-bold text-sm">
@@ -187,9 +193,11 @@ export default function ClientActifBar() {
                 </span>
               )}
             </div>
-            <div className="font-bold text-sm text-[var(--text-primary)] truncate mt-0.5" title={client.raisonSocial}>
-              {client.raisonSocial}
-            </div>
+            <button onClick={() => setFiche(true)} title="Ouvrir la fiche du client"
+              className="group flex items-center gap-1 max-w-full text-left font-bold text-sm text-[var(--text-primary)] mt-0.5 hover:text-emerald-700 transition">
+              <span className="truncate underline decoration-emerald-500/40 decoration-dotted underline-offset-4 group-hover:decoration-emerald-600">{client.raisonSocial}</span>
+              <ChevronRight size={14} className="shrink-0 text-emerald-600" />
+            </button>
             <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5 truncate">
               <MapPin size={10} className="shrink-0" />
               {client.ville || client.adresse || "—"}

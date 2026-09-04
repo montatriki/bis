@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Banknote, TrendingUp, FileText, Clock, Loader2, Flag, AlertTriangle, Check } from "lucide-react";
+import { dateLocaleIso } from "@/lib/date-locale";
+import TicketVente from "@/components/commercial/TicketVente";
+import { Banknote, TrendingUp, FileText, Clock, Loader2, Flag, AlertTriangle, Check, Printer } from "lucide-react";
 
 // Journal de tournée — sur la base.
 // Remplace une timeline entièrement inventée (horaires, montants, solde de
@@ -18,9 +20,10 @@ type Frais = {
   id: number; libelle: string | null; montant: number; carburant: boolean;
 };
 type Recon = {
-  mission: { id: number; commercial: string | null; vehicule: string | null; dateOrdre: string | null; etat: string | null; kmDepart: number; kmArrive: number };
+  mission: { id: number; commercial: string | null; vehicule: string | null; dateOrdre: string | null; etat: string | null; kmDepart: number; kmArrive: number; du?: string | null; au?: string | null };
   ventes: { nb: number; montant: number };
   retours: { nb: number; montant: number };
+  chargements?: { nb: number; montant: number };
   caNet: number;
   encaissements: { nb: number; montant: number; parMode: { mode: string; nb: number; montant: number }[] };
   resteAEncaisser: number;
@@ -36,10 +39,16 @@ const fmt = (v: unknown) =>
 const fmtDate = (v: unknown) => (v ? new Date(String(v)).toLocaleDateString("fr-FR") : "—");
 const fmtHeure = (v: unknown) =>
   v ? new Date(String(v)).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—";
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => dateLocaleIso(d);
+const fmtDateHeure = (v: string) =>
+  new Date(v).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function JournalPage() {
-  const [date, setDate] = useState(iso(new Date()));
+  // Vide à l'ouverture : le serveur choisit la tournée du jour, ou à défaut
+  // la tournée « En cours ». Une date n'est envoyée que si le commercial la
+  // choisit — forcer la date UTC du navigateur faisait rater la tournée selon
+  // l'heure et le fuseau.
+  const [date, setDate] = useState("");
   /** Tournées du commercial, pour la sélection par code mission (OM-2872) :
    *  c'est le repère du terrain, plus sûr que de retrouver la bonne date. */
   const [tournees, setTournees] = useState<
@@ -57,6 +66,9 @@ export default function JournalPage() {
   const [busy, setBusy] = useState(false);
   const [kmArrive, setKmArrive] = useState(0);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  // Ticket ouvert depuis la liste des opérations : même rendu imprimable que
+  // celui émis en fin de commande (articles, remises, totaux, rouleau 80 mm).
+  const [ticketOuvert, setTicketOuvert] = useState<string | null>(null);
 
   const flash = useCallback((msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -75,7 +87,7 @@ export default function JournalPage() {
     // explicite du commercial.
     const source = missionId
       ? Promise.resolve({ mission: { id: missionId } })
-      : fetch(`/api/missions?vue=jour&date=${date}`).then((r) => r.json());
+      : fetch(`/api/missions?vue=jour${date ? `&date=${date}` : ""}`).then((r) => r.json());
     source
       .then(async (d) => {
         if (!d.mission) { setRecon(null); setDocs([]); setRegs([]); setFrais([]); return; }
@@ -130,30 +142,66 @@ export default function JournalPage() {
   const totalFrais = frais.reduce((t, f) => t + f.montant, 0);
   const totalCarburant = frais.filter((f) => f.carburant).reduce((t, f) => t + f.montant, 0);
 
+  // Nature d'une opération : elle fixe le libellé, la couleur et le signe.
+  //   vente        → entre dans le CA (+)
+  //   retour       → sort du CA (−)
+  //   chargement   → commande / bon de chargement du camion : hors CA, neutre
+  //   encaissement → argent réellement collecté (+)
+  type Nature = "vente" | "retour" | "chargement" | "autre" | "encaissement";
+  const natureDoc = (t?: string | null): Nature => {
+    const x = String(t ?? "").toUpperCase();
+    if (["TIC", "BL", "FC", "FAC"].includes(x)) return "vente";
+    if (["BR", "AV", "BRE"].includes(x)) return "retour";
+    if (["COM", "DEV"].includes(x)) return "chargement";
+    return "autre";
+  };
+  const STYLE: Record<Nature, { chip: string; point: string; montant: string; libelle: string; signe: string }> = {
+    vente:        { chip: "bg-blue-50 text-blue-700",     point: "bg-blue-500",    montant: "text-blue-700",    libelle: "Vente",       signe: "" },
+    retour:       { chip: "bg-red-50 text-red-600",       point: "bg-red-500",     montant: "text-red-600",     libelle: "Retour",      signe: "−" },
+    chargement:   { chip: "bg-slate-100 text-slate-600",  point: "bg-slate-400",   montant: "text-slate-500",   libelle: "Chargement",  signe: "" },
+    autre:        { chip: "bg-amber-50 text-amber-700",   point: "bg-amber-400",   montant: "text-amber-700",   libelle: "Document",    signe: "" },
+    encaissement: { chip: "bg-emerald-50 text-emerald-700", point: "bg-emerald-500", montant: "text-emerald-600", libelle: "Encaissement", signe: "+" },
+  };
+
   // Chronologie unifiée : documents et encaissements dans l'ordre réel.
   const timeline = [
-    ...docs.map((d) => ({
-      key: `d-${d.refDoc}`, heure: fmtHeure(d.dateDoc), type: d.typeDoc ?? "Document",
-      description: `${d.refDoc} — ${d.raisonSocial ?? "Client"}`,
-      montant: -(d.ttcNet ?? 0), doc: true, valide: d.valide,
-      tri: d.dateDoc ? new Date(d.dateDoc).getTime() : 0,
-    })),
+    ...docs.map((d) => {
+      const nature = natureDoc(d.typeDoc);
+      return {
+        key: `d-${d.refDoc}`, refDoc: d.refDoc, heure: fmtHeure(d.dateDoc), nature,
+        type: `${STYLE[nature].libelle} · ${d.typeDoc ?? ""}`,
+        description: `${d.refDoc} — ${d.raisonSocial ?? "Client"}`,
+        montant: d.ttcNet ?? 0, valide: d.valide,
+        note: nature === "chargement" ? "hors CA" : nature === "autre" ? "non compté" : null,
+        tri: d.dateDoc ? new Date(d.dateDoc).getTime() : 0,
+      };
+    }),
     ...regs.map((r) => ({
-      key: `r-${r.id}`, heure: fmtHeure(r.datePay), type: r.modePay ?? "Encaissement",
-      description: `Encaissement — ${r.tiersNom ?? "Client"}`,
-      montant: r.montant ?? 0, doc: false, valide: true,
+      key: `r-${r.id}`, refDoc: null as string | null, heure: fmtHeure(r.datePay), nature: "encaissement" as Nature,
+      type: `Encaissement · ${r.modePay ?? ""}`,
+      description: `${r.tiersNom ?? "Client"}`,
+      montant: r.montant ?? 0, valide: true, note: null as string | null,
       tri: r.datePay ? new Date(r.datePay).getTime() : 0,
     })),
   ].sort((a, b) => a.tri - b.tri);
+  // Une tournée de l'ERP d'origine couvre plusieurs jours : quand c'est le
+  // cas, chaque opération est datée, sinon « 17:25 » puis « 09:03 » se lisent
+  // comme un retour en arrière.
+  const jours = new Set(timeline.filter((e) => e.tri).map((e) => new Date(e.tri).toDateString()));
+  const avecJour = jours.size > 1;
+  const heureAffichee = (e: { tri: number; heure: string }) =>
+    avecJour && e.tri ? `${new Date(e.tri).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} ${e.heure}` : e.heure;
 
   return (
     <div className="space-y-5">
+      {ticketOuvert && <TicketVente refDoc={ticketOuvert} onClose={() => setTicketOuvert(null)} />}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Journal de tournée</h1>
           <p className="text-slate-500 text-sm">
             {recon
-              ? `${fmtDate(recon.mission.dateOrdre)} — ${recon.mission.commercial ?? ""}${recon.mission.vehicule ? ` · ${recon.mission.vehicule}` : ""}`
+              ? `${fmtDate(recon.mission.dateOrdre)} — ${recon.mission.commercial ?? ""}${recon.mission.vehicule ? ` · ${recon.mission.vehicule}` : ""}${
+                  recon.mission.du ? ` · du ${fmtDateHeure(recon.mission.du)}${recon.mission.au ? ` au ${fmtDateHeure(recon.mission.au)}` : ""}` : ""}`
               : "Aucune tournée pour cette date"}
           </p>
         </div>
@@ -213,7 +261,7 @@ export default function JournalPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Carte label="Total encaissé" value={`${fmt(recon.encaissements.montant)} TND`}
               icon={Banknote} color="text-emerald-600" bg="bg-emerald-50" border="border-emerald-200" />
-            <Carte label={`CA net (${recon.ventes.nb} vente(s))`} value={`${fmt(recon.caNet)} TND`}
+            <Carte label={`CA net (${recon.ventes.nb} vente(s)${recon.chargements?.nb ? ` · ${recon.chargements.nb} chargement(s) hors CA` : ""})`} value={`${fmt(recon.caNet)} TND`}
               icon={FileText} color="text-blue-600" bg="bg-blue-50" border="border-blue-200" />
             <Carte label="Reste à encaisser" value={`${fmt(recon.resteAEncaisser)} TND`}
               icon={TrendingUp}
@@ -261,27 +309,33 @@ export default function JournalPage() {
               </div>
             ) : (
               <div className="divide-y divide-slate-50">
-                {timeline.map((e) => (
-                  <div key={e.key} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition">
-                    <div className="text-slate-400 text-xs font-mono w-12 shrink-0">{e.heure}</div>
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${e.montant > 0 ? "bg-emerald-500" : "bg-blue-500"}`} />
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        e.montant > 0 ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}>
-                        {e.type}
-                      </span>
-                      {!e.valide && (
-                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">
-                          brouillon
-                        </span>
-                      )}
-                      <div className="text-slate-600 text-sm mt-0.5 truncate">{e.description}</div>
+                {timeline.map((e) => {
+                  const st = STYLE[e.nature];
+                  return (
+                    <div key={e.key}
+                      onClick={() => e.refDoc && setTicketOuvert(e.refDoc)}
+                      role={e.refDoc ? "button" : undefined}
+                      title={e.refDoc ? "Ouvrir le ticket (articles, totaux, impression)" : undefined}
+                      className={`flex items-center gap-4 px-5 py-3.5 transition ${e.refDoc ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-slate-50"}`}>
+                      <div className={`text-slate-400 text-xs font-mono shrink-0 ${avecJour ? "w-24" : "w-12"}`}>{heureAffichee(e)}</div>
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${st.point}`} />
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.chip}`}>{e.type}</span>
+                        {e.note && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{e.note}</span>
+                        )}
+                        {!e.valide && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">brouillon</span>
+                        )}
+                        <div className="text-slate-600 text-sm mt-0.5 truncate">{e.description}</div>
+                      </div>
+                      <div className={`font-semibold text-sm shrink-0 ${st.montant}`}>
+                        {st.signe}{fmt(e.montant)} TND
+                      </div>
+                      {e.refDoc && <Printer size={15} className="text-slate-300 shrink-0" aria-hidden />}
                     </div>
-                    <div className={`font-semibold text-sm shrink-0 ${e.montant > 0 ? "text-emerald-600" : "text-blue-600"}`}>
-                      {e.montant > 0 ? "+" : ""}{fmt(e.montant)} TND
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">

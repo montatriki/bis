@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
-import { memeCommercial } from "@/lib/perimetre-commercial";
+import { memePortefeuille } from "@/lib/perimetre-commercial";
 import { round3, TYPES_VENTE, TYPES_RETOUR } from "@/lib/vente-stats";
 
 // Fiche client du commercial, sur un mois.
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   const maintenant = new Date();
   const client = await prisma.partner.findUnique({ where: { id } });
   if (!client) return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
-  if (auth.user.role === "COMMERCIAL" && !memeCommercial(client.commercial, auth.user.name)) {
+  if (auth.user.role === "COMMERCIAL" && !memePortefeuille(client.commercial, auth.user.name)) {
     return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
   }
 

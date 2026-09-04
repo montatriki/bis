@@ -710,6 +710,8 @@ model Article {
   @@index([designation])
   @@index([famille])
   @@index([kind])
+    photo         String? // data URL JPEG, fiche admin → catalogue commercial
+
   @@map("articles_ext")
 }
 
