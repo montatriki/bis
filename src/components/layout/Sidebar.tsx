@@ -10,7 +10,7 @@ import {
   Truck, History, ShoppingCart, X, MapPin, Boxes, Building2,
   UserCheck, Wallet, Car, BookOpen, Receipt,
   Boxes as BoxesIcon, Factory, Wrench, ChevronDown, FolderKanban,
-  PackagePlus, Lock, Banknote, LayoutGrid
+  PackagePlus, Lock, Banknote, LayoutGrid, Crosshair
 } from "lucide-react";
 import { ERP_MODULES } from "@/lib/erp-modules";
 
@@ -35,6 +35,7 @@ const NAV_ADMIN: NavItem[] = [
   { href: "/admin/etat-stock", label: "État du stock", icon: Boxes },
   { href: "/admin/missions", label: "Ordres de mission", icon: Truck },
   { href: "/admin/commerciaux", label: "Commerciaux", icon: MapPin },
+  { href: "/admin/visites", label: "Visites terrain", icon: Crosshair },
   { href: "/admin/grh", label: "GRH", icon: UserCheck },
   { href: "/admin/traites", label: "KEMBYELTY — Traites", icon: Banknote },
   { href: "/admin/rapports-admin", label: "Rapports", icon: BarChart3 },

@@ -1,8 +1,9 @@
 "use client";
-import { Bell, Search, Menu, ChevronRight, Check } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { Bell, Search, Menu, ChevronRight, Check, Command } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { titreEcran, ESPACES } from "@/lib/ecrans";
 
 type Notif = {
   id: string; title: string; message: string; type: string;
@@ -34,10 +35,15 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string }> = 
 
 export default function TopBar({ user }: { user: { name: string; role: string } }) {
   const router = useRouter();
+  const chemin = usePathname();
   const [showNotifs, setShowNotifs] = useState(false);
+  const [focusRecherche, setFocusRecherche] = useState(false);
+  const champRecherche = useRef<HTMLInputElement>(null);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
   const meta = ROLE_META[user.role] || ROLE_META.ADMIN;
+  const espace = ESPACES[user.role] ?? "Espace";
+  const ecran = titreEcran(chemin);
 
   const charger = useCallback(() => {
     fetch("/api/notifications")
@@ -94,6 +100,22 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
     router.push(n.lien);
   }
 
+  // Le repère « ⌘K » affiché dans le champ doit agir : un raccourci décoratif
+  // est pire que pas de raccourci.
+  useEffect(() => {
+    const surTouche = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        champRecherche.current?.focus();
+      }
+      if (e.key === "Escape" && document.activeElement === champRecherche.current) {
+        champRecherche.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", surTouche);
+    return () => window.removeEventListener("keydown", surTouche);
+  }, []);
+
   const toggleMobileSidebar = () => {
     window.dispatchEvent(new Event("toggle-mobile-sidebar"));
   };
@@ -103,34 +125,80 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
     // notifications, même en `z-[100]`, ne montait qu'au sein de cet en-tête et
     // passait donc *sous* les cartes du tableau de bord. Il faut élever
     // l'en-tête lui-même pour que ses menus déroulants couvrent la page.
-    <header className="relative z-[60] h-14 flex items-center px-4 md:px-6 gap-4 flex-shrink-0 shadow-sm transition-all duration-300 bg-[var(--bg-card)] border-b border-[var(--border-primary)]">
-      {/* Mobile Menu Hamburger button */}
-      <button 
-        onClick={toggleMobileSidebar}
-        className="p-2.5 -ml-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] md:hidden transition-all flex items-center justify-center flex-shrink-0 border border-transparent hover:border-[var(--border-primary)]"
-      >
-        <Menu size={18} />
-      </button>
+    // La barre s'étirait sur toute la largeur alors que le contenu est bridé à
+    // 1600 px et centré : sur grand écran, la recherche et le profil se
+    // retrouvaient loin des colonnes de la page. On aligne la barre sur la
+    // même largeur utile que `<main>`.
+    <header className="relative z-[60] h-16 flex-shrink-0 bg-[var(--bg-card)]/85 backdrop-blur-xl border-b border-[var(--border-primary)]"
+      style={{ boxShadow: "0 1px 0 var(--border-primary), 0 6px 24px -12px var(--shadow-primary)" }}>
+      {/* Filet d'accent : rattache l'en-tête à l'identité chaude de l'app
+          plutôt que de le laisser en bandeau blanc neutre. */}
+      <div className="absolute inset-x-0 top-0 h-px opacity-70"
+        style={{ background: "linear-gradient(90deg, transparent, var(--accent-primary), transparent)" }} />
 
-      {/* Search */}
-      <div className="flex-1 max-w-md hidden sm:block">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-70" />
-          <input placeholder="Rechercher client, produit, document..."
-            className="w-full pl-9 pr-4 py-2 text-xs bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] focus:border-[var(--accent-primary)] focus:outline-none focus:bg-[var(--bg-card)] transition placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]" />
+      <div className="h-full max-w-[1600px] w-full mx-auto flex items-center gap-3 px-4 md:px-6">
+        {/* Menu (mobile) */}
+        <button 
+          onClick={toggleMobileSidebar}
+          className="w-10 h-10 -ml-1.5 rounded-2xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] md:hidden transition-all flex items-center justify-center flex-shrink-0 active:scale-95"
+        >
+          <Menu size={19} />
+        </button>
+
+        {/* Situation : l'utilisateur sait toujours où il se trouve. Sous
+            « lg », la barre n'a plus la place du fil complet — le titre de
+            l'écran seul vaut mieux qu'une barre vide. */}
+        <div className="flex items-baseline gap-2 min-w-0 flex-shrink">
+          <span className="hidden lg:inline text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)] opacity-55 whitespace-nowrap">
+            {espace}
+          </span>
+          {ecran && (
+            <>
+              <span className="hidden lg:inline text-[var(--text-secondary)] opacity-25 text-xs">/</span>
+              <span className="text-sm lg:text-[13px] font-bold text-[var(--text-primary)] truncate max-w-[11rem] sm:max-w-[15rem]">{ecran}</span>
+            </>
+          )}
         </div>
-      </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+        {/* Recherche : discrète au repos, elle s'élargit et s'éclaire au
+            focus — l'action la plus fréquente mérite d'être invitante. */}
+        <div className={`min-w-0 hidden sm:block ml-auto transition-[max-width,flex-grow] duration-300 ease-out ${focusRecherche ? "flex-grow max-w-lg" : "flex-grow max-w-[19rem]"}`}>
+          <div className="relative group">
+            <Search size={15}
+              className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none ${focusRecherche ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)] opacity-55"}`} />
+            <input ref={champRecherche} placeholder="Rechercher…"
+              onFocus={() => setFocusRecherche(true)}
+              onBlur={() => setFocusRecherche(false)}
+              className="w-full pl-11 pr-16 h-10 text-[13px] rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)]
+                         placeholder:text-[var(--text-secondary)]/55 transition-all duration-200
+                         hover:border-[var(--accent-primary)]/25
+                         focus:outline-none focus:bg-[var(--bg-card)] focus:border-[var(--accent-primary)]/45 focus:shadow-[0_6px_24px_-10px_var(--shadow-hover)]" />
+            {/* Repère clavier, estompé dès la saisie. */}
+            <kbd className={`absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-0.5 h-6 px-1.5 rounded-lg
+                             text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-card)] border border-[var(--border-primary)]
+                             transition-opacity pointer-events-none ${focusRecherche ? "opacity-0" : "opacity-70"}`}>
+              <Command size={10} /> K
+            </kbd>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 ml-auto sm:ml-3">
         {/* Notifications */}
         <div className="relative">
           <button onClick={() => setShowNotifs(!showNotifs)}
-            className="relative p-2.5 rounded-xl hover:bg-[var(--accent-light)] transition text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--border-primary)]">
+            className={`relative w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-95
+                        ${showNotifs
+                          ? "bg-[var(--accent-light)] text-[var(--accent-primary)]"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)]"}`}>
             <Bell size={18} />
             {unread > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
-                {unread}
-              </span>
+              <>
+                {/* Halo pulsé : une alerte non lue doit accrocher l'œil. */}
+                <span className="absolute top-1 right-1 w-[18px] h-[18px] rounded-full bg-red-500/30 animate-ping" />
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[var(--bg-card)]">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              </>
             )}
           </button>
           <AnimatePresence>
@@ -197,16 +265,22 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
           </AnimatePresence>
         </div>
 
-        {/* User profile dropdown button */}
-        <div className="flex items-center gap-2.5 pl-2.5 border-l border-[var(--border-primary)]">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black flex-shrink-0 shadow-sm"
-            style={{ background: "var(--accent-primary)" }}>
-            {user.name.charAt(0).toUpperCase()}
+        {/* Profil : une pastille posée, cohérente avec la carte utilisateur de
+            la barre latérale — pas un texte flottant au bord de l'écran. */}
+        <div className="flex items-center gap-2.5 ml-1 md:pl-2 md:pr-3.5 md:py-1.5 md:rounded-2xl md:border md:border-[var(--accent-primary)]/15 md:bg-[var(--accent-light)] min-w-0 transition-all md:hover:border-[var(--accent-primary)]/30 md:hover:shadow-[0_6px_20px_-12px_var(--shadow-hover)] cursor-default">
+          <div className="relative flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-black shadow-sm"
+              style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 72%, #000))" }}>
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            {/* Pastille de présence : l'utilisateur est connecté. */}
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[var(--bg-card)]" />
           </div>
-          <div className="hidden sm:block">
-            <div className="text-xs font-black text-[var(--text-primary)] leading-tight">{user.name}</div>
-            <div className="text-[9px] font-bold uppercase tracking-wider opacity-75 mt-0.5" style={{ color: "var(--accent-primary)" }}>{meta.label}</div>
+          <div className="hidden md:block min-w-0 leading-tight">
+            <div className="text-[13px] font-bold text-[var(--text-primary)] truncate max-w-[10rem]">{user.name}</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-75" style={{ color: "var(--accent-primary)" }}>{meta.label}</div>
           </div>
+        </div>
         </div>
       </div>
     </header>

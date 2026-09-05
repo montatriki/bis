@@ -311,10 +311,15 @@ export async function POST(req: NextRequest) {
   // Position : deux commerces d'une même rue peuvent partager des coordonnées
   // arrondies (138 cas dans l'import). On ne refuse donc que le vrai doublon,
   // c'est-à-dire un client déjà enregistré à quelques mètres.
-  const proche = await clientTropProche(lat, lng);
+  // Le commercial est devant la boutique : c'est lui qui voit s'il s'agit du
+  // même commerce ou du voisin. On l'avertit, et il confirme (`forcer`) en
+  // connaissance de cause plutôt que d'être bloqué sur le terrain.
+  const proche = aGeo && !body?.forcer ? await clientTropProche(lat, lng) : null;
   if (proche) {
     return NextResponse.json(
       {
+        code: "client-proche",
+        client: { id: proche.id, raisonSocial: proche.raisonSocial, distance: Math.round(proche.distance) },
         error:
           `Un client existe déjà à cet endroit : « ${proche.raisonSocial} » ` +
           `(code ${proche.id}, ${Math.round(proche.distance)} m)`,

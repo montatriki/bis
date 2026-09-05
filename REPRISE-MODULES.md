@@ -1914,3 +1914,363 @@ routes tickets, missions, tournée, clients, dashboard quand les données ont
 plus de 10 min ; `GET/POST /api/sync-operations` pour l'état / le forçage.
 1re passe : +48 pièces, 544 lignes, 9 règlements, 2 tournées, 11 visites,
 2 clients en 33 s.
+
+## Création de client : messages invisibles et blocage sans issue
+
+Sur mobile, le formulaire complet, « Créer » ne semblait rien faire : le
+message d'erreur s'affichait **en bas du formulaire défilant**, hors écran
+(le pied Annuler/Créer le masquait). Et un client déjà enregistré dans les
+25 m bloquait **définitivement** la création — or en ville deux commerces
+voisins sont normaux, et le commercial est justement devant la boutique.
+
+- `NouveauClientModal` : messages remontés **en tête** du corps, avec
+  défilement automatique à la vue (`scrollIntoView`) — plus rien d'invisible.
+- Doublon de position : n'est plus une erreur mais une **alerte confirmable**
+  (« <client> est déjà enregistré à N m … C'est un autre commerce — créer
+  quand même »), qui renvoie `forcer: true`.
+- `POST /api/clients` : le contrôle de proximité renvoie `code:"client-proche"`
+  + la fiche du voisin, et est ignoré si `forcer`. Les doublons de téléphone
+  et de matricule fiscal restent bloquants (vraie unicité).
+
+Vérifié (mobile 390 px, position à 12 m de « Supérette hamdi sahbeni ») :
+alerte visible et ramenée à l'écran même après défilement, confirmation →
+client créé, sélectionné comme client en cours, `creePar` renseigné ; pièces
+de test supprimées.
+
+## Panier : mode de règlement « Crédit »
+
+Demande : pouvoir vendre à crédit depuis le panier. Cinquième mode ajouté
+(pleine largeur, ambre) à côté d'Espèce / Chèque / Traite / Retenu :
+- le champ « Montant encaissé » disparaît, aucun règlement n'est créé ;
+- le bandeau annonce « Vente à crédit : X TND portés au débit de <client>,
+  à recouvrer plus tard » et le bouton devient « Émettre le ticket à crédit » ;
+- changer de mode réajuste le montant (0 en crédit, total sinon).
+Le ticket est validé normalement : stock décrémenté, client débité, solde du
+document = total (visible ensuite dans Recouvrement).
+Vérifié (Mokhtar, librairie Synotec sarl, 230,400 TND) : TIC260003 émis,
+totalRegle 0, soldeDoc 230,400, solde client 0 → 230,400, aucun règlement
+créé ; vente de test annulée (stock et compteurs restaurés).
+
+## Panier de commande : reprise du client en cours
+
+Le bandeau affichait « Ste nouira distribution » comme client en cours mais le
+panier redemandait un destinataire (« Sélectionnez un client pour valider ») :
+la page ignorait `useClientActif`. Corrections :
+- au chargement, un panier **sans destinataire** adopte le client en cours
+  (`PUT /api/panier {codeCli}`) ; un choix explicite reste prioritaire ;
+- badge « repris du client en cours » quand les deux coïncident, et bouton
+  « Utiliser « X » (client en cours) » quand ils diffèrent ;
+- si aucun destinataire et un client actif : bouton « Commander pour X » ;
+- `DELETE /api/panier` (vider) libère aussi `codeCli`/`clientNom` — sinon la
+  commande suivante repartait avec le client de la précédente et la reprise ne
+  s'appliquait jamais.
+Vérifié : panier neuf + client en cours « librairie Synotec sarl » → « Commande
+pour : librairie Synotec sarl », badge présent, liste déroulante alignée,
+bouton « Valider la commande » actif, panier serveur à jour.
+
+### Panier de commande : mise en page mobile
+Le tableau à six colonnes ne tient pas sur 390 px (colonne Quantité coupée,
+désignation écrasée sur trois lignes sous le bouton flottant). Sur mobile,
+une **carte par article** (désignation + référence, PU HT avec remise barrée,
+Total TTC, quantité avec boutons 36 px, corbeille en tête) ; le tableau reste
+sur écran large (≥ md). En-tête : « Ajouter des articles » pleine largeur,
+« Vider » à côté ; bouton « Utiliser X (client en cours) » sur toute la
+largeur au lieu d'une pastille qui débordait.
+Vérifié : 390 px et 1300 px, aucun débordement horizontal, 0 erreur.
+
+## Assistant BIS : vraies données et cloisonnement par rôle
+
+Le composant était une **maquette** : cinq réponses écrites en dur
+(« CA de mai 2026 : 23 100 TND », « FOUED 71 300 TND »), aucun appel serveur,
+aucune distinction de rôle — les chiffres n'avaient aucun rapport avec la base.
+
+`POST /api/assistant` calcule désormais chaque réponse sur les données réelles,
+**dans le périmètre du rôle** (aucune écriture, jamais) :
+- **ADMIN / MANAGER** : CA société du mois, créances de tous les clients,
+  stock du dépôt principal, classement des commerciaux, tournées en cours ;
+- **COMMERCIAL** : son CA, les créances de son portefeuille (nom exact), le
+  stock de son camion (emplacement du véhicule affecté), son activité
+  (CA / encaissé / tournées / visites), sa tournée ;
+- **CLIENT** : ses achats du mois et son solde — stock et classement refusés.
+`GET /api/assistant` renvoie rôle, accueil personnalisé et suggestions ; le
+composant n'embarque plus aucune donnée. Une question hors sujet renvoie la
+liste de ce que le rôle peut demander ; sans session : 401.
+Le CA suit la règle Σ(BL,TIC,FC,FAC) − Σ(BR,AV,BRE), nature Vente.
+
+Vérifié (chiffres confrontés à la base) : société 47 842,658 = réponse admin ;
+Mokhtar 6 462,373 = sa réponse ; créances Mokhtar 56 clients / 79 240,106 ;
+camion 248TU6787 13 positifs / 6 négatifs ; client : solde 5 653,964, stock et
+classement refusés.
+
+### Assistant : conversation, listes et périodes
+« stock camion » puis « donner moi la liste » retombait sur le message d'aide :
+aucune mémoire, et les réponses ne donnaient que des totaux. Ajouts :
+- **suivi de conversation** : le composant renvoie le sujet de la dernière
+  réponse ; « donne-moi la liste / le détail / combien / les autres » développe
+  ce sujet au lieu de repartir de zéro ;
+- **listes détaillées** partout : articles du camion (triés par quantité, avec
+  les négatifs), documents de vente, clients débiteurs (avec tél.), clients du
+  portefeuille, étapes de la tournée avec leur état (✅ / ◻️ / 🚫 / ⏭️) ;
+- **périodes** : aujourd'hui, hier, cette semaine, mois dernier, un mois nommé,
+  l'année — « CA de l'année » ne répond plus sur le mois ;
+- **seuils et quantités** : « clients avec solde > 3000 », « les 3 plus
+  grosses créances », « les 10 premiers » ;
+- aiguillage : un montant ou un mot d'argent oriente vers les créances même si
+  la phrase commence par « clients » ;
+- l'aide propose désormais les questions du rôle.
+Vérifié : liste du camion (13 réf.), créances > 3 000 = 8 clients / 50 818,304
+(conforme à la base), CA août 29 461,151, CA année 201 446,331, tournée OM-2894
+avec ses 2 clients ; cloisonnement intact (commercial → sa seule activité,
+client → stock refusé).
+
+### Assistant : compréhension élargie
+« donner moi en dt » après une réponse sur le stock retombait sur le menu
+d'aide. Trois manques :
+- **valorisation** : « en dt / dinars / valeur / combien ça vaut » donne
+  désormais le stock au prix de vente TTC et au coût d'achat (camion du
+  commercial ou dépôt principal selon le rôle) ;
+- **suivi élargi** : toute question courte (≤ 4 mots) ou contenant
+  liste / détail / combien / valeur / dinars prolonge le sujet précédent au
+  lieu d'afficher l'aide ;
+- **politesses et présentation** : bonjour (avec le prénom), merci, « qui
+  es-tu », « aide » — réponses conversationnelles, plus le menu brut.
+Vocabulaire enrichi : « où dois-je aller », « mon programme » → tournée ;
+« qui doit payer », « argent » → créances ; « quelle marchandise il me
+reste » → stock ; « comment je me situe », « bilan » → performance.
+Vérifié : camion 248TU6787 → 4 544,480 TND TTC / 2 036,936 coût (= base) ;
+dépôt principal (admin) → 1 007 288,587 TTC ; cloisonnement intact (client :
+stock, tournée et classement refusés ; commercial : sa seule activité).
+
+## Assistant : vraie IA conversationnelle (NVIDIA NIM)
+
+Demande : « make intelligent like ia ». Clé NVIDIA fournie par l'utilisateur
+(build.nvidia.com, API compatible OpenAI), dans `.env` (non versionné) :
+`NVIDIA_API_KEY` + `NVIDIA_MODEL`.
+
+**Choix du modèle** — 81 modèles testés sur trois critères (français, appel
+d'outils, absence de raisonnement affiché) : la plupart sont en fin de vie ou
+inaccessibles avec cette clé ; `mistral-nemotron` parle bien français mais
+n'appelle pas les outils de façon fiable (0/3) et a inventé un montant lors
+d'un essai ; **`nvidia/nemotron-3.5-lightning-30b-a3b`** appelle les outils
+(2/3, 8-10 s) et respecte les chiffres — retenu, son raisonnement étant filtré.
+
+**Architecture** (`src/lib/assistant-ia.ts` + `/api/assistant`) :
+- le modèle ne touche jamais la base ; il appelle 6 outils
+  (chiffre_affaires, creances_clients, stock, performance, tournee, clients)
+  qui réutilisent les fonctions déjà cloisonnées par rôle — un commercial ne
+  peut pas obtenir les données d'un collègue, même en le demandant ;
+- consigne stricte : n'utiliser que les chiffres des outils, aucun calcul,
+  aucune invention ; français, bref, sans raisonnement ;
+- `nettoyer()` retire les délibérations (`<think>`, « Here's a thinking
+  process », paragraphes en anglais) et redemande la réponse seule au besoin ;
+- **repli automatique** sur le moteur local (mots-clés) si la clé manque, si
+  NIM est lent (45 s) ou en panne : l'assistant répond toujours ;
+- l'historique des 6 derniers messages est transmis pour le suivi.
+
+Vérifié : « donner moi en dt le stock de mon camion » → 13 références,
+4 544,480 TND TTC / 2 036,936 coût (= base) ; « je dois aller où maintenant ? »
+→ les 2 clients de la tournée dans l'ordre ; « j'ai vendu combien aujourd'hui »
+→ 3 371,877 TND / 9 documents ; cloisonnement intact (commercial : ses seules
+données ; client : stock et commerciaux refusés) ; aucun raisonnement visible.
+
+### Assistant : il agit dans l'application (navigation)
+
+L'assistant n'explique plus où aller, il y emmène. Deux outils s'ajoutent aux
+six outils de lecture :
+
+- `ouvrir_page` — 12 écrans commerciaux (tournée, clients, catalogue, panier,
+  recouvrement, journal, dernier ticket, stock camion, approvisionnement,
+  réclamations, statistiques, carte) et 8 écrans pilotage (tableau de bord,
+  clients, missions, commerciaux, état stock, synthèse, comptabilité,
+  rapports). Le rôle CLIENT n'a aucune destination ;
+- `chercher_client` — retrouve un client dans le **portefeuille de
+  l'utilisateur** et ouvre sa fiche. La recherche porte sur chaque mot du nom :
+  les noms importés contiennent des espaces doubles (« AGIL  BEJA NORD »),
+  qu'une recherche littérale manquait. La fiche suit le rôle :
+  `/commercial/clients/{id}` ou `/admin/modules/vente/clients/{id}`.
+
+La réponse expose `navigation` ; `BISAssistant` affiche un bouton nommé
+(« Ouvrir la tournée du jour », « Ouvrir la fiche client ») qui route et ferme
+le panneau.
+
+**La navigation ne dépend pas du modèle.** Deux filets déterministes dans
+`/api/assistant` prennent le relais quand il oublie l'outil — et valent aussi
+pour le moteur local de repli :
+- `pageDemandee()` : verbe d'intention (« ouvre », « montre », « emmène-moi »,
+  « je veux voir ») + nom d'écran, du plus spécifique au plus général
+  (« dernier ticket » avant « ticket ») ;
+- `ficheDemandee()` : « ouvre la fiche de X » → recherche dans le portefeuille,
+  navigation seulement si le nom désigne **un seul** client.
+
+Côté modèle, deux corrections : la consigne « IMPÉRATIF … » était recrachée
+telle quelle dans la réponse (reformulée sobrement), et `anglaisResiduel()`
+détecte désormais les notes de travail (« Key points: », « from the tool »,
+« j'ai utilisé chercher_client », noms d'outils) pour redemander une phrase
+propre. Délai porté à 70 s, la reformulation ajoutant un tour.
+
+Vérifié (11 formulations, deux rôles) : tournée, catalogue, panier, dernier
+ticket, recouvrement, carte, fiche client par le nom → bonne destination,
+HTTP 200 sur les 21 routes, aucune fuite de raisonnement, cloisonnement du
+portefeuille intact.
+
+### En-tête : une barre qui situe, plutôt qu'un bandeau blanc
+
+L'en-tête était un rectangle blanc plat : recherche minuscule collée à gauche,
+nom d'utilisateur en texte nu contre le bord droit, rien n'indiquant l'écran
+courant. Il débordait aussi de 40 px à droite du contenu (barre pleine largeur,
+contenu bridé à 1600 px) — d'où l'impression de travail bâclé.
+
+`src/components/layout/TopBar.tsx`, refait :
+- **fil d'Ariane** « Espace commercial / Catalogue », depuis
+  `src/lib/ecrans.ts` (nouveau). Les libellés y sont ceux du menu : deux tables
+  séparées auraient divergé. La correspondance la plus longue gagne, et les
+  routes dynamiques `/admin/modules/<module>/<sous>` sont résolues au segment.
+  Sous `lg`, seul le titre de l'écran reste — mieux qu'une barre vide sur
+  mobile, où il n'y avait rien ;
+- **recherche** centrée, arrondie, qui s'élargit de 19 à 32 rem au focus, avec
+  loupe qui passe à l'accent et bordure éclairée. Le repère `⌘K` affiché
+  **fonctionne** (raccourci + Échap) : un raccourci décoratif serait pire que
+  pas de raccourci ;
+- **cloche** en pastille de 40 px avec état actif, badge à halo pulsé et
+  liseré, plafonné à « 99+ » ;
+- **profil** en pastille bordée d'accent, avatar dégradé et point de présence,
+  cohérent avec la carte utilisateur de la barre latérale ;
+- fond translucide `backdrop-blur` et filet d'accent en haut, qui rattachent
+  l'en-tête à la palette terre de sienne au lieu d'un blanc neutre.
+
+Vérifié au navigateur en 1920 / 1366 / 390 px, commercial et admin : alignement
+exact avec le contenu (280 → 1880 des deux côtés, mesuré), `Ctrl+K` donne le
+focus au champ, `Échap` le rend, le panneau de notifications passe au-dessus
+des cartes, le module ERP dynamique affiche « Administration / Clients ».
+
+### Catalogue : des cartes produit dans l'identité de l'app
+
+Le catalogue était en bleu Tailwind par défaut — étranger à la palette terre de
+sienne de l'ERP — avec des cartes hautes et creuses, et des photos recadrées
+par `object-cover` : les boîtes de jeu perdaient leurs bords.
+
+`src/app/commercial/(app)/catalogue/page.tsx` :
+- **photo plein cadre, texte posé dessus** : la carte n'a plus de padding
+  propre (il vit sur le bloc de contenu) et la photo occupe tout le haut en 4/3.
+  Le nom du produit et le prix sont écrits **sur** l'image, en blanc, sur un
+  dégradé sombre qui garantit la lisibilité quelle que soit la photo. Un double
+  de la photo, flouté en fond, comble les côtés quand le produit n'a pas le
+  format du cadre — l'image remplit la carte sans jamais être rognée
+  (`object-contain` par-dessus `object-cover blur`). Sans photo, le même bandeau
+  est peint à l'accent : un voile noir sur fond crème virait au gris sale ;
+- **stock lisible sur le visuel** : « À bord · 7 » en haut à droite (blanc, ou
+  rouge/orange en rupture et stock bas), « Dépôt · 30 » en bas, coloré selon les
+  seuils de production (vert ≥ 5, orange 1-4, rouge en dessous) ;
+- **pastille d'état sur le visuel** (« Rupture », « Stock bas ») : l'info se
+  lit avant même de descendre au prix ;
+- **hiérarchie** : nom et prix sur la photo ; sous elle, une seule ligne
+  discrète réunit référence, code-barres, TTC et TVA ;
+- **champs de remise** réunis dans un bloc sur fond crème, focus à l'accent ;
+- **bouton « Ajouter »** en dégradé terre de sienne avec ombre portée, poussé
+  en bas de carte (`mt-auto`) pour aligner tous les boutons de la rangée ;
+  sélecteur de quantité dans la même famille chromatique.
+
+Le bleu a aussi disparu du bouton « Panier », des modes de paiement, du bouton
+de validation et des totaux — ainsi que de `BISAssistant` (bulle flottante,
+bandeau, bulles de message, suggestions, bouton d'envoi), qui flotte au-dessus
+de chaque écran et jurait partout.
+
+Vérifié au navigateur en 1600 et 390 px : plus une seule classe `blue` dans les
+deux fichiers, photo Monopoly affichée entière, cartes alignées.
+
+## Visites terrain : pointage commercial et rapport admin
+
+Le commercial pointe sa présence chez un client depuis sa liste (« Je suis
+là »), l'application vérifie qu'il est bien sur place, et le passage est
+journalisé pour l'administration.
+
+### Table `visites_client` (migration `20260905090000_visites_client`)
+
+Une **seule table indexée**, pas une table par client : le journal d'un client
+se lit par `clientId`, le rapport admin par `visiteLe`, et les deux restent
+immédiats sans parcourir 4 547 tables. `id` en `SERIAL`, clé étrangère vers
+`partners` en cascade.
+
+Trois index couvrent les trois accès réels — mesurés sur **500 000 lignes**
+(127 Mo), chacun en *Index Scan*, jamais en parcours complet :
+- journal d'un client (`clientId`, `visiteLe`) — **1,7 ms** ;
+- rapport du jour (`visiteLe`) — **7,0 ms** ;
+- rapport par commercial sur 30 jours (`commercialNom`, `visiteLe`) — **5,2 ms**.
+
+Les colonnes `clientNom` et `adresse` sont dénormalisées : le rapport doit
+rester lisible même si le client est renommé ou retiré de l'ERP ensuite. Les
+positions du commercial **et** du client sont conservées telles qu'elles
+étaient au pointage — sans les deux, la distance ne serait pas vérifiable a
+posteriori.
+
+### `POST /api/visites` — pointage
+
+Cloisonné : un commercial ne pointe que les clients de son portefeuille
+(`memePortefeuille`, vérifié — un client de Foued renvoie 403). Trois cas, tous
+enregistrés, car un passage refusé serait pire qu'un passage tracé « à
+distance » :
+- **sur place** — distance ≤ `SEUIL_PRESENCE_M` (150 m, dans `src/lib/geo.ts`,
+  qui couvre l'imprécision d'un GPS de téléphone en ville sans confondre deux
+  commerces voisins) ;
+- **trop loin** — le commercial peut corriger la position du client, qui est
+  alors écrite dans `partners` et tracée (`positionCorrigee`) ;
+- **sans position** — GPS refusé ou client jamais géolocalisé.
+
+Corriger sans position GPS est refusé : il n'y aurait rien à écrire.
+
+### `VisiteModal` — l'écran du commercial
+
+Bouton « Je suis là » sur chaque carte client. Le GPS part à l'ouverture, et
+l'écran annonce la situation (sur place / à X mètres / sans position) avant
+d'enregistrer. Il montre aussi les derniers passages, pour que le commercial
+voie s'il est déjà venu.
+
+Deux protections tirées des tests navigateur :
+- **une demande de position à la fois** — deux `getCurrentPosition` concurrents
+  (double montage React, double clic sur « Réessayer ») restaient sans réponse,
+  ni succès ni erreur ;
+- **un garde-fou de 14 s** — certains navigateurs ne rappellent jamais (WebView,
+  sous-sol). Sans lui, l'écran restait sur « Localisation en cours » et le
+  commercial ne pouvait plus pointer du tout. Vérifié : l'écran se débloque et
+  l'enregistrement reste possible.
+
+### `/admin/visites` — le rapport
+
+Client, adresse, commercial, date et heure, plus le contrôle de présence
+(« Sur place · 40 m », « À 1,4 km », « Position inconnue ») et la mention des
+positions corrigées. Filtres par période, commercial et nom de client ; export
+CSV avec BOM (sans lui, Excel affiche « Ã© »). Le nom du client ouvre sa fiche.
+Un commercial qui appelle la même API ne voit que ses propres pointages.
+
+Ajouté au menu admin, à `src/lib/ecrans.ts` (fil d'Ariane) et aux écrans que
+l'assistant sait ouvrir (« montre-moi les visites »).
+
+### Mes clients : ma position et tri par proximité
+
+La position du commercial était déjà dessinée sur la carte (point violet) mais
+rien ne le disait, et la liste restait dans l'ordre du serveur — inutilisable
+en tournée pour savoir chez qui aller ensuite.
+
+`src/app/commercial/(app)/clients/page.tsx` :
+- **bandeau de position** : point pulsé, « Vous êtes localisé · 11 clients à
+  moins de 5 km », ou l'état du GPS (en cours / erreur) quand il manque ;
+- **bouton « Ma position »** : relance la géolocalisation, ouvre la carte et la
+  **recentre** sur le commercial (zoom 14). Le cadrage automatique de la carte
+  restant volontairement figé entre deux changements de filtre — l'utilisateur
+  garde la main sur son zoom — le recentrage passe par une prop `recentrer`
+  (compteur) dans `PortefeuilleMap`, distincte de ce cadrage ;
+- **bouton « Les plus proches »** : trie la liste par distance croissante. Les
+  clients sans coordonnées passent en fin plutôt que d'être masqués — ils
+  existent, ils ne sont simplement pas encore géolocalisés. Actif seulement
+  quand la position est connue ;
+- **rang affiché** : l'avatar devient le numéro d'ordre (1, 2, 3…) tant que le
+  tri est actif — dans une grille à trois colonnes, l'ordre ne se devine pas.
+
+À noter : un panneau « Clients à proximité » existait déjà dans
+`ClientActifBar`, mais il sert à *choisir* le client en cours, s'ouvre par-dessus
+la page et n'affiche ni solde, ni risque, ni boutons. Le tri ajouté ici agit sur
+la liste elle-même, avec les cartes complètes.
+
+Vérifié au navigateur (position simulée à Tunis) : distances strictement
+croissantes (1,1 → 2,9 → 2,9 → 3,3 → 3,9 → 4,8 km), bandeau exact, carte
+recentrée sur le point violet après déplacement manuel.

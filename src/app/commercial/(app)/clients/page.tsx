@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import RiskBadge from "@/components/ui/RiskBadge";
 import { useClientActif } from "@/lib/client-actif";
-import { formatDistance } from "@/lib/geo";
+import { formatDistance, coordValide, distanceM } from "@/lib/geo";
 import NouveauClientModal from "@/components/commercial/NouveauClientModal";
 import ModifierClientModal, { type ClientModifiable } from "@/components/commercial/ModifierClientModal";
+import VisiteModal from "@/components/commercial/VisiteModal";
 
 const PortefeuilleMap = dynamic(() => import("@/components/map/PortefeuilleMap"), {
   ssr: false,
@@ -58,7 +59,7 @@ function riskScore(c: Client): number {
 
 export default function ClientsPage() {
   const router = useRouter();
-  const { client: clientActif, choisir, verifierPosition, position } = useClientActif();
+  const { client: clientActif, choisir, verifierPosition, position, rafraichirPosition, gpsEnCours, erreurGps } = useClientActif();
   const [search, setSearch] = useState("");
   const [gov, setGov] = useState("Tous");
   const [nouveau, setNouveau] = useState(false);
@@ -69,6 +70,8 @@ export default function ClientsPage() {
   const [gouvernorats, setGouvernorats] = useState<string[]>([]);
   const [familles, setFamilles] = useState<string[]>([]);
   const [aModifier, setAModifier] = useState<Client | null>(null);
+  // Client dont on pointe la visite terrain (« je suis là »).
+  const [aPointer, setAPointer] = useState<Client | null>(null);
   const [total, setTotal] = useState(0);
   const [totalCreances, setTotalCreances] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -79,8 +82,33 @@ export default function ClientsPage() {
   // Carte : l'ensemble du portefeuille géolocalisé, indépendant du filtre de la liste.
   const [clientsGeo, setClientsGeo] = useState<PointClient[]>([]);
   const [carteOuverte, setCarteOuverte] = useState(true);
+  /** Tri de la liste : par défaut celui du serveur, ou par proximité. */
+  const [triProximite, setTriProximite] = useState(false);
+  /** Incrémenté au clic sur « Ma position » : recentre la carte. */
+  const [recentrer, setRecentrer] = useState(0);
 
   const filtreActif = search.trim() !== "" || gov !== "Tous";
+
+  // Liste ordonnée par distance quand le commercial le demande : les clients
+  // sans coordonnées passent en fin plutôt que d'être masqués — ils existent,
+  // ils ne sont simplement pas encore géolocalisés.
+  const clientsAffiches = useMemo(() => {
+    if (!triProximite || !position) return clients;
+    const km = (c: Client) =>
+      coordValide(c.latitude, c.longitude)
+        ? distanceM(position.lat, position.lng, c.latitude as number, c.longitude as number)
+        : Number.POSITIVE_INFINITY;
+    return [...clients].sort((a, b) => km(a) - km(b));
+  }, [clients, triProximite, position]);
+
+  /** Nombre de clients à moins de 5 km : le repère utile en tournée. */
+  const clientsProches = useMemo(() => {
+    if (!position) return 0;
+    return clients.filter((c) =>
+      coordValide(c.latitude, c.longitude) &&
+      distanceM(position.lat, position.lng, c.latitude as number, c.longitude as number) <= 5_000,
+    ).length;
+  }, [clients, position]);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +248,49 @@ export default function ClientsPage() {
         </select>
       </div>
 
+      {/* Ma position : le commercial doit savoir si l'application le localise,
+          et pouvoir classer son portefeuille par proximité en tournée. */}
+      <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)]">
+        <span className="flex items-center gap-2 text-sm min-w-0">
+          <span className={`relative flex h-2.5 w-2.5 shrink-0 ${position ? "" : "opacity-50"}`}>
+            {position && <span className="absolute inline-flex h-full w-full rounded-full bg-violet-500 opacity-60 animate-ping" />}
+            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${position ? "bg-violet-600" : "bg-[var(--text-secondary)]"}`} />
+          </span>
+          {position ? (
+            <span className="text-[var(--text-primary)] font-semibold truncate">
+              Vous êtes localisé
+              <span className="font-normal text-[var(--text-secondary)]">
+                {" · "}{clientsProches} client{clientsProches > 1 ? "s" : ""} à moins de 5 km
+              </span>
+            </span>
+          ) : (
+            <span className="text-[var(--text-secondary)]">
+              {gpsEnCours ? "Localisation en cours…" : erreurGps ?? "Position GPS non disponible"}
+            </span>
+          )}
+        </span>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <button onClick={() => { rafraichirPosition(); setRecentrer((n) => n + 1); setCarteOuverte(true); }}
+            disabled={gpsEnCours}
+            title="Actualiser ma position et recentrer la carte"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition
+                       bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-primary)]
+                       hover:text-[var(--text-primary)] disabled:opacity-50">
+            <Crosshair size={13} className={gpsEnCours ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">Ma position</span>
+          </button>
+          <button onClick={() => setTriProximite((v) => !v)} disabled={!position}
+            title={position ? "Classer mes clients du plus proche au plus loin" : "Position GPS requise"}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition border disabled:opacity-40
+                        ${triProximite
+                          ? "bg-[var(--accent-primary)] text-white border-transparent"
+                          : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:text-[var(--text-primary)]"}`}>
+            <Navigation size={13} /> Les plus proches
+          </button>
+        </div>
+      </div>
+
       {/* Carte du portefeuille autour de la position du commercial */}
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
         <button onClick={() => setCarteOuverte((v) => !v)}
@@ -235,6 +306,7 @@ export default function ClientsPage() {
             <PortefeuilleMap
               clients={clientsGeo}
               position={position ? { lat: position.lat, lng: position.lng } : null}
+              recentrer={recentrer}
               actifId={clientActif?.id ?? null}
               filtre={filtreActif}
               onSelect={ouvrirDepuisCarte}
@@ -244,12 +316,12 @@ export default function ClientsPage() {
       </div>
 
       {loading && <div className="py-16 text-center text-[var(--text-secondary)]"><Loader2 className="animate-spin inline" size={22} /></div>}
-      {!loading && clients.length === 0 && (
+      {!loading && clientsAffiches.length === 0 && (
         <div className="py-16 text-center text-sm text-[var(--text-secondary)]">Aucun client trouvé.</div>
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {!loading && clients.map((c, i) => {
+        {!loading && clientsAffiches.map((c, i) => {
           const plafond = c.plafond && c.plafond > 0 ? c.plafond : PLAFOND_DEFAUT;
           const proche = c.soldeFin > plafond * 0.8;
           const tel = (c.tel ?? "").replace(/[^0-9]/g, "");
@@ -264,8 +336,11 @@ export default function ClientsPage() {
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.02, 0.3) }}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400 font-bold text-sm flex items-center justify-center flex-shrink-0">
-                    {nomClient(c).charAt(0).toUpperCase()}
+                  <div className={`relative w-10 h-10 rounded-xl font-bold text-sm flex items-center justify-center flex-shrink-0
+                                   ${triProximite && dist != null
+                                     ? "bg-[var(--accent-primary)] text-white"
+                                     : "bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400"}`}>
+                    {triProximite && dist != null ? i + 1 : nomClient(c).charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <div className="font-semibold text-[var(--text-primary)] text-sm truncate" title={nomClient(c)}>{nomClient(c)}</div>
@@ -316,6 +391,13 @@ export default function ClientsPage() {
                 <button onClick={() => openDetail(c)}
                   className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/25 py-2 rounded-xl hover:bg-blue-100 transition font-medium">
                   <FileText size={12} /> Fiche
+                </button>
+                {/* Pointage terrain : vérifie la présence sur place et
+                    journalise le passage (`visites_client`). */}
+                <button onClick={() => setAPointer(c)} title="Pointer ma visite ici"
+                  className="flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-xl font-semibold transition
+                             bg-[var(--accent-light)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/25 hover:brightness-97">
+                  <MapPin size={12} /> Je suis là
                 </button>
                 <button onClick={() => setAModifier(c)} title="Modifier le client"
                   className="flex items-center justify-center gap-1.5 text-xs bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-primary)] px-3 py-2 rounded-xl hover:text-[var(--text-primary)] transition font-medium">
@@ -469,6 +551,32 @@ export default function ClientsPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Pointage de visite terrain */}
+      {/* Monté par client : chaque ouverture repart d'un état vierge (GPS,
+          commentaire, journal) sans réinitialisation manuelle. */}
+      {aPointer && <VisiteModal
+        key={aPointer.id}
+        client={aPointer}
+        onFermer={() => setAPointer(null)}
+        onEnregistre={(corrige, position) => {
+          // Position corrigée côté serveur : la liste et la carte doivent
+          // repartir des nouvelles coordonnées sans recharger la page.
+          if (!corrige || !aPointer || !position) return;
+          const id = aPointer.id;
+          setClients((liste) => liste.map((c) =>
+            c.id === id ? { ...c, latitude: position.lat, longitude: position.lng } : c));
+          setClientsGeo((pts) => {
+            const sans = pts.filter((p) => p.id !== id);
+            const c = clients.find((x) => x.id === id);
+            return [...sans, {
+              id, nom: (c?.raisonSocial || "").trim() || `Client ${id}`, ville: c?.ville ?? null,
+              latitude: position.lat, longitude: position.lng,
+              soldeFin: c?.soldeFin ?? 0, tel: c?.tel ?? null,
+            }];
+          });
+        }}
+      />}
 
       {/* Création d'un nouveau point de vente */}
       <ModifierClientModal

@@ -58,3 +58,10 @@ export function formatDistance(m: number): string {
   if (m < 1000) return `${Math.round(m)} m`;
   return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m / 1000)} km`;
 }
+
+/**
+ * Distance en deçà de laquelle un commercial est considéré « sur place » chez
+ * son client. 150 m couvre l'imprécision d'un GPS de téléphone en ville (murs,
+ * immeubles) sans confondre deux commerces voisins.
+ */
+export const SEUIL_PRESENCE_M = 150;

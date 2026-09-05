@@ -12,13 +12,15 @@ export type PointClient = {
 };
 
 export default function PortefeuilleMap({
-  clients, position, actifId, filtre, onSelect,
+  clients, position, actifId, filtre, onSelect, recentrer = 0,
 }: {
   clients: PointClient[];
   /** Position GPS du commercial : centre de la carte quand elle est connue. */
   position: { lat: number; lng: number } | null;
   /** Client en visite : mis en évidence. */
   actifId: number | null;
+  /** Incrémenté par l'appelant pour recentrer la carte sur le commercial. */
+  recentrer?: number;
   /** Un filtre est actif : on cadre sur les clients filtrés, pas sur la position. */
   filtre: boolean;
   onSelect: (c: PointClient) => void;
@@ -96,6 +98,13 @@ export default function PortefeuilleMap({
 
     return () => { annule = true; };
   }, [clients, position, actifId, filtre]);
+
+  // Recentrage explicite (bouton « Ma position ») : distinct du cadrage
+  // automatique, qui ne se déclenche qu'au changement de filtre.
+  useEffect(() => {
+    if (!recentrer || !position || !mapInstance.current) return;
+    mapInstance.current.setView([position.lat, position.lng], 14, { animate: true });
+  }, [recentrer, position]);
 
   useEffect(() => () => {
     if (mapInstance.current) {

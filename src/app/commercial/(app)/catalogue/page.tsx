@@ -23,7 +23,9 @@ type Article = {
 type CartItem = { article: Article; qty: number; remise?: number };
 
 /** Modes de règlement de l'ERP d'origine (`Panier-component.js`). */
-const MODES_PAIEMENT = ["Espèce", "Chèque", "Traite", "Retenu"] as const;
+// « Crédit » n'est pas un encaissement : le ticket est émis, la marchandise
+// sort, et la totalité reste au débit du client (à recouvrer plus tard).
+const MODES_PAIEMENT = ["Espèce", "Chèque", "Traite", "Retenu", "Crédit"] as const;
 type ModePaiement = (typeof MODES_PAIEMENT)[number];
 
 /** Valeur numérique brute, utilisable dans un `<input type="number">`. */
@@ -55,6 +57,12 @@ export default function CataloguePage() {
   // montant encaissé, puis le ticket est émis et imprimé.
   const [paiement, setPaiement] = useState(false);
   const [modePay, setModePay] = useState<ModePaiement>("Espèce");
+  /** Bascule de mode : le crédit n'encaisse rien, les autres proposent le total. */
+  const changerMode = (m: ModePaiement) => {
+    setModePay(m);
+    setMontantRegle(m === "Crédit" ? "0" : fmtNombre(totalTTC));
+    if (m !== "Chèque" && m !== "Traite") { setNumPiece(""); setEcheance(""); }
+  };
   const [montantRegle, setMontantRegle] = useState("");
   const [numPiece, setNumPiece] = useState("");
   const [echeance, setEcheance] = useState("");
@@ -346,7 +354,8 @@ export default function CataloguePage() {
   async function emettreTicket() {
     if (!clientActif) return;
     setSaving(true);
-    const montant = Number(montantRegle) || 0;
+    // Crédit : aucun encaissement, la totalité reste due.
+    const montant = modePay === "Crédit" ? 0 : Number(montantRegle) || 0;
     const r = await fetch("/api/panier", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -419,7 +428,8 @@ export default function CataloguePage() {
           )}
         </div>
         <motion.button onClick={() => setShowCart(true)}
-          className="relative flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-blue-500 transition text-sm"
+          className="relative flex items-center gap-2 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-sm shadow-[0_10px_24px_-14px_var(--shadow-hover)] hover:shadow-[0_14px_30px_-14px_var(--shadow-hover)]"
+          style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <ShoppingCart size={16} /> Panier
           {totalItems > 0 && (
@@ -465,56 +475,92 @@ export default function CataloguePage() {
           const rupture = restant <= 0;
           const bas = !rupture && restant <= (a.stMin || 0);
           return (
-            <motion.div key={a.refArt} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm p-4 hover:shadow-md transition"
+            <motion.div key={a.refArt}
+              className="group flex flex-col overflow-hidden bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)]
+                         transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/25
+                         hover:shadow-[0_16px_36px_-20px_var(--shadow-hover)]"
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.02, 0.3) }}>
-              {/* Photo de l'article (fiche admin), sinon pictogramme. */}
-              {a.aPhoto ? (
-                <div className="relative w-full h-40 rounded-xl overflow-hidden mb-3 bg-[var(--bg-primary)] shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/articles/photo?refArt=${encodeURIComponent(a.refArt)}`} alt={a.designation}
-                    loading="lazy" className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
-                  <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
-                </div>
-              ) : (
-                <div className="w-full h-24 bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-card)] rounded-xl flex items-center justify-center mb-3">
-                  <Package size={30} className="text-slate-300" />
-                </div>
-              )}
-              <div className="font-semibold text-[var(--text-primary)] text-sm leading-tight mb-1 line-clamp-2" title={a.designation}>
-                {a.designation}
-              </div>
-              <div className="text-[var(--text-secondary)] text-xs mb-0.5">Réf : {a.refArt}</div>
-              <div className="text-[var(--text-secondary)] text-xs mb-3 truncate">
-                {a.codeBarre ? `CB : ${a.codeBarre}` : a.catalogue || "—"}
-              </div>
-              <div className="flex items-center justify-between mb-1">
-                <div className="font-bold text-[var(--text-primary)] tabular-nums">{fmt(a.tarif1Ht)} TND</div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`text-xs px-2 py-0.5 rounded-full ${
-                    rupture ? "bg-red-50 dark:bg-red-500/10 text-red-600"
-                    : bas ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                    : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
-                    {emplacement ? "À bord" : "Stock"} : {restant}
+              {/* Visuel plein cadre : la photo occupe tout le haut de la carte
+                  et le nom du produit se pose dessus, dans un dégradé sombre —
+                  seul moyen de garder le texte lisible quelle que soit la
+                  photo. Sans photo, le même bandeau est peint à l'accent. */}
+              <div className="relative w-full aspect-[4/3] overflow-hidden">
+                {a.aPhoto ? (
+                  <>
+                    {/* Fond flouté tiré de la photo : remplit les côtés quand le
+                        produit n'a pas le format du cadre, sans jamais le rogner. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/articles/photo?refArt=${encodeURIComponent(a.refArt)}`} alt=""
+                      aria-hidden="true" loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-45" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/articles/photo?refArt=${encodeURIComponent(a.refArt)}`} alt={a.designation}
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.07]" />
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-start justify-center pt-7 bg-gradient-to-br from-[var(--bg-primary)] to-[var(--accent-light)]">
+                    <Package size={44} className="text-[var(--accent-primary)] opacity-25" />
                   </div>
-                  {/* Second stock, comme sur l'application d'origine : le camion
-                      ne dit pas si le dépôt peut réapprovisionner. Seuils repris
-                      de la production — vert ≥ 5, orange 1 à 4, rouge en dessous. */}
-                  {emplacement && a.stockGlobal != null && (
-                    <div
-                      title="Stock global de l'article (tous emplacements)"
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        a.stockGlobal >= 5 ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                        : a.stockGlobal >= 1 ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                        : "bg-red-50 dark:bg-red-500/10 text-red-600"}`}>
-                      {/* Les quantités sont fractionnaires pour certains articles
-                          (383,5) : on retire les zéros inutiles sans tronquer. */}
-                      Dépôt : {Number(a.stockGlobal).toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
+                )}
+
+                {/* Voile : sans lui, un titre clair sur une photo claire
+                    devient illisible. Sur une carte sans photo, un voile noir
+                    virait au gris sale — on y peint l'accent de la maison. */}
+                <div className={`absolute inset-x-0 bottom-0 h-3/5 pointer-events-none ${
+                  a.aPhoto
+                    ? "bg-gradient-to-t from-black/85 via-black/45 to-transparent"
+                    : "bg-gradient-to-t from-[var(--accent-primary)] via-[var(--accent-primary)]/75 to-transparent"}`} />
+
+                {/* État du stock, en haut du visuel. */}
+                {(rupture || bas) && (
+                  <span className={`absolute top-2.5 left-2.5 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg text-white shadow-sm
+                                    ${rupture ? "bg-red-500" : "bg-amber-500"}`}>
+                    {rupture ? "Rupture" : "Stock bas"}
+                  </span>
+                )}
+                <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm whitespace-nowrap
+                                  ${rupture ? "bg-red-500/90 text-white"
+                                    : bas ? "bg-amber-500/90 text-white"
+                                    : "bg-white/85 text-emerald-700"}`}>
+                  {emplacement ? "À bord" : "Stock"} · {restant}
+                </span>
+
+                {/* Nom et prix posés sur la photo. */}
+                <div className="absolute inset-x-0 bottom-0 p-3">
+                  <div className="font-bold text-white text-[13.5px] leading-snug line-clamp-2 drop-shadow-sm" title={a.designation}>
+                    {a.designation}
+                  </div>
+                  <div className="flex items-end justify-between gap-2 mt-1.5">
+                    <div className="font-black text-white text-[20px] leading-none tabular-nums drop-shadow">
+                      {fmt(a.tarif1Ht)} <span className="text-[11px] font-bold opacity-80">TND</span>
                     </div>
-                  )}
+                    {/* Second stock, comme sur l'application d'origine : le camion
+                        ne dit pas si le dépôt peut réapprovisionner. Seuils repris
+                        de la production — vert ≥ 5, orange 1 à 4, rouge en dessous. */}
+                    {emplacement && a.stockGlobal != null && (
+                      <span title="Stock global de l'article (tous emplacements)"
+                        className={`text-[10px] font-bold whitespace-nowrap drop-shadow
+                                    ${a.stockGlobal >= 5 ? "text-emerald-300"
+                                      : a.stockGlobal >= 1 ? "text-amber-300"
+                                      : "text-red-300"}`}>
+                        {/* Les quantités sont fractionnaires pour certains articles
+                            (383,5) : on retire les zéros inutiles sans tronquer. */}
+                        Dépôt · {Number(a.stockGlobal).toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mb-2">
-                TTC {fmt(a.prixTtc)} · TVA {a.tauxTva}%
+
+              {/* Le visuel touche les bords : le padding vit donc sur le
+                  contenu, pas sur la carte. */}
+              <div className="flex flex-col flex-1 p-3 pt-2.5">
+              <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-secondary)]">
+                <span className="truncate font-mono tracking-tight opacity-70">
+                  {a.refArt}{a.codeBarre ? ` · ${a.codeBarre}` : ""}
+                </span>
+                <span className="shrink-0 opacity-70">TTC {fmt(a.prixTtc)} · {a.tauxTva}%</span>
               </div>
 
               {/* Remise et prix net, comme au catalogue de l'ERP d'origine :
@@ -523,12 +569,12 @@ export default function CataloguePage() {
                      [ prix TTC de base — grisé ]  %  [ remise ]  $  [ net ]
                   Le premier champ rappelle le tarif catalogue et n'est pas
                   modifiable ; les deux autres sont liés (`handlePrixChange`). */}
-              <div className="flex items-center gap-1 mb-3">
+              <div className="flex items-center gap-1 mt-2.5 mb-3 p-1 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)]">
                 <input type="text" value={fmt(a.prixTtc)} disabled
                   aria-label={`Prix TTC catalogue de ${a.designation}`}
                   className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
-                             bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg
-                             text-[var(--text-secondary)] opacity-70 cursor-not-allowed" />
+                             bg-transparent border-0 rounded-lg
+                             text-[var(--text-secondary)] opacity-60 cursor-not-allowed" />
                 <span className="text-[11px] font-bold text-[var(--text-secondary)] px-0.5">%</span>
                 <input type="text" inputMode="decimal"
                   value={remises[a.refArt]?.pct ?? ""}
@@ -537,9 +583,10 @@ export default function CataloguePage() {
                   onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                   placeholder="0"
                   aria-label={`Remise en pourcentage pour ${a.designation}`}
-                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
-                             bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg
-                             focus:outline-none focus:border-blue-500" />
+                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums font-semibold
+                             bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)]
+                             transition focus:outline-none focus:border-[var(--accent-primary)]/50
+                             focus:ring-2 focus:ring-[var(--accent-primary)]/12" />
                 <span className="text-[11px] font-bold text-[var(--text-secondary)] px-0.5">$</span>
                 <input type="text" inputMode="decimal"
                   value={remises[a.refArt]?.net ?? fmtNombre(a.prixTtc)}
@@ -548,23 +595,27 @@ export default function CataloguePage() {
                   onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                   onFocus={(e) => e.target.select()}
                   aria-label={`Prix net TTC pour ${a.designation}`}
-                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums
-                             bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg
-                             focus:outline-none focus:border-blue-500" />
+                  className="w-0 flex-1 min-w-0 px-1.5 py-1.5 text-[11px] text-center tabular-nums font-semibold
+                             bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)]
+                             transition focus:outline-none focus:border-[var(--accent-primary)]/50
+                             focus:ring-2 focus:ring-[var(--accent-primary)]/12" />
               </div>
 
               {qty === 0 ? (
                 <motion.button onClick={() => addToCart(a)} disabled={rupture}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs bg-blue-600 text-white py-2.5 rounded-xl hover:bg-blue-500 transition font-medium disabled:opacity-40"
-                  whileHover={{ scale: rupture ? 1 : 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Plus size={13} /> {rupture ? "Rupture" : "Ajouter"}
+                  className="mt-auto w-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white py-2.5 rounded-xl
+                             transition-all disabled:opacity-35 disabled:cursor-not-allowed
+                             shadow-[0_8px_20px_-12px_var(--shadow-hover)] hover:shadow-[0_12px_26px_-12px_var(--shadow-hover)]"
+                  style={{ background: rupture ? "var(--text-secondary)" : "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}
+                  whileHover={{ scale: rupture ? 1 : 1.015 }} whileTap={{ scale: 0.98 }}>
+                  <Plus size={14} /> {rupture ? "Rupture" : "Ajouter"}
                 </motion.button>
               ) : (
-                <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl p-1">
+                <div className="mt-auto flex items-center gap-1.5 rounded-xl p-1 bg-[var(--accent-light)] border border-[var(--accent-primary)]/20">
                   <button onClick={() => updateQty(a.refArt, -1)} className="w-8 h-8 shrink-0 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm hover:bg-red-50 transition">
                     <Minus size={13} className="text-red-500" />
                   </button>
-                  <span className="font-bold text-blue-700 dark:text-blue-400 w-6 text-center">{qty}</span>
+                  <span className="font-black w-6 text-center tabular-nums" style={{ color: "var(--accent-primary)" }}>{qty}</span>
                   <button onClick={() => updateQty(a.refArt, 1)} disabled={restant <= 0}
                     title={restant <= 0 ? "Plus rien à bord pour cet article" : undefined}
                     className="w-8 h-8 shrink-0 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm hover:bg-emerald-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
@@ -577,6 +628,7 @@ export default function CataloguePage() {
                   </div>
                 </div>
               )}
+              </div>
             </motion.div>
           );
         })}
@@ -710,25 +762,34 @@ export default function CataloguePage() {
 
                   <div className="grid grid-cols-4 gap-1.5">
                     {MODES_PAIEMENT.map((m) => (
-                      <button key={m} type="button" onClick={() => setModePay(m)}
+                      <button key={m} type="button" onClick={() => changerMode(m)}
                         className={`py-2 rounded-lg text-xs font-semibold border transition ${
+                          m === "Crédit" ? "col-span-4" : ""
+                        } ${
                           modePay === m
-                            ? "bg-blue-600 text-white border-blue-600"
+                            ? m === "Crédit"
+                              ? "bg-amber-500 text-white border-amber-500"
+                              : "text-white border-transparent shadow-sm"
                             : "border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)]"
-                        }`}>
-                        {m}
+                        }`}
+                        style={modePay === m && m !== "Crédit"
+                          ? { background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }
+                          : undefined}>
+                        {m === "Crédit" ? "Crédit — à payer plus tard" : m}
                       </button>
                     ))}
                   </div>
 
-                  <label className="block">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                      Montant encaissé (TND)
-                    </span>
-                    <input type="number" inputMode="decimal" min={0} step="0.001"
-                      value={montantRegle} onChange={(e) => setMontantRegle(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 text-sm text-right tabular-nums bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-blue-500" />
-                  </label>
+                  {modePay !== "Crédit" && (
+                    <label className="block">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Montant encaissé (TND)
+                      </span>
+                      <input type="number" inputMode="decimal" min={0} step="0.001"
+                        value={montantRegle} onChange={(e) => setMontantRegle(e.target.value)}
+                        className="w-full mt-1 px-3 py-2 text-sm text-right tabular-nums bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-[var(--accent-primary)]/50" />
+                    </label>
+                  )}
 
                   {(modePay === "Chèque" || modePay === "Traite") && (
                     <div className="grid grid-cols-2 gap-2">
@@ -737,24 +798,28 @@ export default function CataloguePage() {
                           N° {modePay.toLowerCase()}
                         </span>
                         <input value={numPiece} onChange={(e) => setNumPiece(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-blue-500" />
+                          className="w-full mt-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-[var(--accent-primary)]/50" />
                       </label>
                       <label className="block">
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                           Échéance
                         </span>
                         <input type="date" value={echeance} onChange={(e) => setEcheance(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-blue-500" />
+                          className="w-full mt-1 px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg focus:outline-none focus:border-[var(--accent-primary)]/50" />
                       </label>
                     </div>
                   )}
 
                   {/* Ce qui restera dû après encaissement. */}
                   {(() => {
-                    const reste = Math.round((totalTTC - (Number(montantRegle) || 0)) * 1000) / 1000;
+                    const reste = Math.round((totalTTC - (modePay === "Crédit" ? 0 : Number(montantRegle) || 0)) * 1000) / 1000;
                     return reste > 0 ? (
                       <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                        Reste à payer : <strong>{fmt(reste)} TND</strong> — porté au débit du client
+                        {modePay === "Crédit" ? (
+                          <>Vente à crédit : <strong>{fmt(reste)} TND</strong> portés au débit de {clientActif?.raisonSocial ?? "ce client"}, à recouvrer plus tard.</>
+                        ) : (
+                          <>Reste à payer : <strong>{fmt(reste)} TND</strong> — porté au débit du client</>
+                        )}
                       </div>
                     ) : null;
                   })()}
@@ -762,7 +827,7 @@ export default function CataloguePage() {
                   <button onClick={emettreTicket} disabled={saving}
                     className="w-full bg-emerald-600 text-white py-3 rounded-xl font-medium hover:bg-emerald-500 transition text-sm disabled:opacity-50 flex items-center justify-center gap-2">
                     {saving && <Loader2 className="animate-spin" size={16} />}
-                    Émettre le ticket
+                    {modePay === "Crédit" ? "Émettre le ticket à crédit" : "Émettre le ticket"}
                   </button>
                   <button onClick={() => setPaiement(false)} disabled={saving}
                     className="w-full py-2.5 rounded-xl font-medium text-sm border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] transition disabled:opacity-50">
@@ -774,7 +839,8 @@ export default function CataloguePage() {
               {cart.length > 0 && !paiement && (
                 <div className="p-5 border-t border-[var(--border-primary)]">
                   <button onClick={validerPanier} disabled={saving || !clientActif}
-                    className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-500 transition text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="w-full text-white py-3 rounded-xl font-bold transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_10px_24px_-14px_var(--shadow-hover)] hover:shadow-[0_14px_30px_-14px_var(--shadow-hover)]"
+                    style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}>
                     {saving && <Loader2 className="animate-spin" size={16} />}
                     Valider le panier → Ticket
                   </button>
@@ -804,7 +870,7 @@ export default function CataloguePage() {
 
 function Row({ label, value, strong, muted }: { label: string; value: string; strong?: boolean; muted?: boolean }) {
   return (
-    <div className={`flex justify-between ${strong ? "text-sm font-bold mt-2 text-blue-700 dark:text-blue-400" : muted ? "text-xs text-[var(--text-secondary)] mt-1" : "text-sm font-bold"}`}>
+    <div className={`flex justify-between ${strong ? "text-sm font-black mt-2 text-[var(--accent-primary)]" : muted ? "text-xs text-[var(--text-secondary)] mt-1" : "text-sm font-bold"}`}>
       <span className={strong || muted ? "" : "text-[var(--text-secondary)]"}>{label}</span>
       <span className="tabular-nums">{value} TND</span>
     </div>

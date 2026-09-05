@@ -37,6 +37,16 @@ export default function NouveauClientModal({
   const [photoErreur, setPhotoErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Client déjà enregistré à quelques mètres : le commercial est sur place et
+  // tranche lui-même (même commerce, ou le voisin) plutôt que d'être bloqué.
+  const [clientProche, setClientProche] = useState<{ id: number; raisonSocial: string; distance: number } | null>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+
+  // Un message apparu en tête reste invisible si le formulaire est défilé :
+  // on le ramène à l'écran, sinon le commercial croit que rien ne s'est passé.
+  useEffect(() => {
+    if (erreur || clientProche) messagesRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [erreur, clientProche]);
   // Adresse déduite de la position : "en cours" pendant l'appel, "ok" quand
   // les champs ont été remplis, "echec" si le service n'a pas répondu.
   const [adresseAuto, setAdresseAuto] = useState<"aucune" | "en cours" | "ok" | "echec">("aucune");
@@ -53,6 +63,7 @@ export default function NouveauClientModal({
       setPhoto(null);
       setPhotoErreur(null);
       setErreur(null);
+      setClientProche(null);
       if (!position) rafraichirPosition();
     });
     return () => { annule = true; };
@@ -95,7 +106,7 @@ export default function NouveauClientModal({
     }
   }
 
-  async function enregistrer() {
+  async function enregistrer(forcer = false) {
     // Un point de vente créé sur le terrain doit être identifiable et
     // non dupliqué : les quatre champs ci-dessous sont donc exigés.
     if (!form.raisonSocial.trim()) { setErreur("La raison sociale est obligatoire"); return; }
@@ -105,6 +116,7 @@ export default function NouveauClientModal({
     if (!position) { setErreur("Position GPS absente — activez la localisation puis réessayez"); return; }
     setEnCours(true);
     setErreur(null);
+    if (!forcer) setClientProche(null);
     try {
       const r = await fetch("/api/clients", {
         method: "POST",
@@ -114,10 +126,16 @@ export default function NouveauClientModal({
           latitude: position?.lat ?? null,
           longitude: position?.lng ?? null,
           photo,
+          ...(forcer ? { forcer: true } : {}),
         }),
       });
       const d = await r.json();
-      if (!r.ok) { setErreur(d.error ?? "Échec de la création"); return; }
+      if (!r.ok) {
+        // Voisin immédiat : on propose de confirmer plutôt que de refuser.
+        if (d.code === "client-proche" && d.client) { setClientProche(d.client); setErreur(null); return; }
+        setErreur(d.error ?? "Échec de la création");
+        return;
+      }
       onCree(d.client);
     } catch {
       setErreur("Réseau indisponible — réessayez");
@@ -147,6 +165,33 @@ export default function NouveauClientModal({
             </div>
 
             <div className="p-5 overflow-auto flex-1 space-y-4">
+              {/* Messages en tête : sur mobile, une erreur affichée en bas du
+                  formulaire défilant restait invisible — le commercial appuyait
+                  sur « Créer » sans rien voir se passer. */}
+              <div ref={messagesRef} />
+              {erreur && (
+                <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2.5">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" /> <span>{erreur}</span>
+                </div>
+              )}
+              {clientProche && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 space-y-2">
+                  <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                    <span>
+                      <b>{clientProche.raisonSocial}</b> est déjà enregistré à {clientProche.distance} m
+                      (code {clientProche.id}). S&apos;il s&apos;agit du même commerce, annulez et sélectionnez-le ;
+                      sinon confirmez la création.
+                    </span>
+                  </div>
+                  <button onClick={() => enregistrer(true)} disabled={enCours}
+                    className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-amber-500 text-white py-2 rounded-lg hover:bg-amber-400 transition disabled:opacity-50">
+                    {enCours && <Loader2 className="animate-spin" size={13} />}
+                    C&apos;est un autre commerce — créer quand même
+                  </button>
+                </div>
+              )}
+
               {/* Position GPS */}
               <div className={`rounded-xl border p-3 ${aPosition ? "bg-emerald-500/10 border-emerald-500/30" : "bg-amber-500/10 border-amber-500/30"}`}>
                 <div className="flex items-center gap-2.5">
@@ -220,11 +265,6 @@ export default function NouveauClientModal({
                 </div>
               </div>
 
-              {erreur && (
-                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2.5">
-                  <AlertTriangle size={14} className="shrink-0" /> {erreur}
-                </div>
-              )}
             </div>
 
             <div className="flex gap-3 p-5 border-t border-[var(--border-primary)]">
@@ -232,7 +272,7 @@ export default function NouveauClientModal({
                 className="flex-1 border border-[var(--border-primary)] text-[var(--text-secondary)] py-2.5 rounded-xl font-medium hover:bg-[var(--bg-primary)] transition text-sm">
                 Annuler
               </button>
-              <button onClick={enregistrer} disabled={enCours || !form.raisonSocial.trim()}
+              <button onClick={() => enregistrer()} disabled={enCours || !form.raisonSocial.trim()}
                 className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-500 transition text-sm disabled:opacity-50 flex items-center justify-center gap-2">
                 {enCours && <Loader2 className="animate-spin" size={15} />}
                 Créer et démarrer la visite

@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useClientActif } from "@/lib/client-actif";
 import Link from "next/link";
 import { ShoppingCart, Trash2, Loader2, Check, AlertTriangle, Search, Send, Plus, Minus } from "lucide-react";
 import { confirmer } from "@/lib/alertes";
@@ -20,6 +21,10 @@ const fmt = (v: unknown) =>
   new Intl.NumberFormat("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(v) || 0);
 
 export default function PanierPage() {
+  // Le client en cours du bandeau est le destinataire naturel de la commande :
+  // le commercial l'a déjà choisi (GPS ou à la main), le redemander ici était
+  // une saisie en double qui bloquait la validation.
+  const { client: clientActif } = useClientActif();
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [client, setClient] = useState<{ codeCli: number | null; clientNom: string | null }>({ codeCli: null, clientNom: null });
   const [tot, setTot] = useState({ totalHT: 0, totalTVA: 0, totalTTC: 0, totalRemise: 0 });
@@ -34,12 +39,29 @@ export default function PanierPage() {
     setTimeout(() => setToast(null), 6000);
   }, []);
 
+  // Client en cours au moment du chargement : lu par référence pour ne pas
+  // relancer le chargement à chaque changement de bandeau.
+  const actifRef = useRef(clientActif);
+  useEffect(() => { actifRef.current = clientActif; }, [clientActif]);
+
   const charger = useCallback(() => {
     fetch("/api/panier?vue=courant")
       .then((r) => r.json())
-      .then((d) => {
+      .then(async (d) => {
         setLignes(d.lignes ?? []);
-        setClient({ codeCli: d.panier?.codeCli ?? null, clientNom: d.panier?.clientNom ?? null });
+        let codeCli: number | null = d.panier?.codeCli ?? null;
+        let clientNom: string | null = d.panier?.clientNom ?? null;
+        // Panier sans destinataire : on reprend le client en cours du bandeau,
+        // que le commercial a déjà choisi. Évite une saisie en double.
+        const actif = actifRef.current;
+        if (codeCli == null && actif?.id) {
+          const r = await fetch("/api/panier", {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codeCli: actif.id }),
+          }).then((x) => x.json()).catch(() => null);
+          if (r?.ok) { codeCli = actif.id; clientNom = actif.raisonSocial; }
+        }
+        setClient({ codeCli, clientNom });
         setTot({
           totalHT: d.totalHT ?? 0, totalTVA: d.totalTVA ?? 0,
           totalTTC: d.totalTTC ?? 0, totalRemise: d.totalRemise ?? 0,
@@ -81,6 +103,7 @@ export default function PanierPage() {
     charger();
   };
 
+
   const vider = async () => {
     const ok = await confirmer("Le panier sera entièrement vidé.", {
       titre: "Vider le panier", intitule: "Vider le panier", danger: true,
@@ -115,14 +138,14 @@ export default function PanierPage() {
             {lignes.length} article(s) · {fmt(tot.totalTTC)} TND TTC
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Link href="/commercial/catalogue"
-            className="px-3 py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 flex items-center gap-1.5">
+            className="flex-1 sm:flex-none justify-center px-3 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 flex items-center gap-1.5">
             <Plus size={15} /> Ajouter des articles
           </Link>
           {lignes.length > 0 && (
             <button onClick={vider}
-              className="px-3 py-2 rounded-xl text-sm font-semibold border border-red-200 text-red-600 flex items-center gap-1.5">
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold border border-red-200 text-red-600 flex items-center gap-1.5 shrink-0">
               <Trash2 size={15} /> Vider
             </button>
           )}
@@ -171,13 +194,34 @@ export default function PanierPage() {
                 ))}
               </select>
             </div>
-            {client.clientNom && (
-              <div className="text-xs text-emerald-600">Commande pour : <b>{client.clientNom}</b></div>
-            )}
+            {client.clientNom ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-emerald-600">Commande pour : <b>{client.clientNom}</b></span>
+                {clientActif && client.codeCli === clientActif.id && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                    repris du client en cours
+                  </span>
+                )}
+                {clientActif && client.codeCli !== clientActif.id && (
+                  <button onClick={() => choisirClient(clientActif.id)}
+                    className="w-full sm:w-auto text-left px-2.5 py-1.5 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-semibold">
+                    Utiliser « {clientActif.raisonSocial} » <span className="text-emerald-500">(client en cours)</span>
+                  </button>
+                )}
+              </div>
+            ) : clientActif ? (
+              <button onClick={() => choisirClient(clientActif.id)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition">
+                Commander pour « {clientActif.raisonSocial} » (client en cours)
+              </button>
+            ) : null}
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Écran large : tableau. Mobile : une carte par article — les six
+                colonnes ne tiennent pas sur 390 px (quantité coupée, désignation
+                écrasée sur trois lignes). */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -241,6 +285,66 @@ export default function PanierPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile : une carte par article */}
+            <ul className="md:hidden divide-y divide-slate-100">
+              {lignes.map((l) => (
+                <li key={l.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-slate-800 leading-snug">{l.designation ?? l.refArt}</div>
+                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        {l.refArt}{l.unite ? ` · ${l.unite}` : ""}
+                      </div>
+                    </div>
+                    <button onClick={() => majQte(l.refArt, 0)} aria-label="Retirer l'article"
+                      className="text-red-500 p-1.5 -mr-1 shrink-0">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs text-slate-500">
+                      <span className="uppercase tracking-wide text-[10px] font-semibold text-slate-400">PU HT</span>
+                      <div className="text-slate-700 tabular-nums">
+                        {(l.remise ?? 0) > 0 ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="line-through text-slate-400">{fmt(l.puHt)}</span>
+                            <span>{fmt(l.puHt * (1 - (l.remise ?? 0) / 100))}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold text-[10px]">
+                              −{l.remise} %
+                            </span>
+                          </span>
+                        ) : fmt(l.puHt)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="uppercase tracking-wide text-[10px] font-semibold text-slate-400">Total TTC</span>
+                      <div className="font-bold text-slate-800 tabular-nums">{fmt(l.totalTTC)}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="uppercase tracking-wide text-[10px] font-semibold text-slate-400">Quantité</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => majQte(l.refArt, l.qte - 1)} aria-label="Diminuer"
+                        className="w-9 h-9 rounded-xl border border-slate-200 text-slate-600 flex items-center justify-center active:bg-slate-50">
+                        <Minus size={15} />
+                      </button>
+                      <input type="number" inputMode="decimal" step="0.001" value={l.qte}
+                        onChange={(e) => majQte(l.refArt, Number(e.target.value))}
+                        aria-label={`Quantité pour ${l.designation ?? l.refArt}`}
+                        className="w-16 px-2 py-2 rounded-xl border border-slate-200 text-sm text-center tabular-nums" />
+                      <button onClick={() => majQte(l.refArt, l.qte + 1)} aria-label="Augmenter"
+                        className="w-9 h-9 rounded-xl border border-slate-200 text-slate-600 flex items-center justify-center active:bg-slate-50">
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
             <div className="p-4 border-t border-slate-100 bg-slate-50 space-y-1">
               <div className="flex justify-between text-sm text-slate-600">
                 <span>Total HT</span><span>{fmt(tot.totalHT)} TND</span>

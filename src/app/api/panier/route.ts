@@ -398,6 +398,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true, message: "Article retiré" });
   }
 
+  // Vider le panier libère aussi le destinataire : sinon la commande suivante
+  // repartait avec le client de la précédente, et la reprise du client en
+  // cours ne s'appliquait pas (le panier « avait déjà » un client).
   const res = await prisma.panierLigne.deleteMany({ where: { panierId: p.id } });
+  await prisma.panier.update({ where: { id: p.id }, data: { codeCli: null, clientNom: null } });
   return NextResponse.json({ ok: true, message: `Panier vidé (${res.count} ligne(s))` });
 }

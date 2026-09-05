@@ -646,6 +646,8 @@ model Partner {
   // (téléphone réduit à ses chiffres, matricule en majuscules) et ne couvrent
   // que les valeurs renseignées — Prisma ne sait pas décrire cela, d'où le SQL
   // manuel. Ne pas régénérer ce modèle avec `db push`, qui les supprimerait.
+  visites VisiteClient[]
+
   @@index([nature])
   @@index([raisonSocial])
   @@map("partners")
@@ -2593,4 +2595,52 @@ model EnregistrementVisite {
   @@index([ligneId])
   @@index([commercial])
   @@map("enregistrements_visite")
+}
+
+// Journal des visites terrain pointées par le commercial depuis sa liste
+// clients (bouton « Je suis là »), en dehors de toute tournée planifiée —
+// `LigneMission` ne couvre que les visites prévues dans un ordre de mission.
+//
+// Une seule table indexée plutôt qu'une table par client : le journal d'un
+// client se lit par `clientId`, le rapport admin par `visiteLe`, et les deux
+// restent immédiats à plusieurs millions de lignes.
+model VisiteClient {
+  id Int @id @default(autoincrement())
+
+  // Tiers réel de l'ERP (`partners.id`), pas le modèle démo `Client`.
+  clientId  Int
+  client    Partner @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Dénormalisés : le rapport admin doit rester lisible même si le client est
+  // renommé ou supprimé de l'ERP par la suite.
+  clientNom String
+  adresse   String?
+
+  // Auteur du pointage. `commercialNom` est le nom du portefeuille, seule clé
+  // de rattachement fiable côté ERP (cf. `filtrePortefeuille`).
+  userId        Int?
+  commercialNom String
+
+  visiteLe DateTime @default(now())
+
+  // Position du commercial au moment du pointage, et celle du client telle
+  // qu'elle était alors : sans les deux, la distance n'est pas vérifiable a
+  // posteriori.
+  latCommercial Float?
+  lngCommercial Float?
+  latClient     Float?
+  lngClient     Float?
+  /** Distance en mètres entre les deux, au moment du pointage. */
+  distanceM     Int?
+  /** Vrai si la distance est sous le seuil de présence. */
+  surPlace      Boolean @default(false)
+  /** Le commercial a corrigé la position du client depuis cet écran. */
+  positionCorrigee Boolean @default(false)
+
+  commentaire String?
+  createdAt   DateTime @default(now())
+
+  @@index([clientId, visiteLe])
+  @@index([visiteLe])
+  @@index([commercialNom, visiteLe])
+  @@map("visites_client")
 }

@@ -1,42 +1,53 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, User, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Sparkles, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-type Message = { role: "user" | "assistant"; content: string; time: string };
+type Message = { role: "user" | "assistant"; content: string; time: string; lien?: string };
 
-const SUGGESTIONS = [
-  "Quel est le CA du mois?",
-  "Clients avec solde > 3000 TND?",
-  "Produits sous stock minimum?",
-  "Performance de Mokhtar ce mois?",
-];
-
-const DEMO_RESPONSES: Record<string, string> = {
-  default: "Je suis BIS Assistant, votre IA de gestion commerciale. Je peux vous aider avec les données de vente, stock, clients et performances.",
-  ca: "📊 CA de mai 2026 : **23 100 TND** (objectif: 25 000 TND, taux: 92.4%). Meilleur commercial: FOUED avec 71 300 TND sur l'année.",
-  clients: "🔴 5 clients dépassent 3 000 TND de solde :\n• AGIL BEJA SUD — 4 428 TND\n• AGIL BEJA NORD — 4 291 TND\n• AGIL SIDI KHLIFA — 3 659 TND\n• AGIL MAHDIA — 3 408 TND\n• librairie saphir — 2 738 TND",
-  stock: "⚠️ 2 articles sous seuil minimum :\n• coffret echec 2025 — stock: 2 (min: 5)\n• jeux ludo bois — stock: 9 (min: 10)\n\nJe peux générer un bon de commande automatique.",
-  performance: "📈 Mokhtar Trabelsi — Mai 2026 :\n• CA réalisé: 3 506 TND / 5 000 objectif (70%)\n• Visites: 14/17 clients\n• Taux recouvrement: 68%\n• Km parcourus: 287 km",
-};
-
-function getResponse(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes("ca") || m.includes("chiffre") || m.includes("mois")) return DEMO_RESPONSES.ca;
-  if (m.includes("client") || m.includes("solde") || m.includes("créance")) return DEMO_RESPONSES.clients;
-  if (m.includes("stock") || m.includes("rupture") || m.includes("minimum")) return DEMO_RESPONSES.stock;
-  if (m.includes("mokhtar") || m.includes("performance") || m.includes("commercial")) return DEMO_RESPONSES.performance;
-  return DEMO_RESPONSES.default;
-}
 
 function now() { return new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
 
-/** Délai de frappe simulé, entre 0,9 s et 1,5 s. Isolé du rendu : `Math.random`
- *  ne doit pas être appelé pendant qu'un composant se rend. */
-function delaiReponse() { return 900 + Math.random() * 600; }
+/** Libellé du bouton de navigation proposé par l'assistant. */
+function libelleLien(chemin: string): string {
+  if (/^\/(?:commercial\/clients|admin\/modules\/vente\/clients)\/\d+/.test(chemin)) return "Ouvrir la fiche client";
+  const noms: Record<string, string> = {
+    "/commercial/planning": "Ouvrir la tournée du jour",
+    "/commercial/clients": "Ouvrir mes clients",
+    "/commercial/catalogue": "Ouvrir le catalogue",
+    "/commercial/panier": "Ouvrir le panier",
+    "/commercial/recouvrement": "Ouvrir le recouvrement",
+    "/commercial/journal": "Ouvrir le journal de caisse",
+    "/commercial/dernier-ticket": "Ouvrir le dernier ticket",
+    "/commercial/retour-stock": "Ouvrir le stock du camion",
+    "/commercial/approvisionnement": "Ouvrir l'approvisionnement",
+    "/commercial/reclamation": "Ouvrir les réclamations",
+    "/commercial/statistiques": "Ouvrir les statistiques",
+    "/commercial/map": "Ouvrir la carte",
+    "/admin/dashboard": "Ouvrir le tableau de bord",
+    "/admin/missions": "Ouvrir les ordres de mission",
+    "/admin/commerciaux": "Ouvrir les commerciaux",
+    "/admin/visites": "Ouvrir les visites terrain",
+    "/admin/etat-stock": "Ouvrir l'état du stock",
+    "/admin/synthese": "Ouvrir la synthèse",
+    "/admin/compta": "Ouvrir la comptabilité",
+    "/admin/rapports-admin": "Ouvrir les rapports",
+    "/admin/modules/vente/clients": "Ouvrir les clients",
+  };
+  return noms[chemin] ?? "Ouvrir l'écran";
+}
+
 
 export default function BISAssistant() {
   const [open, setOpen] = useState(false);
+  // Rôle de l'utilisateur : décide des suggestions et, côté serveur, du
+  // périmètre des données auxquelles l'assistant a accès.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const router = useRouter();
+  // Sujet de la dernière réponse : permet au serveur de comprendre les
+  // questions de suivi (« donne-moi la liste » après une réponse sur le stock).
+  const dernierSujet = useRef<string | null>(null);
   // Le message d'accueil appartient à l'état initial : le poser depuis un effet
   // déclenchait un rendu supplémentaire à chaque montage, et `now()` lit
   // l'horloge — un appel impur interdit pendant le rendu.
@@ -56,17 +67,57 @@ export default function BISAssistant() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
-  function send(text?: string) {
+  // Accueil et suggestions viennent du serveur : ils dépendent du rôle, que
+  // seul le serveur connaît de façon fiable.
+  useEffect(() => {
+    if (!open || suggestions.length) return;
+    let annule = false;
+    fetch("/api/assistant")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (annule || !d) return;
+        setSuggestions(d.suggestions ?? []);
+        if (d.accueil) {
+          setMessages((prev) => (prev.length <= 1 ? [{ role: "assistant" as const, content: d.accueil, time: now() }] : prev));
+        }
+      })
+      .catch(() => {});
+    return () => { annule = true; };
+  }, [open, suggestions.length]);
+
+  async function send(text?: string) {
     const msg = text || input.trim();
     if (!msg) return;
     setInput("");
-    const userMsg: Message = { role: "user", content: msg, time: now() };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, { role: "user", content: msg, time: now() }]);
     setTyping(true);
-    setTimeout(() => {
+    try {
+      // Les données viennent du serveur, dans le périmètre du rôle : un
+      // commercial ne peut pas obtenir le CA d'un collègue.
+      const r = await fetch("/api/assistant", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        // L'historique permet au modèle de suivre le fil (« et en dinars ? »).
+        body: JSON.stringify({
+          question: msg,
+          suivi: { sujet: dernierSujet.current },
+          historique: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const d = await r.json();
+      if (d.sujet && d.sujet !== "aide") dernierSujet.current = d.sujet;
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: d.reponse ?? d.error ?? "Je n'ai pas pu répondre.",
+        time: now(),
+        // L'assistant peut proposer d'ouvrir un écran : on laisse le geste à
+        // l'utilisateur plutôt que de le déplacer sans prévenir.
+        lien: typeof d.navigation === "string" ? d.navigation : undefined,
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "assistant", content: "Connexion indisponible — réessayez.", time: now() }]);
+    } finally {
       setTyping(false);
-      setMessages(prev => [...prev, { role: "assistant", content: getResponse(msg), time: now() }]);
-    }, delaiReponse());
+    }
   }
 
   return (
@@ -74,7 +125,8 @@ export default function BISAssistant() {
       {/* Toggle button */}
       <motion.button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-500/30 text-white"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-[0_18px_40px_-16px_var(--shadow-hover)]"
+        style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 76%, #000))" }}
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
         animate={open ? { rotate: 0 } : { rotate: 0 }}>
         {open ? <X size={22} /> : (
@@ -97,13 +149,13 @@ export default function BISAssistant() {
             transition={{ type: "spring", damping: 22, stiffness: 280 }}>
 
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3.5 flex items-center gap-3">
+            <div className="px-4 py-3.5 flex items-center gap-3" style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 76%, #000))" }}>
               <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
                 <Sparkles size={18} className="text-white" />
               </div>
               <div>
                 <div className="text-white font-bold text-sm">BIS Assistant</div>
-                <div className="text-blue-200 text-xs flex items-center gap-1.5">
+                <div className="text-white/75 text-xs flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                   Propulsé par IA
                 </div>
@@ -118,13 +170,20 @@ export default function BISAssistant() {
               {messages.map((msg, i) => (
                 <motion.div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${msg.role === "assistant" ? "bg-blue-100 text-blue-600" : "bg-slate-200 text-slate-600"}`}>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${msg.role === "assistant" ? "bg-[var(--accent-light)] text-[var(--accent-primary)]" : "bg-slate-200 text-slate-600"}`}>
                     {msg.role === "assistant" ? <Bot size={14} /> : <User size={14} />}
                   </div>
                   <div className={`max-w-[78%] ${msg.role === "user" ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                    <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-line ${msg.role === "assistant" ? "bg-white border border-slate-100 text-slate-700 shadow-sm" : "bg-blue-600 text-white"}`}>
+                    <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-line ${msg.role === "assistant" ? "bg-white border border-slate-100 text-slate-700 shadow-sm" : "text-white"}`}
+                      style={msg.role === "assistant" ? undefined : { background: "var(--accent-primary)" }}>
                       {msg.content.replace(/\*\*(.*?)\*\*/g, "$1")}
                     </div>
+                    {msg.lien && (
+                      <button onClick={() => { router.push(msg.lien!); setOpen(false); }}
+                        className="flex items-center gap-1.5 text-xs font-bold text-[var(--accent-primary)] bg-[var(--accent-light)] border border-[var(--accent-primary)]/20 rounded-xl px-3 py-2 hover:brightness-97 transition">
+                        {libelleLien(msg.lien)} <ArrowRight size={13} />
+                      </button>
+                    )}
                     <span className="text-[10px] text-slate-400 px-1">{msg.time}</span>
                   </div>
                 </motion.div>
@@ -132,13 +191,13 @@ export default function BISAssistant() {
 
               {typing && (
                 <motion.div className="flex gap-2.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Bot size={14} className="text-blue-600" />
+                  <div className="w-8 h-8 rounded-xl bg-[var(--accent-light)] flex items-center justify-center flex-shrink-0">
+                    <Bot size={14} className="text-[var(--accent-primary)]" />
                   </div>
                   <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm">
                     <div className="flex gap-1">
                       {[0,1,2].map(i => (
-                        <motion.div key={i} className="w-2 h-2 bg-blue-400 rounded-full"
+                        <motion.div key={i} className="w-2 h-2 rounded-full bg-[var(--accent-primary)] opacity-55"
                           animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.15 }} />
                       ))}
                     </div>
@@ -151,9 +210,9 @@ export default function BISAssistant() {
             {/* Suggestions */}
             {messages.length <= 2 && (
               <div className="px-3 py-2 border-t border-slate-100 bg-white flex gap-1.5 overflow-x-auto scrollbar-none">
-                {SUGGESTIONS.slice(0, 3).map(s => (
+                {suggestions.slice(0, 4).map(s => (
                   <button key={s} onClick={() => send(s)}
-                    className="flex-shrink-0 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition font-medium whitespace-nowrap">
+                    className="flex-shrink-0 text-xs bg-[var(--accent-light)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20 px-3 py-1.5 rounded-xl hover:brightness-97 transition font-semibold whitespace-nowrap">
                     {s}
                   </button>
                 ))}
@@ -165,9 +224,10 @@ export default function BISAssistant() {
               <input value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && send()}
                 placeholder="Poser une question..."
-                className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-300 text-slate-800 placeholder:text-slate-400" />
+                className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[var(--accent-primary)]/45 text-slate-800 placeholder:text-slate-400" />
               <motion.button onClick={() => send()} disabled={!input.trim()}
-                className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-500 transition disabled:opacity-40"
+                className="w-10 h-10 text-white rounded-xl flex items-center justify-center transition hover:brightness-110 disabled:opacity-40"
+                style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 76%, #000))" }}
                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Send size={15} />
               </motion.button>
