@@ -41,7 +41,10 @@ export async function GET(req: NextRequest) {
   // Les chiffres de cet écran n'ont de valeur que frais : déclenche une
   // resynchronisation en arrière-plan si les données datent.
   void rafraichirStockSiPerime();
-  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
+  // Back-office : cette route expose tous les emplacements avec puAchat, pmp
+  // et la valorisation totale — donc les marges. Le commercial a /api/catalogue,
+  // restreint à son camion.
+  const auth = await requireSession(["ADMIN", "MANAGER"]);
   if (!auth.ok) return auth.res;
 
   const sp = req.nextUrl.searchParams;

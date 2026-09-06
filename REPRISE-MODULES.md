@@ -2242,6 +2242,11 @@ positions corrigées. Filtres par période, commercial et nom de client ; export
 CSV avec BOM (sans lui, Excel affiche « Ã© »). Le nom du client ouvre sa fiche.
 Un commercial qui appelle la même API ne voit que ses propres pointages.
 
+Le filtre commercial est un **champ de recherche**, pas une liste déroulante :
+avec 21 vendeurs, il fallait parcourir tout le menu des yeux. On tape quelques
+lettres (« mokh » ramène la liste de 21 à 1), on choisit dans les suggestions,
+et une croix remet « Tous les commerciaux ».
+
 Ajouté au menu admin, à `src/lib/ecrans.ts` (fil d'Ariane) et aux écrans que
 l'assistant sait ouvrir (« montre-moi les visites »).
 
@@ -2274,3 +2279,240 @@ la liste elle-même, avec les cartes complètes.
 Vérifié au navigateur (position simulée à Tunis) : distances strictement
 croissantes (1,1 → 2,9 → 2,9 → 3,3 → 3,9 → 4,8 km), bandeau exact, carte
 recentrée sur le point violet après déplacement manuel.
+
+### « Modifier un client » : le formulaire refait
+
+Bandeau bleu étranger à la palette, champs de 36 px difficiles à viser au
+pouce, trois colonnes serrées sur mobile, et surtout un `max-h-[92vh]` qui
+faisait passer le titre sous la barre d'adresse mobile — l'en-tête était coupé.
+
+`src/components/commercial/ModifierClientModal.tsx` :
+- **feuille glissante sur mobile** (poignée, coins arrondis en haut, ancrée en
+  bas pour que le pouce atteigne les actions), **carte centrée sur bureau** ;
+  `dvh` au lieu de `vh` : la barre d'adresse mobile rognait l'en-tête ;
+- **trois sections** — Identité, Coordonnées, Emplacement — au lieu d'une liste
+  continue de quinze champs ;
+- **grilles qui se replient** : le code TVA prend toute la largeur sur mobile,
+  clé et catégorie se partagent la ligne suivante ; téléphone et e-mail passent
+  l'un sous l'autre ;
+- **champs de 44 px** (cible tactile minimale), focus à l'accent avec halo ;
+- **bloc Emplacement distingué** sur fond accent : « Utiliser ma position » est
+  l'action la plus fréquente de ce formulaire sur le terrain ;
+- **barre d'actions** avec `env(safe-area-inset-bottom)` — sans elle, le bouton
+  tombait sous le geste d'accueil iOS — et « Enregistrer » plus large
+  qu'« Annuler ».
+
+**Correction annexe, valable partout** : `BISAssistant` était en `z-50`, comme
+les neuf modals de l'application — sa bulle masquait leurs boutons de
+validation. Passé en `z-40` : il reste au-dessus du contenu, jamais au-dessus
+d'une fenêtre modale.
+
+Vérifié en 1500 et 390 px : titre visible dans les deux cas (auparavant coupé
+sur mobile), plus une seule classe `blue` dans le fichier.
+
+### Photo du point de vente, modifiable depuis le terrain
+
+La devanture n'était capturée qu'à la **création** d'un client
+(`NouveauClientModal`). Les 4 547 clients importés de l'ERP n'en ont donc
+aucune, et rien ne permettait d'en ajouter une après coup.
+
+`ModifierClientModal` reprend la mécanique existante — `compresserImage`
+(1000 px de côté, JPEG qualité 0,7) et `capture="environment"` qui ouvre
+directement l'appareil photo arrière sur mobile :
+- **zone vide** en pointillés (« Prendre une photo de la devanture ») quand le
+  client n'en a pas ;
+- **aperçu** avec « Remplacer » et une corbeille quand il en a une, plus un
+  badge « Nouvelle photo » tant que le changement n'est pas enregistré ;
+- **chargement à la demande** : la photo n'accompagne pas la liste des clients
+  — 200 images base64 alourdiraient la page — elle est lue à l'ouverture du
+  modal via `?codeCli=`.
+
+`PUT /api/clients` accepte désormais `photo`, avec les contrôles de la
+création : préfixe `data:image/`, 600 Ko maximum. **Absente du corps = photo
+inchangée** ; `null` explicite = supprimée. Le modal ne l'envoie que si elle a
+changé, sinon chaque correction de téléphone renverrait 600 Ko de base64.
+
+`PHOTO_MAX` a dû être remontée avant le `PUT` : déclarée après, un `const`
+n'étant pas hoisté, la première modification avec photo aurait levé une
+`ReferenceError`.
+
+Vérifié bout en bout : ajout, conservation lors d'une modification sans photo,
+format invalide refusé, photo > 600 Ko refusée, suppression explicite,
+cloisonnement (un client d'un autre commercial renvoie 403), et relecture après
+réouverture. Compression mesurée : 11,6 Ko → 6,5 Ko.
+
+Note d'outillage : `setInputFiles` de Playwright livre un fichier de **taille
+zéro** dans ce contexte, d'où un « Image illisible » trompeur pendant les
+tests ; l'injection des octets via `DataTransfer` reproduit fidèlement l'appareil
+photo.
+
+Deux défauts de mise en page corrigés ensuite, mesurés au navigateur :
+- **la zone défilante débordait de 75 px sous la barre d'actions** (mesuré :
+  elle descendait à 947 px pour une barre commençant à 872). `h-full` sur
+  l'enfant d'un conteneur `flex-1` se calcule sur la hauteur *souhaitée* du
+  parent, pas sur celle qu'il reçoit ; `flex-1 min-h-0` sur la zone elle-même
+  la borne correctement. (`absolute inset-0`, essayé d'abord, retire l'enfant
+  du flux et fait s'effondrer la carte à 150 px — piège classique.)
+- **le contenu se coupait net au ras des boutons**, sans rien indiquer qu'il
+  restait des champs plus bas : un dégradé posé au-dessus de la barre d'actions
+  montre que le formulaire continue.
+
+La photo est aussi **remontée en tête du formulaire** : c'est le repère visuel
+du point de vente, il doit se voir à l'ouverture plutôt qu'après avoir fait
+défiler. Sans photo, la zone devient un bandeau horizontal compact (icône +
+deux lignes) au lieu d'un grand carré en pointillés qui repoussait les champs.
+
+**Le haut refait en bannière.** L'en-tête restait un bandeau blanc générique
+(« Modifier un client » + code) et la photo n'était qu'une carte de plus dans
+le formulaire. Désormais :
+- **le nom du client domine** — « AGIL MAHDIA » en gros, code et ville dessous :
+  le commercial voit d'abord CHEZ QUI il est ;
+- **la photo devient le fond de la bannière**, sous un dégradé sombre qui garde
+  le texte lisible ; sans photo, le fond est peint à l'accent ;
+- **les actions photo sont posées dessus** (« Prendre la photo » / « Remplacer »
+  + corbeille), en boutons translucides — plus de bloc séparé dans le corps ;
+- la **poignée mobile** est superposée à la bannière : au-dessus, sur fond
+  blanc, elle coupait l'image d'une bande claire.
+
+
+
+## Recherche globale (barre du haut)
+
+Le champ de la barre du haut était décoratif : il ne cherchait rien. Il est
+maintenant le point d'entrée de toute l'application.
+
+### `GET /api/recherche?q=…`
+
+Six natures de résultats, chacune dans le **périmètre du rôle** :
+- **clients** — nom, ville, téléphone, matricule fiscal, code ; un commercial
+  ne trouve que son portefeuille (`filtrePortefeuille`) ;
+- **articles** — désignation, référence, code-barres ;
+- **documents** — numéro de pièce ou nom du tiers ; le commercial ne voit que
+  les siens (`commercial = son nom`), le client que les siennes (`codeCli`) ;
+- **ordres de mission** — « OM-2894 », commercial, véhicule ;
+- **commerciaux** (administration et management) — nom du vendeur, avec la
+  taille de son portefeuille et ses créances ; le clic ouvre sa fiche
+  d'activité. La source est le portefeuille ERP (`partners.commercial`) et non
+  la table des comptes : des vendeurs de production n'ont pas d'accès à
+  l'application, ils seraient restés introuvables ;
+- **écrans** — « recouvrement », « stock »… ouvrent directement la page, et la
+  table des écrans est filtrée par rôle (Mokhtar voit « Stock véhicule »,
+  l'admin « État du stock »).
+
+**Quotas par nature** : les clients, souvent les plus nombreux, occupaient les
+20 places et masquaient tout le reste — chercher « mokht » ne montrait jamais le
+commercial Mokhtar, pourtant en base. Chaque nature a désormais sa part (3
+écrans, 3 commerciaux, 5 clients, 4 articles, 4 pièces, 2 tournées), puis les
+places libres sont comblées. L'affichage suit l'utilité : écrans, personnes,
+puis ce qu'elles produisent.
+
+**Recherche mot à mot.** Les noms importés portent parenthèses, tirets et
+espaces doubles : « Ste Anouar express (abou dhabi) » restait introuvable dès
+qu'on tapait le nom naturellement, sans la ponctuation. La requête est
+maintenant découpée en mots, chacun devant figurer dans le nom, **dans
+n'importe quel ordre** — « anouar abou » suffit à trouver ce client.
+
+**Rattrapage sur faute de frappe.** Quand aucun nom ne correspond, la
+similarité trigramme (`similarity()`, requête brute paramétrée) propose les
+plus proches, marqués « nom approchant » pour que l'utilisateur sache que ce
+n'est pas une correspondance exacte : « medinar » → *ste medinart*,
+« chop mabrok » → *Chop imed mabrouk*, « superete bilel » → les trois
+*Superette Bilel*. Le portefeuille du commercial est appliqué dans la requête
+brute aussi — vérifié : un client de Foued reste invisible à Mokhtar.
+
+La **forme de la saisie oriente la recherche** : `TIC251545` est un numéro de
+pièce (8 documents remontés au lieu de 4), `6192207300800` un code-barres,
+`41101015` un code client.
+
+### Index (migration `20260905140000_recherche_globale`)
+
+`pg_trgm` et `unaccent` activées, **8 index GIN trigrammes** sur les colonnes
+cherchées (raison sociale, ville, téléphone, désignation, référence,
+code-barres, numéro de pièce, tiers du document). Sans eux, chaque frappe
+imposerait un parcours complet des 4 601 tiers et 28 966 documents. Mesuré :
+**0,17 à 0,42 s** par requête, réseau compris — 0,26 à 0,37 s avec le
+rattrapage par similarité.
+
+Les ordres de mission n'ont pas de code stocké (« OM-2894 » est dérivé de
+l'id) : la recherche par numéro passe par la clé primaire, déjà indexée.
+
+### La barre
+
+Débounce de 220 ms (une requête par frappe saturerait la base), navigation
+`↑ ↓` / `Entrée` / `Échap`, pictogramme et teinte par nature pour que l'œil
+trie avant de lire, montants alignés à droite. Le `⌘K` déjà en place donne le
+focus. Sur mobile, la recherche était **absente** (`hidden sm:block`) : une
+loupe la déploie désormais en pleine largeur.
+
+Cloisonnement vérifié : « MAJDOUB » (client de Foued) → 0 résultat pour
+Mokhtar, 4 pour l'admin ; les 8 documents remontés à Mokhtar lui appartiennent
+tous (contrôlé en base) ; le rôle CLIENT ne trouve rien hors de ses achats.
+
+## Audit de sécurité — septembre 2026
+
+Sauvegarde préalable (`db/backups/avant_audit_*.dump`), écritures de test
+contrôlées, instantané avant/après : **aucune dérive des données métier**
+(règlements 14 758, documents 28 969, tiers 4 601, soldes 97 493,000 — identiques).
+
+### Faille critique : le cookie de session était falsifiable
+
+`src/lib/auth.ts` stockait la session en **base64 non signé**. Vérifié en
+conditions réelles : un cookie fabriqué à la main avec `{"role":"ADMIN"}`
+ouvrait `/api/utilisateurs`, `/api/grh`, `/api/compta` et `/api/parametres` en
+**200**, sans mot de passe. Toute la sécurité de l'application reposait dessus,
+et `name` étant lui aussi falsifiable, tous les cloisonnements par nom de
+commercial tombaient avec.
+
+Corrigé par une **signature HMAC-SHA256** (`SESSION_SECRET` dans `.env`,
+32 octets), comparaison à temps constant, et `secure` activé en production. Un
+cookie sans signature ou mal signé est refusé (401 vérifié) ; les trois rôles se
+connectent normalement.
+
+### Fuites de lecture entre utilisateurs
+
+- **`/api/erp`** — la plus large : ouverte au COMMERCIAL, elle servait la base
+  tiers complète sans notion de portefeuille. Mesuré : Mokhtar voyait les
+  clients de **12 autres commerciaux** avec leurs soldes, plus tous les
+  documents, règlements et comptes de la société. Réservée à ADMIN/MANAGER —
+  aucun écran commercial ne l'appelle (vérifié).
+- **`/api/tresorerie`** — comptes bancaires, chéquiers, chèques et extraits de
+  compte. Réservée au pilotage ; le POST l'était déjà.
+- **`/api/creances?axe=tresorerie`** — 3,6 M TND d'encaissements société. Le
+  périmètre était calculé dans la fonction mais pas appliqué à cette branche.
+  L'axe des créances, lui, reste ouvert au commercial et bien cloisonné.
+- **`/api/etat-stock`** et **`/api/transferts`** — valorisation, `puAchat`,
+  `pmp`, donc les marges. Le commercial garde `/api/catalogue`, restreint à son
+  camion.
+- **`/api/catalogue`** — un rôle CLIENT recevait `puAchat` et `pmp`. L'écran
+  « commander » de l'espace client utilise cette route : plutôt que de la
+  fermer, les coûts sont retirés de la réponse pour ce rôle.
+
+### Écritures non protégées
+
+Chaque route ci-dessous chargeait le tiers ou la tournée **sans jamais comparer
+son commercial** — l'oubli était systématique :
+
+- **`/api/reglements` POST** — un commercial pouvait créditer ou débiter le
+  client d'un collègue et fausser son recouvrement ;
+- **`/api/panier` PUT** — vendre au nom du client d'un autre (le panier
+  débouche sur un ticket : sortie de stock + écriture au compte) ;
+- **`/api/commandes` POST** — idem, et la route n'exigeait aucun rôle ;
+- **`/api/erp/document-lines` PUT** — le GET contrôlait la propriété, le PUT
+  non, alors qu'il réécrit toutes les lignes et les totaux ;
+- **`/api/missions`** — ajouter une visite, réécrire un planning, clôturer une
+  tournée d'autrui ; cinq points corrigés par un garde commun
+  `tourneeInterdite()` ;
+- **`/api/frais-mission`** — lire, imputer, modifier et supprimer les frais de
+  n'importe quelle tournée ; quatre handlers corrigés.
+
+Vérifié après correction : les trois écritures croisées renvoient 403 et
+**aucune ligne de test n'a été créée en base** ; le commercial garde ses propres
+tournées, frais, clients et panier.
+
+### Points sains
+
+Aucun `$queryRawUnsafe`, aucun secret en dur, `.env` hors dépôt, mots de passe
+tous hachés (bcrypt), cookie `httpOnly`, intégrité référentielle intacte
+(0 document/ligne/règlement orphelin, 0 solde incohérent, 0 doublon d'id).
+Les quatre `dangerouslySetInnerHTML` proviennent de l'en-tête de facture
+paramétré, écrivable seulement par ADMIN/MANAGER : risque accepté.

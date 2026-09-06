@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
+import { memePortefeuille } from "@/lib/perimetre-commercial";
 import { round3 } from "@/lib/vente-stats";
 import { validerDocument } from "@/lib/document-validation";
 
@@ -354,8 +355,17 @@ export async function PUT(req: NextRequest) {
     const codeCli = int(body.codeCli);
     let clientNom: string | null = null;
     if (codeCli != null) {
-      const t = await prisma.partner.findUnique({ where: { id: codeCli }, select: { raisonSocial: true } });
+      const t = await prisma.partner.findUnique({
+        where: { id: codeCli },
+        select: { raisonSocial: true, commercial: true },
+      });
       if (!t) return NextResponse.json({ error: `Tiers ${codeCli} inconnu` }, { status: 400 });
+      // Le panier débouche sur un ticket : sortie de stock et écriture au
+      // compte du tiers. Sans ce contrôle, un commercial vendait au nom du
+      // client d'un collègue.
+      if (auth.user.role === "COMMERCIAL" && !memePortefeuille(t.commercial, auth.user.name)) {
+        return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
+      }
       clientNom = t.raisonSocial;
     }
     const row = await prisma.panier.update({

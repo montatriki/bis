@@ -135,6 +135,9 @@ export async function GET(req: NextRequest) {
 // de l'ancien mobile. Un commercial ne modifie que son portefeuille. Les
 // soldes (débit, crédit, solde) et le commercial affecté ne passent jamais
 // par ici : ils sont pilotés par les documents, les règlements et l'admin.
+/** Taille maximale de la photo du point de vente (data URL), ~600 Ko. */
+const PHOTO_MAX = 600_000;
+
 export async function PUT(req: NextRequest) {
   const auth = await requireSession(["COMMERCIAL", "MANAGER", "ADMIN"]);
   if (!auth.ok) return auth.res;
@@ -163,6 +166,22 @@ export async function PUT(req: NextRequest) {
 
   const tel = body?.tel === undefined ? undefined : (normaliserTel(body.tel) || null);
 
+  // Photo de la devanture : ajoutée ou remplacée depuis le terrain. Absente du
+  // corps = inchangée ; `null` explicite = supprimée. Mêmes contrôles qu'à la
+  // création — sans eux, un envoi malformé passerait en base.
+  let photo: string | null | undefined;
+  if (body?.photo !== undefined) {
+    if (body.photo === null || body.photo === "") {
+      photo = null;
+    } else if (typeof body.photo !== "string" || !body.photo.startsWith("data:image/")) {
+      return NextResponse.json({ error: "Format de photo non supporté" }, { status: 400 });
+    } else if (body.photo.length > PHOTO_MAX) {
+      return NextResponse.json({ error: "Photo trop lourde (max ~600 Ko)" }, { status: 400 });
+    } else {
+      photo = body.photo;
+    }
+  }
+
   const row = await prisma.partner.update({
     where: { id },
     data: {
@@ -172,20 +191,17 @@ export async function PUT(req: NextRequest) {
       famille: texte("famille"), matriculeF: texte("matriculeF"),
       codeTva: texte("codeTva"), cletva: texte("cletva"), categorieTva: texte("categorieTva"),
       registreCom: texte("registreCom"),
-      latitude, longitude,
+      latitude, longitude, photo,
     },
     select: {
       id: true, raisonSocial: true, ville: true, gouvernorat: true, tel: true, email: true,
       adresse: true, famille: true, sousFamille: true, soldeFin: true, debit: true, credit: true,
       plafond: true, latitude: true, longitude: true, matriculeF: true,
-      codeTva: true, cletva: true, categorieTva: true, registreCom: true,
+      codeTva: true, cletva: true, categorieTva: true, registreCom: true, photo: true,
     },
   });
   return NextResponse.json({ ok: true, client: row });
 }
-
-/** Taille maximale de la photo du point de vente (data URL), ~600 Ko. */
-const PHOTO_MAX = 600_000;
 
 /**
  * Téléphone réduit à ses chiffres significatifs, indicatif tunisien retiré.

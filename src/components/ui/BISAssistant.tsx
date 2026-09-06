@@ -125,7 +125,7 @@ export default function BISAssistant() {
       {/* Toggle button */}
       <motion.button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-[0_18px_40px_-16px_var(--shadow-hover)]"
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-[0_18px_40px_-16px_var(--shadow-hover)]"
         style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 76%, #000))" }}
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
         animate={open ? { rotate: 0 } : { rotate: 0 }}>
@@ -141,7 +141,7 @@ export default function BISAssistant() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed bottom-24 right-6 z-50 w-[360px] bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col"
+            className="fixed bottom-24 right-6 z-40 w-[360px] bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col"
             style={{ maxHeight: "70vh", height: 520 }}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

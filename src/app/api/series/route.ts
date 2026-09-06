@@ -134,7 +134,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
+  // Cohérence avec le GET et le DELETE de cette même route : un commercial ne
+  // pouvait ni lire ni supprimer ce module, mais pouvait y créer des numéros.
+  const auth = await requireSession(["ADMIN", "MANAGER"]);
   if (!auth.ok) return auth.res;
 
   const body = await req.json().catch(() => ({}));

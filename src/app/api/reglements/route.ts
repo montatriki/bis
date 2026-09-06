@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
-import { cleCommercial } from "@/lib/perimetre-commercial";
+import { cleCommercial, memePortefeuille } from "@/lib/perimetre-commercial";
 
 // Encaissements clients / décaissements fournisseurs.
 //
@@ -31,6 +31,12 @@ export async function POST(req: NextRequest) {
 
   const partner = await prisma.partner.findUnique({ where: { id: codeCli } });
   if (!partner) return NextResponse.json({ error: "Tiers introuvable" }, { status: 404 });
+  // Un encaissement modifie le solde du tiers : sans ce contrôle, un
+  // commercial pouvait créditer (ou débiter, avec sens "F") le client d'un
+  // collègue et fausser son recouvrement.
+  if (auth.user.role === "COMMERCIAL" && !memePortefeuille(partner.commercial, auth.user.name)) {
+    return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
+  }
 
   const mode = body?.mode ? String(body.mode) : "Espèces";
   const echeance = body?.echeance ? String(body.echeance) : "";

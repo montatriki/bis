@@ -60,6 +60,12 @@ export async function PUT(req: NextRequest) {
   if (!document) {
     return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
   }
+  // Même contrôle qu'en lecture : écrire dans le document d'un collègue serait
+  // plus grave encore que le lire, puisque cette route remplace toutes les
+  // lignes et recalcule les totaux de l'entête.
+  if (auth.user.role === "COMMERCIAL" && !memeCommercial(document.commercial, auth.user.name)) {
+    return NextResponse.json({ error: "Document d'un autre commercial" }, { status: 403 });
+  }
   // Un document validé a déjà impacté le stock et le solde : modifier ses lignes
   // désynchroniserait la base. Il faut le dévalider d'abord.
   if (document.valide) {

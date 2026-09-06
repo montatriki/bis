@@ -36,7 +36,10 @@ const s = (v: unknown) => (v == null ? "" : String(v).trim());
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
 export async function GET(req: NextRequest) {
-  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
+  // Back-office : le détail d'un transfert (en-tête, lignes, stocks des deux
+  // emplacements) n'est rattaché à aucun utilisateur. Les écritures étaient
+  // déjà réservées à ADMIN/MANAGER.
+  const auth = await requireSession(["ADMIN", "MANAGER"]);
   if (!auth.ok) return auth.res;
 
   const sp = req.nextUrl.searchParams;

@@ -24,7 +24,14 @@ function colFilters(sp: URLSearchParams, allowed: string[]) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
+  // Back-office uniquement. Cette route sert une vingtaine de ressources
+  // (base tiers complète, tous les documents, règlements, trésorerie, comptes)
+  // sans notion de portefeuille : ouverte au rôle COMMERCIAL, elle exposait à
+  // chaque vendeur les clients et les ventes de tous ses collègues, annulant
+  // le cloisonnement appliqué par /api/clients et /api/tickets. Aucun écran
+  // commercial ne l'appelle — vérifié sur src/app/commercial et
+  // src/components/commercial.
+  const auth = await requireSession(["ADMIN", "MANAGER"]);
   if (!auth.ok) return auth.res;
   const sp = req.nextUrl.searchParams;
   const resource = sp.get("resource") ?? "partners";

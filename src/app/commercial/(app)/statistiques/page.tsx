@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Users, MapPin, ShoppingBag, TrendingUp, AlertTriangle, ChevronRight,
@@ -49,10 +50,10 @@ export default function CommercialStatistiquesPage() {
             {/* Raccourci vers la sélection du client quand aucune visite n'est
                 en cours : c'est le premier geste de la tournée. */}
             {!clientActif && (
-              <a href="/commercial/clients"
+              <Link href="/commercial/clients"
                 className="bg-white text-emerald-700 rounded-2xl px-4 py-3 font-bold text-sm hover:bg-emerald-50 transition flex items-center gap-2">
                 <Users size={16} /> Choisir un client
-              </a>
+              </Link>
             )}
             <div className="bg-white/10 rounded-2xl p-4">
               <div className="text-emerald-200 text-xs mb-1 font-semibold uppercase tracking-wide">Chiffre d&apos;affaires</div>

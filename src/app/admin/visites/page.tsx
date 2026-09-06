@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MapPin, Search, Loader2, Check, Users, CalendarDays, Download } from "lucide-react";
+import { MapPin, Search, Loader2, Check, Users, CalendarDays, Download, X } from "lucide-react";
 import { dateLocaleIso } from "@/lib/date-locale";
 import { formatDistance } from "@/lib/geo";
 
@@ -28,6 +28,10 @@ export default function VisitesPage() {
   const [resume, setResume] = useState<Resume>({ visites: 0, surPlace: 0, clients: 0 });
   const [total, setTotal] = useState(0);
   const [commerciaux, setCommerciaux] = useState<string[]>([]);
+  /** Saisie du filtre commercial : 21 vendeurs, une liste déroulante seule
+      obligeait à parcourir tout le menu des yeux. */
+  const [rechercheCom, setRechercheCom] = useState("");
+  const [listeComOuverte, setListeComOuverte] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const charger = useCallback(() => {
@@ -59,6 +63,13 @@ export default function VisitesPage() {
       .then((d) => setCommerciaux((d.rows ?? []).map((r: { vendeur: string }) => r.vendeur).filter(Boolean)))
       .catch(() => {});
   }, []);
+
+  /** Vendeurs correspondant à la saisie, accents et casse ignorés. */
+  const commerciauxFiltres = useMemo(() => {
+    const q = rechercheCom.trim().toLowerCase();
+    if (!q) return commerciaux;
+    return commerciaux.filter((c) => c.toLowerCase().includes(q));
+  }, [commerciaux, rechercheCom]);
 
   /** Export CSV du rapport affiché, pour l'archivage ou Excel. */
   function exporter() {
@@ -119,11 +130,46 @@ export default function VisitesPage() {
           <input type="date" value={au} onChange={(e) => setAu(e.target.value)} aria-label="Au"
             className="px-3 h-9 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] focus:outline-none focus:border-[var(--accent-primary)]/50" />
         </div>
-        <select value={commercial} onChange={(e) => setCommercial(e.target.value)} aria-label="Commercial"
-          className="px-3 h-9 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] focus:outline-none focus:border-[var(--accent-primary)]/50">
-          <option value="">Tous les commerciaux</option>
-          {commerciaux.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        {/* Commercial : champ de recherche plutôt qu'une liste déroulante —
+            avec 21 vendeurs, il fallait parcourir tout le menu des yeux. */}
+        <div className="relative w-full sm:w-56">
+          <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-55 pointer-events-none" />
+          <input
+            value={listeComOuverte ? rechercheCom : (commercial || "")}
+            onChange={(e) => { setRechercheCom(e.target.value); setListeComOuverte(true); }}
+            onFocus={() => { setRechercheCom(""); setListeComOuverte(true); }}
+            onBlur={() => setTimeout(() => setListeComOuverte(false), 150)}
+            placeholder="Tous les commerciaux"
+            aria-label="Filtrer par commercial"
+            className="w-full pl-9 pr-8 h-9 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)]
+                       text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60
+                       focus:outline-none focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/12" />
+          {commercial && (
+            <button onClick={() => { setCommercial(""); setRechercheCom(""); }}
+              aria-label="Tous les commerciaux"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--accent-light)] transition">
+              <X size={13} />
+            </button>
+          )}
+          {listeComOuverte && (
+            <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-xl bg-[var(--bg-card)]
+                            border border-[var(--border-primary)] shadow-xl py-1">
+              <button onMouseDown={() => { setCommercial(""); setListeComOuverte(false); }}
+                className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-[var(--accent-light)] transition">
+                Tous les commerciaux
+              </button>
+              {commerciauxFiltres.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-[var(--text-secondary)]">Aucun commercial trouvé.</div>
+              ) : commerciauxFiltres.map((c) => (
+                <button key={c} onMouseDown={() => { setCommercial(c); setListeComOuverte(false); }}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-[var(--accent-light)] transition truncate
+                              ${c === commercial ? "font-bold text-[var(--accent-primary)]" : "text-[var(--text-primary)]"}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-55" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nom du client…"

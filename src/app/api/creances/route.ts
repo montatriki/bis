@@ -41,6 +41,13 @@ export async function GET(req: NextRequest) {
   // Trésorerie : mouvements encaissés, pas les créances. Axe distinct car il
   // répond à « d'où vient l'argent ? » et non « qui me doit ? ».
   if (axe === "tresorerie") {
+    // Cet axe agrège les encaissements et décaissements de toute la société,
+    // sans notion de portefeuille : le `perimetre` calculé plus haut ne lui
+    // était pas appliqué. Réservé au pilotage — le commercial garde l'axe des
+    // créances, lui bien cloisonné.
+    if (auth.user.role === "COMMERCIAL") {
+      return NextResponse.json({ error: "Réservé au pilotage" }, { status: 403 });
+    }
     const [parMode, parMois] = await Promise.all([
       prisma.erpReglement.groupBy({
         by: ["modePay", "sens"],

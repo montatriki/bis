@@ -27,7 +27,10 @@ const ETATS_CHEQUE = ["Emis", "Remis", "Encaissé", "Rejeté", "Déchiré"] as c
 export async function GET(req: NextRequest) {
   // `tresorerie` figure dans l'application mobile du commercial : il consulte
   // les encaissements. L'écriture reste réservée à l'administration.
-  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL"]);
+  // Back-office : comptes bancaires, chéquiers, chèques et extraits de compte
+  // n'ont aucun filtre par utilisateur — ouverte au commercial, cette route
+  // exposait la trésorerie de la société. Le POST était déjà réservé.
+  const auth = await requireSession(["ADMIN", "MANAGER"]);
   if (!auth.ok) return auth.res;
 
   const sp = req.nextUrl.searchParams;

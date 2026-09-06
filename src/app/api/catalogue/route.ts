@@ -15,6 +15,8 @@ import { cleCommercial, emplacementVehicule } from "@/lib/perimetre-commercial";
 // aussi `document-validation.ts`, qui décrémente le même emplacement.
 
 export async function GET(req: NextRequest) {
+  // Tous les rôles : l'écran « commander » de l'espace client s'en sert aussi.
+  // Les coûts d'achat sont retirés plus bas pour le rôle CLIENT.
   const auth = await requireSession();
   if (!auth.ok) return auth.res;
 
@@ -182,9 +184,14 @@ export async function GET(req: NextRequest) {
     prisma.article.count({ where: { archiver: 0, vendable: 1, enStock: { gt: 0 } } }),
   ]);
 
+  // `puAchat` et `pmp` sont les coûts d'achat, donc les marges de l'entreprise :
+  // un client n'a pas à les recevoir, même s'il ne les affiche pas.
+  const masquerCouts = auth.user.role === "CLIENT";
+
   // Prix TTC calculé depuis le tarif HT et le taux de TVA de l'article.
   const withTtc = rows.map((a) => ({
     ...a,
+    ...(masquerCouts ? { puAchat: undefined, pmp: undefined } : {}),
     // Le FODEC entre dans la base de TVA (règle tunisienne) : sans lui,
       // KIDS ZONE ressort à 28,586 au lieu des 28,872 de la production.
       prixTtc: Math.round((a.tarif1Ht * (1 + (a.tauxFodec ?? 0) / 100) * (1 + a.tauxTva / 100) + Number.EPSILON) * 1000) / 1000,

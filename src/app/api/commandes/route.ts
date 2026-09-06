@@ -6,7 +6,7 @@ import { prepareDocument } from "@/lib/document-numbering";
 import { computeDocument, type LineInput } from "@/lib/document-calc";
 import { docTypeRule } from "@/lib/document-types";
 import { validerDocument } from "@/lib/document-validation";
-import { emplacementVehicule, cleCommercial } from "@/lib/perimetre-commercial";
+import { emplacementVehicule, cleCommercial, memePortefeuille } from "@/lib/perimetre-commercial";
 
 // Création d'une commande depuis le catalogue (panier commercial / client).
 //
@@ -23,7 +23,7 @@ const num = (v: unknown) => {
 };
 
 export async function POST(req: NextRequest) {
-  const auth = await requireSession();
+  const auth = await requireSession(["ADMIN", "MANAGER", "COMMERCIAL", "CLIENT"]);
   if (!auth.ok) return auth.res;
 
   const body = await req.json().catch(() => ({}));
@@ -64,6 +64,12 @@ export async function POST(req: NextRequest) {
   }
 
   const partner = await prisma.partner.findUnique({ where: { id: codeCli } });
+  // Le document crée une écriture au compte du tiers : un commercial ne peut
+  // commander qu'au nom de ses propres clients. (Le rôle CLIENT est déjà
+  // borné plus haut : son tiers vient de la session, jamais du corps.)
+  if (auth.user.role === "COMMERCIAL" && !memePortefeuille(partner?.commercial, auth.user.name)) {
+    return NextResponse.json({ error: "Ce client n'est pas dans votre portefeuille" }, { status: 403 });
+  }
   const typeDoc = (s(body?.typeDoc) || "COM").toUpperCase();
   const rule = docTypeRule(typeDoc);
   const prepared = await prepareDocument(typeDoc);

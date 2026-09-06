@@ -1,9 +1,14 @@
 "use client";
-import { Bell, Search, Menu, ChevronRight, Check, Command } from "lucide-react";
+import { Bell, Search, Menu, ChevronRight, Check, Command, X, Loader2, Users, Package, FileText, Truck, ArrowRight, UserRound } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { titreEcran, ESPACES } from "@/lib/ecrans";
+
+type Trouvaille = {
+  type: "client" | "article" | "document" | "mission" | "commercial" | "page";
+  id: string; titre: string; detail?: string; info?: string; lien: string;
+};
 
 type Notif = {
   id: string; title: string; message: string; type: string;
@@ -26,6 +31,16 @@ function depuis(iso: string): string {
   return `${Math.floor(h / 24)} j`;
 }
 
+/** Pictogramme et teinte par nature de résultat : l'œil trie avant de lire. */
+const STYLE_TROUVAILLE: Record<Trouvaille["type"], { icone: React.ReactNode; classe: string }> = {
+  client: { icone: <Users size={14} />, classe: "bg-[var(--accent-light)] text-[var(--accent-primary)]" },
+  article: { icone: <Package size={14} />, classe: "bg-emerald-50 text-emerald-700" },
+  document: { icone: <FileText size={14} />, classe: "bg-blue-50 text-blue-700" },
+  mission: { icone: <Truck size={14} />, classe: "bg-amber-50 text-amber-700" },
+  commercial: { icone: <UserRound size={14} />, classe: "bg-violet-50 text-violet-700" },
+  page: { icone: <ArrowRight size={14} />, classe: "bg-slate-100 text-slate-600" },
+};
+
 const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
   ADMIN: { label: "Administrateur", color: "text-slate-700", bg: "bg-slate-100" },
   MANAGER: { label: "Manager", color: "text-blue-700", bg: "bg-blue-100" },
@@ -39,6 +54,14 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
   const [showNotifs, setShowNotifs] = useState(false);
   const [focusRecherche, setFocusRecherche] = useState(false);
   const champRecherche = useRef<HTMLInputElement>(null);
+  // Recherche globale : clients, articles, pièces, tournées et écrans, dans le
+  // périmètre du rôle (`/api/recherche`).
+  const [requete, setRequete] = useState("");
+  const [resultats, setResultats] = useState<Trouvaille[]>([]);
+  const [chercheEnCours, setChercheEnCours] = useState(false);
+  const [surligne, setSurligne] = useState(0);
+  /** Recherche déployée sur mobile (masquée par défaut, faute de place). */
+  const [rechercheMobile, setRechercheMobile] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
   const meta = ROLE_META[user.role] || ROLE_META.ADMIN;
@@ -100,6 +123,47 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
     router.push(n.lien);
   }
 
+  // Une requête par frappe saturerait la base : on attend une pause de saisie.
+  useEffect(() => {
+    const q = requete.trim();
+    let annule = false;
+    if (q.length < 2) {
+      // Vider hors du corps de l'effet : un setState synchrone y provoque des
+      // rendus en cascade.
+      const vider = setTimeout(() => { if (!annule) setResultats([]); }, 0);
+      return () => { annule = true; clearTimeout(vider); };
+    }
+    const t = setTimeout(() => {
+      // L'indicateur d'attente vit dans le délai, pas dans le corps de
+      // l'effet : un setState synchrone y déclencherait des rendus en cascade.
+      setChercheEnCours(true);
+      fetch(`/api/recherche?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => { if (!annule) { setResultats(d.resultats ?? []); setSurligne(0); } })
+        .catch(() => { if (!annule) setResultats([]); })
+        .finally(() => { if (!annule) setChercheEnCours(false); });
+    }, 220);
+    return () => { annule = true; clearTimeout(t); };
+  }, [requete]);
+
+  /** Ouvre un résultat et referme la recherche. */
+  const ouvrirResultat = useCallback((r: Trouvaille) => {
+    setRequete("");
+    setResultats([]);
+    setFocusRecherche(false);
+    setRechercheMobile(false);
+    champRecherche.current?.blur();
+    router.push(r.lien);
+  }, [router]);
+
+  /** Flèches pour parcourir, Entrée pour ouvrir, Échap pour fermer. */
+  function surToucheRecherche(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!resultats.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setSurligne((i) => (i + 1) % resultats.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSurligne((i) => (i - 1 + resultats.length) % resultats.length); }
+    else if (e.key === "Enter") { e.preventDefault(); ouvrirResultat(resultats[surligne] ?? resultats[0]); }
+  }
+
   // Le repère « ⌘K » affiché dans le champ doit agir : un raccourci décoratif
   // est pire que pas de raccourci.
   useEffect(() => {
@@ -109,6 +173,8 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
         champRecherche.current?.focus();
       }
       if (e.key === "Escape" && document.activeElement === champRecherche.current) {
+        setRequete("");
+        setResultats([]);
         champRecherche.current?.blur();
       }
     };
@@ -162,27 +228,87 @@ export default function TopBar({ user }: { user: { name: string; role: string } 
 
         {/* Recherche : discrète au repos, elle s'élargit et s'éclaire au
             focus — l'action la plus fréquente mérite d'être invitante. */}
-        <div className={`min-w-0 hidden sm:block ml-auto transition-[max-width,flex-grow] duration-300 ease-out ${focusRecherche ? "flex-grow max-w-lg" : "flex-grow max-w-[19rem]"}`}>
+        <div className={`min-w-0 ml-auto transition-[max-width,flex-grow] duration-300 ease-out
+                         ${rechercheMobile ? "absolute inset-x-3 z-20 max-w-none" : "hidden sm:block"}
+                         ${focusRecherche ? "flex-grow sm:max-w-lg" : "flex-grow sm:max-w-[19rem]"}`}>
           <div className="relative group">
             <Search size={15}
               className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none ${focusRecherche ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)] opacity-55"}`} />
-            <input ref={champRecherche} placeholder="Rechercher…"
+            <input ref={champRecherche} placeholder="Client, produit, pièce, écran…"
+              value={requete}
+              onChange={(e) => setRequete(e.target.value)}
+              onKeyDown={surToucheRecherche}
               onFocus={() => setFocusRecherche(true)}
-              onBlur={() => setFocusRecherche(false)}
+              // Différé : sans cela, le clic sur un résultat démonterait la
+              // liste avant que l'événement ne l'atteigne.
+              onBlur={() => setTimeout(() => { setFocusRecherche(false); setRechercheMobile(false); }, 180)}
               className="w-full pl-11 pr-16 h-10 text-[13px] rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)]
                          placeholder:text-[var(--text-secondary)]/55 transition-all duration-200
                          hover:border-[var(--accent-primary)]/25
                          focus:outline-none focus:bg-[var(--bg-card)] focus:border-[var(--accent-primary)]/45 focus:shadow-[0_6px_24px_-10px_var(--shadow-hover)]" />
-            {/* Repère clavier, estompé dès la saisie. */}
-            <kbd className={`absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-0.5 h-6 px-1.5 rounded-lg
-                             text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-card)] border border-[var(--border-primary)]
-                             transition-opacity pointer-events-none ${focusRecherche ? "opacity-0" : "opacity-70"}`}>
-              <Command size={10} /> K
-            </kbd>
+
+            {chercheEnCours ? (
+              <Loader2 size={14} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-[var(--accent-primary)]" />
+            ) : requete ? (
+              <button onClick={() => { setRequete(""); champRecherche.current?.focus(); }}
+                aria-label="Effacer la recherche"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--accent-light)] transition">
+                <X size={14} />
+              </button>
+            ) : (
+              /* Repère clavier, estompé dès la saisie. */
+              <kbd className={`absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-0.5 h-6 px-1.5 rounded-lg
+                               text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-card)] border border-[var(--border-primary)]
+                               transition-opacity pointer-events-none ${focusRecherche ? "opacity-0" : "opacity-70"}`}>
+                <Command size={10} /> K
+              </kbd>
+            )}
+
+            {/* Résultats : regroupés par nature, parcourus aux flèches. */}
+            {focusRecherche && requete.trim().length >= 2 && (
+              <div className="absolute left-0 right-0 top-full mt-2 max-h-[26rem] overflow-y-auto rounded-2xl
+                              bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-2xl py-1.5 z-[70]">
+                {resultats.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-xs text-[var(--text-secondary)]">
+                    {chercheEnCours ? "Recherche…" : `Aucun résultat pour « ${requete.trim()} »`}
+                  </div>
+                ) : resultats.map((r, i) => (
+                  <button key={r.id}
+                    onMouseDown={(e) => { e.preventDefault(); ouvrirResultat(r); }}
+                    onMouseEnter={() => setSurligne(i)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition
+                                ${i === surligne ? "bg-[var(--accent-light)]" : "hover:bg-[var(--accent-light)]/60"}`}>
+                    <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${STYLE_TROUVAILLE[r.type].classe}`}>
+                      {STYLE_TROUVAILLE[r.type].icone}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-bold text-[var(--text-primary)] truncate">{r.titre}</span>
+                      {r.detail && <span className="block text-[11px] text-[var(--text-secondary)] opacity-80 truncate">{r.detail}</span>}
+                    </span>
+                    {r.info && (
+                      <span className="text-[11px] font-bold text-[var(--accent-primary)] shrink-0 tabular-nums">{r.info}</span>
+                    )}
+                  </button>
+                ))}
+                {resultats.length > 0 && (
+                  <div className="px-3 pt-2 mt-1 border-t border-[var(--border-primary)] text-[10px] text-[var(--text-secondary)] opacity-70 flex items-center gap-2">
+                    <kbd className="px-1 rounded border border-[var(--border-primary)]">↑↓</kbd> parcourir
+                    <kbd className="px-1 rounded border border-[var(--border-primary)]">↵</kbd> ouvrir
+                    <kbd className="px-1 rounded border border-[var(--border-primary)]">esc</kbd> fermer
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-1 ml-auto sm:ml-3">
+          {/* Loupe (mobile) : la recherche y était purement absente. */}
+          <button onClick={() => { setRechercheMobile(true); setTimeout(() => champRecherche.current?.focus(), 60); }}
+            aria-label="Rechercher"
+            className="sm:hidden w-10 h-10 rounded-2xl flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--accent-light)] transition">
+            <Search size={18} />
+          </button>
         {/* Notifications */}
         <div className="relative">
           <button onClick={() => setShowNotifs(!showNotifs)}

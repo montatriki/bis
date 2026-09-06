@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { rafraichirOperationsSiPerime } from "@/lib/sync-operations";
 import { requireSession } from "@/lib/session";
 import { round3 } from "@/lib/vente-stats";
-import { filtrePortefeuille, cleCommercial } from "@/lib/perimetre-commercial";
+import { filtrePortefeuille, cleCommercial, memeCommercial } from "@/lib/perimetre-commercial";
 import { rafraichirStockSiPerime } from "@/lib/sync-production";
 import { appliquerReleveMission, synchroniserKilometrages, vehiculesNonReferences } from "@/lib/kilometrage-vehicules";
 import { TYPES_CA } from "@/lib/vente-stats";
@@ -11,6 +11,26 @@ import {
   ETATS_MISSION, ETATS_VISITE, cloturerTournee, creerTournee, estCloturee,
   reconcilierTournee, stockVehicule,
 } from "@/lib/missions";
+
+/**
+ * Un commercial n'agit que sur ses propres tournées.
+ *
+ * Les handlers d'écriture sélectionnaient déjà `mission.commercial` mais ne le
+ * comparaient jamais : ajouter une visite, réécrire un planning ou clôturer la
+ * tournée d'un collègue passait sans contrôle. `memeCommercial` plutôt qu'une
+ * égalité stricte, car l'ERP écrit « MOKHTAR » là où la session porte
+ * « Mokhtar Trabelsi ».
+ *
+ * Une tournée sans commercial renseigné est refusée : la laisser passer
+ * rendrait toutes ces tournées modifiables par n'importe qui.
+ */
+function tourneeInterdite(
+  mission: { commercial: string | null },
+  user: { role: string; name: string },
+): boolean {
+  if (user.role !== "COMMERCIAL") return false;
+  return !memeCommercial(mission.commercial, user.name);
+}
 
 // Tournées de vente ambulante — planning, visites, réconciliation.
 //
@@ -742,6 +762,9 @@ export async function POST(req: NextRequest) {
       where: { id: dayId }, select: { commercial: true, etat: true },
     });
     if (!mission) return NextResponse.json({ error: "Tournée introuvable" }, { status: 404 });
+    if (tourneeInterdite(mission, auth.user)) {
+      return NextResponse.json({ error: "Tournée d'un autre commercial" }, { status: 403 });
+    }
     if (estCloturee(mission.etat)) {
       return NextResponse.json({ error: "Tournée clôturée — planning non modifiable" }, { status: 409 });
     }
@@ -823,6 +846,9 @@ export async function PUT(req: NextRequest) {
       select: { etat: true, commercial: true },
     });
     if (!mission) return NextResponse.json({ error: "Tournée introuvable" }, { status: 404 });
+    if (tourneeInterdite(mission, auth.user)) {
+      return NextResponse.json({ error: "Tournée d'un autre commercial" }, { status: 403 });
+    }
     if (estCloturee(mission.etat)) {
       return NextResponse.json({ error: "Tournée clôturée — planning non modifiable" }, { status: 409 });
     }
@@ -880,9 +906,12 @@ export async function PUT(req: NextRequest) {
 
   if (vue === "visite") {
     const ligne = await prisma.ligneMission.findUnique({
-      where: { id }, include: { mission: { select: { etat: true } } },
+      where: { id }, include: { mission: { select: { etat: true, commercial: true } } },
     });
     if (!ligne) return NextResponse.json({ error: "Visite introuvable" }, { status: 404 });
+    if (tourneeInterdite(ligne.mission, auth.user)) {
+      return NextResponse.json({ error: "Tournée d'un autre commercial" }, { status: 403 });
+    }
     if (estCloturee(ligne.mission.etat)) {
       return NextResponse.json({ error: "Tournée clôturée — visite non modifiable" }, { status: 409 });
     }
@@ -919,6 +948,16 @@ export async function PUT(req: NextRequest) {
   }
 
   if (vue === "tournee") {
+    // Clôturer une tournée, changer son véhicule ou ses compteurs kilométriques
+    // n'appartient qu'à son commercial.
+    const laTournee = await prisma.erpMission.findUnique({
+      where: { id }, select: { commercial: true },
+    });
+    if (!laTournee) return NextResponse.json({ error: "Tournée introuvable" }, { status: 404 });
+    if (tourneeInterdite(laTournee, auth.user)) {
+      return NextResponse.json({ error: "Tournée d'un autre commercial" }, { status: 403 });
+    }
+
     // Les 2 610 tournées importées portent « Cloturé » (orthographe de l'ERP
     // source) là où l'application écrit « Clôturée » : une comparaison stricte
     // refusait de modifier une tournée en lui laissant son propre état.
