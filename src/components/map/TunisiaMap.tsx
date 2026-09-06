@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
+import { X, Info } from "lucide-react";
 
 // Supervision cartographique — trois couches, toutes alimentées par la base.
 //
@@ -68,6 +69,13 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
   // par le zoom rendrait sinon la carte incontrôlable).
   const cadragePour = useRef<string>("");
   const [tournees, setTournees] = useState<Tournee[]>([]);
+  /** Plaques des véhicules sans position GPS connue, telles que l'API les liste. */
+  const [sansPosition, setSansPosition] = useState<string[]>([]);
+  /** Tournées ouvertes mais non traçables : ni étape planifiée, ni véhicule localisé. */
+  const [sansTrace, setSansTrace] = useState<{ id: number; commercial: string | null }[]>([]);
+  // La légende occupe un tiers de la carte et masque des points : elle se
+  // replie en une pastille, l'utilisateur choisit ce qu'il veut voir.
+  const [legendeOuverte, setLegendeOuverte] = useState(true);
   // La carte se construit de façon asynchrone (`import("leaflet")`). Sans ce
   // témoin, l'effet de dessin s'exécutait avant que la carte n'existe, sortait
   // en silence et n'était jamais relancé : les données étaient chargées mais
@@ -88,6 +96,9 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
       setClients(c.rows ?? []);
       setZones(z.rows ?? []);
       setTournees(t.rows ?? []);
+      // L'API renvoie la liste des plaques, pas un compteur.
+      setSansPosition(Array.isArray(t.vehiculesSansPosition) ? t.vehiculesSansPosition : []);
+      setSansTrace(Array.isArray(t.tourneesSansTrace) ? t.tourneesSansTrace : []);
     });
     return () => { annule = true; };
   }, []);
@@ -417,9 +428,10 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
 
   // Ce que la couche montre réellement : des tournées, pas des punaises.
   const etapesTotal = tournees.reduce((n, t) => n + t.etapes.length, 0);
+  const vehiculesLocalises = vehicules.filter((v) => v.currentLat != null && v.currentLng != null).length;
   const compte =
     couche === "trafic"
-      ? `${tournees.length} tournée(s) · ${etapesTotal} étape(s)`
+      ? `${tournees.length} tracée(s) sur ${tournees.length + sansTrace.length} · ${etapesTotal} étape(s)`
     : couche === "clients" ? `${fmt(clients.length)} client(s)`
     : `${zones.length} zone(s)`;
 
@@ -427,10 +439,33 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
     <div className="relative w-full h-full rounded-2xl overflow-hidden">
       <div ref={mapRef} className="w-full h-full" />
 
-      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-lg z-10 border border-slate-100">
-        <div className="text-[10px] font-bold text-slate-800 uppercase tracking-wider mb-2">
-          {couche === "trafic" ? "Tournées du jour" : couche === "clients" ? "Légende clients" : "Légende zones"}
-          <span className="ml-1.5 font-semibold text-slate-500 normal-case">· {compte}</span>
+      {/* Repliée, la légende ne laisse qu'une pastille : la carte se lit en
+          entier. Le compteur reste visible dans les deux états. */}
+      {!legendeOuverte && (
+        <button onClick={() => setLegendeOuverte(true)}
+          className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-md
+                     rounded-xl px-3 py-2 shadow-lg border border-slate-100 hover:bg-white transition"
+          title="Afficher la légende">
+          <Info size={13} className="text-slate-500 shrink-0" />
+          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+            {couche === "trafic" ? "Tournées" : couche === "clients" ? "Clients" : "Zones"}
+          </span>
+          <span className="text-[10px] font-semibold text-slate-500">{compte}</span>
+        </button>
+      )}
+
+      <div className={`absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-lg z-10 border border-slate-100
+                       max-h-[70%] overflow-y-auto ${legendeOuverte ? "" : "hidden"}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">
+            {couche === "trafic" ? "Tournées du jour" : couche === "clients" ? "Légende clients" : "Légende zones"}
+            <span className="ml-1.5 font-semibold text-slate-500 normal-case">· {compte}</span>
+          </div>
+          <button onClick={() => setLegendeOuverte(false)}
+            aria-label="Masquer la légende"
+            className="-mt-0.5 -mr-0.5 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0">
+            <X size={13} />
+          </button>
         </div>
         <div className="space-y-1.5">
           {legende.map((l) => (
@@ -440,6 +475,39 @@ export default function TunisiaMap({ couche = "trafic" }: { couche?: Couche }) {
             </div>
           ))}
         </div>
+
+        {/* Une carte presque vide n'est pas forcément en panne : la flotte
+            n'est localisée que si l'application terrain remonte sa position.
+            Sans cette note, l'écran laissait croire à un dysfonctionnement. */}
+        {couche === "trafic" && sansPosition.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] leading-snug text-slate-500 max-w-[16rem]">
+            <span className="font-bold text-slate-700">{vehiculesLocalises} véhicule(s) localisé(s)</span>
+            {" · "}{sansPosition.length} sans position GPS
+            <div className="mt-1 opacity-85 font-mono text-[9px]">{sansPosition.join(" · ")}</div>
+            <div className="mt-1 opacity-80">
+              Un véhicule n&apos;apparaît qu&apos;après la première remontée de position
+              depuis l&apos;application du commercial.
+            </div>
+          </div>
+        )}
+
+        {/* Tournées ouvertes mais introuvables sur la carte : sans cette
+            mention, on croyait la carte fausse alors qu'il manque le plan de
+            visite côté ERP. */}
+        {couche === "trafic" && sansTrace.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] leading-snug text-slate-500 max-w-[16rem]">
+            <span className="font-bold text-amber-700">
+              {sansTrace.length} tournée(s) sans plan de visite
+            </span>
+            <div className="mt-0.5 opacity-85">
+              {sansTrace.map((t) => t.commercial || `OM-${t.id}`).join(" · ")}
+            </div>
+            <div className="mt-0.5 opacity-80">
+              Aucune étape planifiée dans l&apos;ERP et aucun véhicule localisé :
+              rien à tracer.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

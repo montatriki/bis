@@ -497,9 +497,16 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const affichables = tournees.filter((t) => t.etapes.length > 0 || t.position);
     return NextResponse.json({
-      rows: tournees.filter((t) => t.etapes.length > 0 || t.position),
+      rows: affichables,
       total: tournees.length,
+      // Tournées ouvertes mais absentes de la carte : aucune étape planifiée et
+      // aucun véhicule localisé. Sans ce compte, l'écran annonçait « 1 tournée »
+      // alors que 5 étaient en cours — on croyait la carte fausse.
+      tourneesSansTrace: tournees
+        .filter((t) => !affichables.includes(t))
+        .map((t) => ({ id: t.id, commercial: t.commercial, vehicule: t.vehicule, etat: t.etat })),
       // Véhicules sans position connue : la supervision « temps réel » ne peut
       // rien en dire tant qu'aucun point GPS n'est remonté.
       vehiculesSansPosition: vehicules

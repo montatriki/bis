@@ -2516,3 +2516,81 @@ tous hachés (bcrypt), cookie `httpOnly`, intégrité référentielle intacte
 (0 document/ligne/règlement orphelin, 0 solde incohérent, 0 doublon d'id).
 Les quatre `dangerouslySetInnerHTML` proviennent de l'en-tête de facture
 paramétré, écrivable seulement par ADMIN/MANAGER : risque accepté.
+
+### Supervision GIS — onglet « Trafic » : les positions n'étaient rattachées à personne
+
+L'onglet affichait un seul véhicule alors que **1 700 positions GPS** existaient
+en base. Ce n'était pas un défaut d'affichage : `POST /api/position`
+enregistrait la trace **sans jamais renseigner `commercialId`**, et sans
+`vehicleId` dès que la plaque n'était pas déduite de l'emplacement de stock.
+Résultat : 1 102 traces sur 1 700 n'appartenaient ni à un commercial ni à un
+véhicule — donc invisibles partout.
+
+`src/app/api/position/route.ts` :
+- le véhicule vient d'abord du rattachement de la fiche commerciale
+  (`commercials.vehicleId`), et seulement à défaut de l'emplacement de stock ;
+- la trace porte désormais **les deux identifiants** quand ils existent ;
+- `commercials.currentLat/Lng/lastGpsUpdate` est mis à jour en même temps que
+  le véhicule : la supervision fonctionne même sans véhicule rattaché.
+
+Données réparées : les 1 102 traces orphelines (période du 17 au 31/08,
+immédiatement avant celles du véhicule 26 et dans la même zone) rattachées à
+Mokhtar/248TU6787, puis les traces portant un véhicule complétées de leur
+commercial via `commercials.vehicleId`. **1 700 traces, 0 orpheline.**
+
+`TunisiaMap` affiche enfin l'état réel : « 1 véhicule(s) localisé(s) · 6 sans
+position GPS », les plaques concernées, et la raison — un véhicule n'apparaît
+qu'après la première remontée depuis l'application du commercial. Une carte
+presque vide n'est plus prise pour une panne. (`vehiculesSansPosition` est une
+**liste de plaques**, pas un compteur : le composant le traitait comme un
+nombre.)
+
+**Les deux points visibles s'expliquent — et la carte le dit enfin.** L'onglet
+Trafic ne trace pas la flotte mais les **étapes des tournées** : deux points =
+les deux clients planifiés de la seule tournée traçable. Or **6 tournées sont
+ouvertes** ce jour-là ; les 5 autres (SIHEM HARABI, heni rekik, Foued Fakhfekh,
+aziz chelly, HENI LAJMI) n'ont **aucune étape planifiée dans l'ERP** et aucun
+véhicule localisé, donc rien à dessiner. Le filtre
+`t.etapes.length > 0 || t.position` les écartait **silencieusement** : l'écran
+annonçait « 1 tournée » comme si tout allait bien.
+
+L'API expose désormais `tourneesSansTrace`, et la légende affiche
+« 1 tracée(s) sur 6 » puis « 5 tournée(s) sans plan de visite » avec les noms
+des commerciaux concernés.
+
+**Légende repliable.** Enrichie de ces explications, elle occupait un tiers de
+la carte et masquait des étapes. Un bouton × la referme en une pastille
+compacte qui conserve le compteur (« TOURNÉES · 2 tracée(s) sur 7 · 14 étapes »),
+et un clic dessus la rouvre. Elle est aussi bornée à 70 % de la hauteur avec
+défilement interne, pour ne jamais déborder sur les petits écrans.
+
+**L'API de production est hors service** — constaté pendant ce diagnostic :
+`POST /clients/`, `/articles/`, `/ordre_mission/`, `/ligne_mission/` renvoient
+tous `{}` (HTTP 200, 2 octets) alors que le serveur répond et que
+l'application mobile fonctionne. La synchronisation ne peut donc rien
+rapporter — vérifié : **les données locales restent intactes** (2 683 tournées,
+19 697 étapes, 4 601 clients, 28 969 documents), la synchronisation n'écrase
+rien quand la source renvoie vide. Les plans de visite manquants viendront dès
+que l'API répondra de nouveau.
+
+
+### Valorisation du stock par famille — refonte responsive
+
+La fenêtre débordait par le haut (le titre passait sous la barre de
+l'application) et son tableau de **sept colonnes** était illisible sous 640 px.
+
+`src/components/erp/ValorisationFamilles.tsx` :
+- **feuille glissante sur mobile** (poignée, coins arrondis en haut), carte
+  centrée sur bureau ; `max-h-[92dvh]` au lieu d'un conteneur qui défilait —
+  le modal tient désormais entièrement dans l'écran (mesuré : haut à 68 px sur
+  mobile, 78 px sur bureau, bas dans la fenêtre dans les deux cas) ;
+- **une carte par famille sur mobile** au lieu du tableau : nom, part en
+  pourcentage, barre de proportion, puis les cinq chiffres en grille de deux ;
+- **tableau conservé à partir de `sm`**, avec défilement interne et en-tête
+  collant ;
+- **marge négative en rouge** — « Matière première » affichait −154 993 en
+  vert, la couleur du gain ;
+- **totaux d'abord** sur mobile (`flex-col-reverse`) : c'est ce qu'on vient
+  chercher, la note explicative passe dessous ;
+- `env(safe-area-inset-bottom)` pour ne pas tomber sous le geste d'accueil iOS,
+  et « Imprimer » réduit à son icône sur petit écran.
