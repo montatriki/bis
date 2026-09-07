@@ -188,9 +188,19 @@ export async function GET(req: NextRequest) {
   // un client n'a pas à les recevoir, même s'il ne les affiche pas.
   const masquerCouts = auth.user.role === "CLIENT";
 
+  // Présence d'une photo — comme dans la branche « camion » plus haut. Elle
+  // manquait ici : l'espace client n'affichait donc jamais les visuels, même
+  // pour les articles qui en ont un.
+  const refsG = rows.map((a) => a.refArt);
+  const avecPhotoG = refsG.length
+    ? new Set((await prisma.$queryRaw<{ refArt: string }[]>`
+        SELECT "refArt" FROM "articles_ext" WHERE "refArt" IN (${Prisma.join(refsG)}) AND photo IS NOT NULL`).map((r) => r.refArt))
+    : new Set<string>();
+
   // Prix TTC calculé depuis le tarif HT et le taux de TVA de l'article.
   const withTtc = rows.map((a) => ({
     ...a,
+    aPhoto: avecPhotoG.has(a.refArt),
     ...(masquerCouts ? { puAchat: undefined, pmp: undefined } : {}),
     // Le FODEC entre dans la base de TVA (règle tunisienne) : sans lui,
       // KIDS ZONE ressort à 28,586 au lieu des 28,872 de la production.

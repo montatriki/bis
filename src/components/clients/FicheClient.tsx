@@ -23,6 +23,8 @@ type Visite = { id: number; dateVisite: string | null; etat: string; heurePrevue
 type Fiche = {
   client: {
     id: number; raisonSocial: string | null; ville: string | null; gouvernorat: string | null; adresse: string | null;
+    /** Devanture photographiée sur le terrain (data URL), fond de l'en-tête. */
+    photo?: string | null;
     tel: string | null; email: string | null; famille: string | null; sousFamille: string | null; matriculeF: string | null;
     plafond: number | null; soldeFin: number; debit: number; credit: number; latitude: number | null; longitude: number | null;
   };
@@ -117,8 +119,23 @@ export default function FicheClient({
 
       {c && fiche && (
         <>
-          {/* En-tête */}
-          <div className="bg-slate-800 text-white rounded-2xl p-5">
+          {/* En-tête : la devanture photographiée sur le terrain sert de fond.
+              Elle situe le point de vente d'un coup d'œil — un aplat gris n'en
+              disait rien. Sans photo, on garde l'ardoise sombre d'origine. */}
+          <div className="relative overflow-hidden rounded-2xl text-white">
+            {c.photo ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.photo} alt="" aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover" />
+                {/* Voile : sans lui, le texte blanc devient illisible sur une
+                    devanture claire. */}
+                <div className="absolute inset-0 bg-slate-900/78 sm:bg-gradient-to-r sm:from-slate-900/88 sm:via-slate-900/70 sm:to-slate-900/45" />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-slate-800" />
+            )}
+            <div className="relative p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold truncate">{nom}</h1>
@@ -148,18 +165,19 @@ export default function FicheClient({
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-4">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-4">
               <Stat label="Débit" value={fmt(fiche.compte.debit)} />
               <Stat label="Crédit" value={fmt(fiche.compte.credit)} />
               <Stat label="Solde dû" value={fmt(fiche.compte.solde)} alerte={fiche.compte.solde > 0} />
             </div>
-            <div className="mt-2 text-[11px] text-slate-400">
+            <div className="mt-2 text-[11px] text-slate-300/90">
               Calculé à l&apos;instant depuis les documents et règlements (solde initial {fmt(fiche.compte.soldeIni)}).
               {Math.abs(fiche.compte.ecart) >= 0.01 && (
                 <span className="ml-1 inline-flex items-center gap-1 text-amber-300">
                   <AlertTriangle size={11} /> Le compteur enregistré en base indique {fmt(fiche.compte.soldeStocke)} (écart {fmt(fiche.compte.ecart)}) — dérive héritée de l&apos;ancien système.
                 </span>
               )}
+            </div>
             </div>
           </div>
 
@@ -359,9 +377,11 @@ export default function FicheClient({
 
 function Stat({ label, value, alerte }: { label: string; value: string; alerte?: boolean }) {
   return (
-    <div className="bg-white/10 rounded-xl px-3 py-2 text-center">
-      <div className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">{label}</div>
-      <div className={`font-bold tabular-nums ${alerte ? "text-red-300" : ""}`}>{value}</div>
+    // Fond flouté plutôt que translucide : posées sur une photo, les cartes
+    // à 10 % d'opacité laissaient le motif brouiller les chiffres.
+    <div className="bg-black/45 backdrop-blur-sm rounded-xl px-2 sm:px-3 py-2 text-center min-w-0">
+      <div className="text-[9px] sm:text-[10px] uppercase tracking-wide text-slate-300 font-bold truncate">{label}</div>
+      <div className={`text-[13px] sm:text-base font-bold tabular-nums truncate ${alerte ? "text-red-300" : "text-white"}`}>{value}</div>
     </div>
   );
 }

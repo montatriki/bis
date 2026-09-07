@@ -374,12 +374,12 @@ export default function ClientsPage() {
 
               <div className="flex gap-2 mb-2">
                 {estActif ? (
-                  <span className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-emerald-600 text-white py-2 rounded-xl font-semibold">
+                  <span className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-emerald-600 text-white h-11 rounded-xl font-semibold">
                     <Check size={12} /> Visite en cours
                   </span>
                 ) : (
                   <button onClick={() => selectionner(c)}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/25 py-2 rounded-xl hover:bg-emerald-100 transition font-medium"
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/25 h-11 rounded-xl hover:bg-emerald-100 transition font-semibold"
                     title="Démarrer la visite de ce client">
                     <Crosshair size={12} />
                     {dist != null ? `Visite · ${formatDistance(dist)}` : "Démarrer la visite"}
@@ -387,30 +387,30 @@ export default function ClientsPage() {
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 sm:flex gap-2">
                 <button onClick={() => openDetail(c)}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/25 py-2 rounded-xl hover:bg-blue-100 transition font-medium">
+                  className="sm:flex-1 flex items-center justify-center gap-1.5 text-xs bg-[var(--accent-light)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/25 h-11 rounded-xl hover:brightness-97 transition font-semibold">
                   <FileText size={12} /> Fiche
                 </button>
                 {/* Pointage terrain : vérifie la présence sur place et
                     journalise le passage (`visites_client`). */}
                 <button onClick={() => setAPointer(c)} title="Pointer ma visite ici"
-                  className="flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-xl font-semibold transition
-                             bg-[var(--accent-light)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/25 hover:brightness-97">
+                  className="flex items-center justify-center gap-1.5 text-xs px-3 h-11 rounded-xl font-semibold transition sm:shrink-0
+                             bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
                   <MapPin size={12} /> Je suis là
                 </button>
                 <button onClick={() => setAModifier(c)} title="Modifier le client"
-                  className="flex items-center justify-center gap-1.5 text-xs bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-primary)] px-3 py-2 rounded-xl hover:text-[var(--text-primary)] transition font-medium">
+                  className="flex items-center justify-center gap-1.5 text-xs bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-primary)] px-3 h-11 rounded-xl hover:text-[var(--text-primary)] transition font-semibold sm:shrink-0">
                   <Pencil size={12} /> Modifier
                 </button>
                 {tel ? (
                   <a href={`https://wa.me/${tel.startsWith("216") ? tel : `216${tel}`}?text=${msg}`}
                     target="_blank" rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/25 py-2 rounded-xl hover:bg-emerald-100 transition font-medium">
+                    className="sm:flex-1 flex items-center justify-center gap-1.5 text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/25 h-11 rounded-xl hover:bg-emerald-100 transition font-semibold">
                     <MessageCircle size={12} /> Contact
                   </a>
                 ) : (
-                  <span className="flex-1 flex items-center justify-center gap-1.5 text-xs border border-[var(--border-primary)] text-[var(--text-secondary)] py-2 rounded-xl opacity-50">
+                  <span className="sm:flex-1 flex items-center justify-center gap-1.5 text-xs border border-[var(--border-primary)] text-[var(--text-secondary)] h-11 rounded-xl opacity-50">
                     <MessageCircle size={12} /> Sans tél.
                   </span>
                 )}

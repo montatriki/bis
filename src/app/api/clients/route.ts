@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         id: true, raisonSocial: true, ville: true, gouvernorat: true, tel: true, email: true,
         adresse: true, famille: true, sousFamille: true, soldeFin: true, debit: true, credit: true,
         plafond: true, latitude: true, longitude: true, matriculeF: true,
-        codeTva: true, cletva: true, categorieTva: true, registreCom: true,
+        codeTva: true, cletva: true, categorieTva: true, etabTva: true, registreCom: true,
       },
     }),
     prisma.partner.count({ where }),
@@ -190,6 +190,7 @@ export async function PUT(req: NextRequest) {
       ville: texte("ville"), gouvernorat: texte("gouvernorat"),
       famille: texte("famille"), matriculeF: texte("matriculeF"),
       codeTva: texte("codeTva"), cletva: texte("cletva"), categorieTva: texte("categorieTva"),
+      etabTva: texte("etabTva"),
       registreCom: texte("registreCom"),
       latitude, longitude, photo,
     },
@@ -197,7 +198,7 @@ export async function PUT(req: NextRequest) {
       id: true, raisonSocial: true, ville: true, gouvernorat: true, tel: true, email: true,
       adresse: true, famille: true, sousFamille: true, soldeFin: true, debit: true, credit: true,
       plafond: true, latitude: true, longitude: true, matriculeF: true,
-      codeTva: true, cletva: true, categorieTva: true, registreCom: true, photo: true,
+      codeTva: true, cletva: true, categorieTva: true, etabTva: true, registreCom: true, photo: true,
     },
   });
   return NextResponse.json({ ok: true, client: row });
@@ -364,6 +365,13 @@ export async function POST(req: NextRequest) {
       tel: tel || null,
       email: String(body?.email ?? "").trim() || null,
       matriculeF: matriculeF || null,
+      // Segments du matricule fiscal, saisis séparément côté terrain comme
+      // dans l'ERP d'origine : ce sont eux que lisent les écrans admin et les
+      // documents, `matriculeF` n'en étant que la forme concaténée.
+      codeTva: String(body?.codeTva ?? "").trim() || null,
+      cletva: String(body?.cletva ?? "").trim().toUpperCase() || null,
+      categorieTva: String(body?.categorieTva ?? "").trim().toUpperCase() || null,
+      etabTva: String(body?.etabTva ?? "").trim() || null,
       famille: String(body?.famille ?? "").trim() || null,
       latitude: aGeo ? lat : null,
       longitude: aGeo ? lng : null,

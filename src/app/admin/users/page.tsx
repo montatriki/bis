@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pencil, Trash2, Shield, TrendingUp, MapPin, ShoppingBag, Search, X, Loader2, Save } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, TrendingUp, MapPin, ShoppingBag, Search, X, Loader2, Save, Copy, Check, KeyRound } from "lucide-react";
 import { confirmer } from "@/lib/alertes";
 
 type User = {
@@ -12,7 +12,7 @@ type User = {
 
 const ROLE_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
   ADMIN: { color: "bg-slate-700", icon: Shield, label: "Admin" },
-  MANAGER: { color: "bg-blue-600", icon: TrendingUp, label: "Manager" },
+  MANAGER: { color: "bg-[color-mix(in_srgb,var(--accent-primary)_75%,#000)]", icon: TrendingUp, label: "Manager" },
   COMMERCIAL: { color: "bg-emerald-600", icon: MapPin, label: "Commercial" },
   CLIENT: { color: "bg-amber-600", icon: ShoppingBag, label: "Client" },
 };
@@ -53,17 +53,59 @@ export default function UsersPage() {
     [u.name, u.login, u.email, u.role].some((v) => (v ?? "").toLowerCase().includes(search.toLowerCase()))
   );
 
+  /**
+   * Mot de passe fraîchement réinitialisé, par utilisateur. Les mots de passe
+   * sont hachés (bcrypt) : celui-ci n'existe que le temps de l'afficher, il ne
+   * sera plus jamais récupérable ensuite.
+   */
+  const [nouveauMdp, setNouveauMdp] = useState<Record<string, string>>({});
+  /** Dernier élément copié, pour la confirmation visuelle. */
+  const [copie, setCopie] = useState<string | null>(null);
+
+  async function copier(texte: string, cle: string) {
+    try {
+      await navigator.clipboard.writeText(texte);
+      setCopie(cle);
+      setTimeout(() => setCopie((c) => (c === cle ? null : c)), 1800);
+    } catch {
+      setToast({ ok: false, msg: "Copie impossible sur ce navigateur" });
+    }
+  }
+
+  /** Génère un nouveau mot de passe côté serveur et l'affiche une fois. */
+  async function reinitialiser(u: User) {
+    if (!(await confirmer(
+      `Générer un nouveau mot de passe pour « ${u.name} » ? L'ancien cessera aussitôt de fonctionner.`,
+    ))) return;
+    try {
+      const r = await fetch("/api/utilisateurs", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: u.id, reinitialiser: true }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setToast({ ok: false, msg: d.error ?? "Échec de la réinitialisation" }); return; }
+      setNouveauMdp((m) => ({ ...m, [u.id]: d.motDePasse }));
+      setToast({ ok: true, msg: `Nouveau mot de passe généré pour ${u.name} — transmettez-le maintenant` });
+    } catch {
+      setToast({ ok: false, msg: "Réseau indisponible" });
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Gestion des utilisateurs</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Gestion des utilisateurs</h1>
           <p className="text-[var(--text-secondary)] text-sm">
             {loading ? "Chargement…" : `${rows.length} compte(s) · ${rows.filter((u) => u.isActive).length} actif(s)`}
           </p>
         </div>
+        {/* Pleine largeur sur mobile : le bouton flottait à gauche, seul sur
+            sa ligne, ce qui déséquilibrait l'écran. */}
         <motion.button onClick={() => setEditing({ role: "COMMERCIAL", isActive: true })}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-medium transition"
+          className="flex items-center justify-center gap-2 text-white h-11 px-4 rounded-xl font-bold transition shrink-0
+                     shadow-[0_10px_24px_-14px_var(--shadow-hover)]"
+          style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <Plus size={16} /> Nouvel utilisateur
         </motion.button>
@@ -78,7 +120,8 @@ export default function UsersPage() {
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={search} onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-4 py-2.5 text-sm bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl w-full focus:outline-none"
+          className="pl-9 pr-4 h-11 text-sm bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl w-full
+                     transition focus:outline-none focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/12"
           placeholder="Rechercher un utilisateur…" />
       </div>
 
@@ -114,14 +157,67 @@ export default function UsersPage() {
                 <Row label="Créé le" value={fmtDate(u.createdAt)} />
               </div>
 
+              {/* Identifiants : le login se copie tel quel. Le mot de passe est
+                  haché en base — il n'existe en clair nulle part, donc rien à
+                  afficher tant qu'on n'en a pas généré un nouveau. */}
+              <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-2.5 mb-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)] opacity-70">Login</div>
+                    <div className="font-mono text-[13px] font-bold text-[var(--text-primary)] truncate">{u.login}</div>
+                  </div>
+                  <button onClick={() => copier(u.login, `login-${u.id}`)}
+                    title="Copier le login"
+                    className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border border-[var(--border-primary)]
+                               text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+                    {copie === `login-${u.id}` ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                  </button>
+                </div>
+
+                {nouveauMdp[u.id] ? (
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border-primary)]">
+                    <div className="min-w-0">
+                      <div className="text-[9px] font-bold uppercase tracking-wide text-amber-600">
+                        Nouveau mot de passe — affiché une seule fois
+                      </div>
+                      <div className="font-mono text-[13px] font-bold text-[var(--text-primary)] truncate">
+                        {nouveauMdp[u.id]}
+                      </div>
+                    </div>
+                    <button onClick={() => copier(`Login : ${u.login}\nMot de passe : ${nouveauMdp[u.id]}`, `duo-${u.id}`)}
+                      title="Copier le login et le mot de passe"
+                      className="shrink-0 h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-[11px] font-bold text-white
+                                 bg-emerald-600 hover:bg-emerald-500 transition">
+                      {copie === `duo-${u.id}` ? <Check size={12} /> : <Copy size={12} />}
+                      <span className="hidden sm:inline">Copier</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border-primary)]">
+                    <div className="min-w-0">
+                      <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)] opacity-70">Mot de passe</div>
+                      <div className="font-mono text-[13px] text-[var(--text-secondary)] tracking-widest">••••••••</div>
+                    </div>
+                    <button onClick={() => reinitialiser(u)}
+                      title="Générer un nouveau mot de passe"
+                      className="shrink-0 h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-[11px] font-bold
+                                 border border-[var(--border-primary)] text-[var(--text-secondary)]
+                                 hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition">
+                      <KeyRound size={12} /> <span className="hidden sm:inline">Réinitialiser</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <button onClick={() => setEditing(u)}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/25 py-2 rounded-xl hover:bg-blue-100 transition font-medium">
-                  <Pencil size={12} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs h-10 rounded-xl transition font-bold
+                             bg-[var(--accent-light)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/25 hover:brightness-97">
+                  <Pencil size={13} /> Modifier
                 </button>
-                <button onClick={() => remove(u)}
-                  className="px-3 flex items-center justify-center text-xs bg-red-50 dark:bg-red-500/10 text-red-600 border border-red-200 dark:border-red-500/25 py-2 rounded-xl hover:bg-red-100 transition">
-                  <Trash2 size={12} />
+                <button onClick={() => remove(u)} aria-label="Supprimer"
+                  className="w-10 h-10 flex items-center justify-center text-xs bg-red-50 dark:bg-red-500/10 text-red-600 border border-red-200 dark:border-red-500/25 rounded-xl hover:bg-red-100 transition">
+                  <Trash2 size={13} />
                 </button>
               </div>
             </motion.div>
@@ -183,8 +279,9 @@ function UserForm({ initial, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
       <motion.form onSubmit={submit} onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
-        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+        className="bg-[var(--bg-card)] border border-[var(--border-primary)] w-full sm:max-w-md
+                   max-h-[92dvh] sm:max-h-[90vh] rounded-t-3xl sm:rounded-2xl flex flex-col overflow-hidden"
+        initial={{ opacity: 0, y: 32, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 32, scale: 0.98 }}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-primary)]">
           <div className="font-bold text-[var(--text-primary)]">{isNew ? "Nouvel utilisateur" : `Modifier ${initial.name}`}</div>
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-primary)] text-[var(--text-secondary)]"><X size={18} /></button>
@@ -192,9 +289,9 @@ function UserForm({ initial, onClose, onSaved }: {
 
         {err && <div className="mx-5 mt-3 px-3 py-2 rounded-lg bg-red-500/10 text-red-500 text-sm">{err}</div>}
 
-        <div className="px-5 py-4 space-y-3 overflow-auto">
+        <div className="px-4 sm:px-5 py-4 space-y-3 overflow-y-auto flex-1 min-h-0">
           <Field label="Nom complet" req value={f.name} onChange={(v) => set("name", v)} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             <Field label="Login" req value={f.login} onChange={(v) => set("login", v)} />
             <Field label="Téléphone" value={f.phone} onChange={(v) => set("phone", v)} />
           </div>
@@ -221,11 +318,13 @@ function UserForm({ initial, onClose, onSaved }: {
           </label>
         </div>
 
-        <div className="border-t border-[var(--border-primary)] px-5 py-3 flex justify-end gap-2">
+        <div className="border-t border-[var(--border-primary)] shrink-0 bg-[var(--bg-card)]
+                        px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 flex gap-2 sm:justify-end">
           <button type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold rounded-lg border border-[var(--border-primary)] text-[var(--text-secondary)]">Annuler</button>
+            className="flex-1 sm:flex-none px-4 h-11 text-sm font-bold rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">Annuler</button>
           <button type="submit" disabled={busy}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg text-white bg-blue-600 disabled:opacity-60">
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 h-11 text-sm font-bold rounded-xl text-white disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}>
             {busy ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />} Enregistrer
           </button>
         </div>

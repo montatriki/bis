@@ -103,6 +103,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * Mot de passe temporaire lisible : il sera dicté ou recopié à la main.
+ * On exclut les caractères qui se confondent (O/0, I/l/1) et on garde un tiret
+ * pour la lisibilité.
+ */
+function motDePasseLisible(): string {
+  const lettres = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+  const chiffres = "23456789";
+  const pioche = (source: string, n: number) =>
+    Array.from({ length: n }, () => source[Math.floor(Math.random() * source.length)]).join("");
+  return `${pioche(lettres, 4)}-${pioche(chiffres, 4)}`;
+}
+
 export async function PUT(req: NextRequest) {
   const auth = await requireSession(["ADMIN"]);
   if (!auth.ok) return auth.res;
@@ -116,7 +129,12 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Rôle invalide" }, { status: 400 });
   }
 
-  const password = s(body.password);
+  // Réinitialisation : l'administrateur ne peut pas *lire* un mot de passe —
+  // ils sont hachés (bcrypt), le clair n'existe nulle part. Il en génère donc
+  // un nouveau, renvoyé **une seule fois** dans cette réponse pour être
+  // transmis à l'utilisateur ; ensuite il n'est plus récupérable.
+  const reinitialiser = body.reinitialiser === true;
+  const password = reinitialiser ? motDePasseLisible() : s(body.password);
   if (password && password.length < 4) {
     return NextResponse.json({ error: "Mot de passe trop court (4 caractères minimum)" }, { status: 400 });
   }
@@ -139,7 +157,9 @@ export async function PUT(req: NextRequest) {
       },
       select: { id: true, name: true, login: true, email: true, role: true, isActive: true },
     });
-    return NextResponse.json({ ok: true, row });
+    // Le mot de passe en clair n'accompagne QUE la réinitialisation explicite,
+    // jamais une modification ordinaire — et il n'est plus récupérable ensuite.
+    return NextResponse.json({ ok: true, row, ...(reinitialiser ? { motDePasse: password } : {}) });
   } catch (e) {
     const msg = (e as Error).message.includes("Unique")
       ? "Ce login ou cet email est déjà utilisé"

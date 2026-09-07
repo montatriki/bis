@@ -7,6 +7,8 @@ type Article = {
   refArt: string; codeBarre: string | null; designation: string;
   unite: string | null; enStock: number; stMin: number;
   tarif1Ht: number; tauxTva: number; prixTtc: number;
+  /** L'article a une photo : elle est servie à part par `/api/articles/photo`. */
+  aPhoto?: boolean;
 };
 type CartItem = { article: Article; qty: number };
 
@@ -107,7 +109,8 @@ export default function CommanderPage() {
             Référence : <strong className="text-[var(--text-primary)]">{refDoc}</strong>
           </p>
           <button onClick={() => { setCart([]); setStep("catalogue"); setNote(""); setRefDoc(""); }}
-            className="bg-blue-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-blue-500 transition">
+            className="text-white px-8 py-3 rounded-xl font-bold transition shadow-[0_10px_24px_-14px_var(--shadow-hover)]"
+            style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}>
             Nouvelle commande
           </button>
         </motion.div>
@@ -165,7 +168,7 @@ export default function CommanderPage() {
             <div className="flex justify-between text-sm"><span className="text-[var(--text-secondary)]">TVA</span><span className="font-medium tabular-nums">{fmt(totalTVA)} TND</span></div>
             <div className="flex justify-between text-base font-bold pt-1.5 border-t border-[var(--border-primary)]">
               <span className="text-[var(--text-primary)]">Total TTC</span>
-              <span className="text-blue-700 dark:text-blue-400 tabular-nums">{fmt(totalTTC)} TND</span>
+              <span className="text-[var(--accent-primary)] tabular-nums">{fmt(totalTTC)} TND</span>
             </div>
           </div>
         </div>
@@ -175,7 +178,8 @@ export default function CommanderPage() {
           className="w-full px-4 py-3 text-sm bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl focus:outline-none resize-none" />
 
         <button onClick={envoyer} disabled={saving || cart.length === 0}
-          className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2">
+          className="w-full text-white py-3 rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_10px_24px_-14px_var(--shadow-hover)]"
+          style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}>
           {saving && <Loader2 className="animate-spin" size={16} />} Envoyer la commande
         </button>
       </div>
@@ -193,7 +197,8 @@ export default function CommanderPage() {
           </p>
         </div>
         <motion.button onClick={() => setStep("recap")} disabled={cart.length === 0}
-          className="relative flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-blue-500 transition text-sm disabled:opacity-40"
+          className="relative flex items-center gap-2 text-white px-4 py-2.5 rounded-xl font-bold transition text-sm disabled:opacity-40 shadow-[0_10px_24px_-14px_var(--shadow-hover)]"
+          style={{ background: "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}
           whileHover={{ scale: cart.length ? 1.02 : 1 }} whileTap={{ scale: 0.98 }}>
           <ShoppingCart size={16} /> Mon panier
           {totalItems > 0 && (
@@ -230,8 +235,26 @@ export default function CommanderPage() {
           return (
             <motion.div key={a.refArt} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-sm p-4"
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.02, 0.3) }}>
-              <div className="w-full h-24 bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-card)] rounded-xl flex items-center justify-center mb-3">
-                <Package size={30} className="text-slate-300" />
+              {/* Visuel du produit : la photo n'était jamais affichée côté
+                  client, alors que l'article en a une. `object-contain` montre
+                  l'article entier, avec un double flouté pour combler les
+                  côtés quand son format diffère du cadre. */}
+              <div className="relative w-full h-32 rounded-xl overflow-hidden mb-3 flex items-center justify-center
+                              bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-card)]">
+                {a.aPhoto ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/articles/photo?refArt=${encodeURIComponent(a.refArt)}`} alt=""
+                      aria-hidden="true" loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-40" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/articles/photo?refArt=${encodeURIComponent(a.refArt)}`} alt={a.designation}
+                      loading="lazy"
+                      className="relative w-full h-full object-contain" />
+                  </>
+                ) : (
+                  <Package size={30} className="text-slate-300" />
+                )}
               </div>
               <div className="font-semibold text-[var(--text-primary)] text-sm leading-tight mb-1 line-clamp-2" title={a.designation}>
                 {a.designation}
@@ -247,15 +270,16 @@ export default function CommanderPage() {
 
               {qty === 0 ? (
                 <button onClick={() => addToCart(a)} disabled={rupture}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs bg-blue-600 text-white py-2.5 rounded-xl hover:bg-blue-500 transition font-medium disabled:opacity-40">
+                  className="w-full flex items-center justify-center gap-1.5 text-[13px] text-white py-2.5 rounded-xl transition font-bold disabled:opacity-40 shadow-[0_8px_20px_-12px_var(--shadow-hover)]"
+                  style={{ background: rupture ? "var(--text-secondary)" : "linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 78%, #000))" }}>
                   <Plus size={13} /> {rupture ? "Indisponible" : "Ajouter"}
                 </button>
               ) : (
-                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-500/10 rounded-xl p-1">
+                <div className="flex items-center justify-between rounded-xl p-1 bg-[var(--accent-light)] border border-[var(--accent-primary)]/20">
                   <button onClick={() => updateQty(a.refArt, -1)} className="w-8 h-8 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm">
                     <Minus size={13} className="text-red-500" />
                   </button>
-                  <span className="font-bold text-blue-700 dark:text-blue-400">{qty}</span>
+                  <span className="font-black tabular-nums text-[var(--accent-primary)]">{qty}</span>
                   <button onClick={() => updateQty(a.refArt, 1)} className="w-8 h-8 flex items-center justify-center bg-[var(--bg-card)] rounded-lg shadow-sm">
                     <Plus size={13} className="text-emerald-500" />
                   </button>

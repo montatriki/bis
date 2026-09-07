@@ -161,13 +161,13 @@ export default function RecouvrementPage() {
                   {tel && (
                     <a href={`https://wa.me/${tel.startsWith("216") ? tel : `216${tel}`}?text=${msg}`}
                       target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                      className="flex-1 text-xs py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-500/25 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition font-medium flex items-center justify-center gap-1">
-                      <MessageCircle size={11} /> Relancer
+                      className="flex-1 text-xs h-11 rounded-xl border border-emerald-200 dark:border-emerald-500/25 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition font-semibold flex items-center justify-center gap-1.5">
+                      <MessageCircle size={13} /> Relancer
                     </a>
                   )}
                   <button onClick={(e) => { e.stopPropagation(); selectClient(c); setShowPayModal(true); setPayAmount(String(c.soldeFin)); }}
-                    className="flex-1 text-xs py-1.5 rounded-lg border border-blue-200 dark:border-blue-500/25 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition font-medium flex items-center justify-center gap-1">
-                    <CreditCard size={11} /> Encaisser
+                    className="flex-1 text-xs h-11 rounded-xl border border-[var(--accent-primary)]/25 bg-[var(--accent-light)] text-[var(--accent-primary)] hover:brightness-97 transition font-semibold flex items-center justify-center gap-1.5">
+                    <CreditCard size={13} /> Encaisser
                   </button>
                 </div>
               </motion.div>

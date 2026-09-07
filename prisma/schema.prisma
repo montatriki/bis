@@ -608,6 +608,8 @@ model Partner {
   codeTva      String?
   cletva       String?
   categorieTva String?
+  /** 4e segment du matricule fiscal tunisien : n° d'établissement (« 000 »). */
+  etabTva      String?
   matriculeF   String? // MF
   famille      String? // Fam_cli
   sousFamille  String? // Sous_fam_cli

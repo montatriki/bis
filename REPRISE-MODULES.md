@@ -2594,3 +2594,156 @@ l'application) et son tableau de **sept colonnes** était illisible sous 640 px.
   chercher, la note explicative passe dessous ;
 - `env(safe-area-inset-bottom)` pour ne pas tomber sous le geste d'accueil iOS,
   et « Imprimer » réduit à son icône sur petit écran.
+
+### Fiche client : la devanture en fond d'en-tête
+
+L'en-tête était un aplat gris qui ne disait rien du point de vente. La photo
+prise sur le terrain (`partners.photo`, capturée à la création du client ou
+depuis « Modifier un client ») lui sert désormais de fond — le commercial
+reconnaît le commerce d'un coup d'œil.
+
+- `GET /api/clients/fiche` expose `client.photo` (elle n'était pas dans la
+  réponse) ;
+- `FicheClient` l'affiche en `object-cover` sous un dégradé sombre —
+  horizontal sur bureau pour laisser voir la photo à droite, plus dense sur
+  mobile où le texte occupe toute la largeur ;
+- **sans photo, l'ardoise sombre d'origine est conservée** : 1 client sur 4 551
+  en a une aujourd'hui, l'écran ne devait pas se dégrader pour les autres ;
+- les cartes Débit / Crédit / Solde passent de `bg-white/10` à un fond noir
+  flouté : à 10 % d'opacité, le motif de la photo brouillait les chiffres. Sur
+  mobile, libellés et montants sont réduits et tronqués pour tenir en trois
+  colonnes sur 390 px.
+
+Vérifié aux trois cas : client avec photo (fond actif), sans photo (ardoise),
+et rendu mobile.
+
+### Espace client : les photos d'articles manquaient
+
+L'écran « Commander » affichait toujours le pictogramme, même pour les articles
+qui ont une photo. Deux causes cumulées :
+
+1. **`GET /api/catalogue` ne calculait `aPhoto` que dans la branche du
+   commercial** (stock camion). La branche générale — celle que reçoit le rôle
+   CLIENT — ne le renvoyait pas du tout, donc l'écran ne pouvait pas savoir
+   qu'une photo existait. La même requête `pg_trgm`-libre sur `articles_ext`
+   est désormais faite dans les deux branches.
+2. **`src/app/client/commander/page.tsx` n'affichait jamais d'image** : le
+   pictogramme `Package` était codé en dur. Il montre maintenant la photo
+   (`object-contain` sur un double flouté, comme le catalogue commercial) et
+   ne retombe sur le pictogramme qu'à défaut.
+
+`GET /api/articles/photo` était déjà ouverte à tous les rôles : rien à changer
+côté service — vérifié, elle renvoie bien 200 / image-jpeg / 82 Ko au client.
+
+Les 7 classes `blue` restantes de cet écran (boutons « Ajouter », « Mon
+panier », total, sélecteur de quantité) sont passées à l'accent terre de
+sienne, comme le reste de l'application.
+
+Vérifié pour le rôle CLIENT : `aPhoto = true` sur le coffret Monopoly, image
+affichée en 1500 et 390 px, et **`puAchat` / `pmp` toujours masqués**.
+
+### « Nouveau point de vente » : responsive mobile
+
+Le titre était coupé en haut sur téléphone : `max-h-[92vh]` ignore les barres
+du navigateur mobile, le modal dépassait donc de l'écran.
+
+`src/components/commercial/NouveauClientModal.tsx`, aligné sur
+`ModifierClientModal` :
+- **feuille glissante** ancrée en bas sur mobile (poignée posée sur le bandeau
+  vert — au-dessus, sur fond clair, elle aurait coupé l'en-tête d'une bande
+  blanche), carte centrée à partir de `sm` ;
+- **`dvh` au lieu de `vh`** : le titre est désormais entièrement visible ;
+- **champs de 44 px** (cible tactile minimale) avec halo au focus ; libellés en
+  petites capitales ;
+- **le matricule fiscal prend toute la ligne sur mobile** : « 1234567/A/M/000 »
+  ne tient pas en demi-largeur sur 390 px ;
+- **`env(safe-area-inset-bottom)`** sous la barre d'actions, et le libellé du
+  bouton principal raccourci en « Créer et visiter » sur mobile — « Créer et
+  démarrer la visite » débordait de son bouton.
+
+Vérifié en 390×844, **360×640** et 1400×900 : titre visible, modal contenu dans
+l'écran, bouton principal atteignable dans les trois cas.
+
+### Matricule fiscal en quatre segments
+
+L'ERP d'origine saisit le matricule en quatre cases — code TVA, clé, catégorie,
+établissement — là où le formulaire terrain demandait un seul champ libre
+(« 1234567/A/M/000 »), source d'erreurs de frappe.
+
+**Migration `20260907100000_client_etablissement`** : ajout de
+`partners.etabTva`. Les trois autres segments existaient déjà (`codeTva`,
+`cletva`, `categorieTva`) et sont **effectivement remplis** en base — 4 069
+clients sur 4 551 ont un code TVA — alors qu'aucun n'a de `matriculeF`. La
+saisie en un champ ignorait donc les colonnes réellement exploitées.
+
+`NouveauClientModal` et `ModifierClientModal` affichent désormais quatre
+entrées sur une grille de 6 colonnes : le code prend la moitié (7 chiffres), la
+clé, la catégorie et l'établissement une case chacun, centrées. Clé et
+catégorie sont **normalisées en majuscules à la saisie** (l'ERP écrit « A »,
+« M »), et l'établissement vaut « 000 » par défaut — l'établissement principal.
+
+Le matricule reste **obligatoire** à la création : code, clé et catégorie sont
+exigés séparément, avec un message par champ plutôt qu'un « matricule fiscal
+obligatoire » global. `POST /api/clients` enregistre les quatre segments **et**
+recompose `matriculeF` (« 1234567/A/M/000 »), qui porte le contrôle d'unicité et
+s'imprime sur les documents.
+
+Vérifié : création sans matricule refusée, création complète enregistrée avec
+`code=1234567 · cle=A · cat=M · etab=000` (saisie en minuscules normalisée),
+4 segments affichés en 390 et 1400 px, base laissée intacte (4 601 clients).
+
+### Utilisateurs : identifiants copiables et réinitialisation
+
+**Les mots de passe ne peuvent pas être affichés** : ils sont hachés (bcrypt),
+le clair n'existe nulle part en base — ni pour l'administrateur, ni pour
+personne. La demande « voir les mots de passe » a donc été traduite en ce que
+font les ERP : on n'en retrouve pas un, on en génère un nouveau.
+
+- **Login copiable** sur chaque carte (bouton copie, coche de confirmation) ;
+- **« Réinitialiser »** génère un mot de passe côté serveur — lettres et
+  chiffres sans caractères ambigus (`O/0`, `I/l/1`), format `Abcd-2345`, pensé
+  pour être dicté au téléphone ;
+- il s'affiche **une seule fois**, avec la mention explicite, et un bouton
+  **« Copier »** qui met « Login : … / Mot de passe : … » dans le
+  presse-papiers, prêt à envoyer ;
+- `PUT /api/utilisateurs` ne renvoie le clair **que** sur `reinitialiser:true`
+  — une modification ordinaire (téléphone, rôle…) n'en renvoie jamais. Réservé
+  à ADMIN.
+
+Vérifié bout en bout : l'ancien mot de passe est refusé (401) après
+réinitialisation, le nouveau fonctionne (200), une modification ordinaire ne
+renvoie rien, un COMMERCIAL reçoit « Accès refusé », et la copie place bien
+`zztestui` puis `Login : … / Mot de passe : BmhC-8698` dans le presse-papiers.
+Compte de test supprimé.
+
+**Responsive** : le bouton « Nouvel utilisateur » et les actions passent en
+pleine largeur sur mobile, champ de recherche et boutons à 44 px (cible
+tactile), formulaire en feuille glissante (`dvh` +
+`env(safe-area-inset-bottom)`), et les 7 classes `blue` restantes de l'écran
+sont passées à l'accent.
+
+### Espace commercial : cibles tactiles et boutons qui débordaient
+
+Audit responsive des 13 écrans commerciaux en 390 px, mesuré au navigateur.
+**Aucun débordement horizontal**, aucun tableau coupé — mais deux écrans
+sortaient du lot sur la taille des boutons :
+
+| Écran | Boutons < 36 px avant | après |
+|---|---|---|
+| Mes clients | **791** | 7 |
+| Recouvrement | **80** | 3 |
+
+Ce sont précisément les actions de terrain — « Fiche », « Je suis là »,
+« Modifier », « Contact », « Encaisser », « Relancer » — visées au pouce, debout
+dans un commerce. Toutes passées à **44 px** (`h-11`), la cible tactile
+minimale. Les 3 à 7 restants sont les boutons de la barre du haut, communs à
+tous les écrans.
+
+**Défaut découvert en vérifiant le rendu** : une fois agrandis, les quatre
+boutons de la carte client **débordaient à droite** sur 390 px (« Sans té… »
+coupé). Ils passent en **grille 2×2 sur mobile** et redeviennent une seule
+ligne dès `sm` — vérifié : rien n'est tronqué sur mobile, et le bureau est
+inchangé.
+
+Le bleu résiduel de ces deux écrans (bouton « Fiche », bouton « Encaisser »)
+est passé à l'accent.

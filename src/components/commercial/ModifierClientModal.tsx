@@ -19,12 +19,14 @@ export type ClientModifiable = {
   ville: string | null; gouvernorat: string | null; famille: string | null; matriculeF: string | null;
   latitude: number | null; longitude: number | null;
   codeTva?: string | null; cletva?: string | null; categorieTva?: string | null; registreCom?: string | null;
+  /** 4e segment du matricule fiscal : n° d'établissement. */
+  etabTva?: string | null;
   /** Devanture du point de vente (data URL). Chargée à l'ouverture du modal. */
   photo?: string | null;
 };
 
 type Form = {
-  raisonSocial: string; codeTva: string; cletva: string; categorieTva: string; registreCom: string;
+  raisonSocial: string; codeTva: string; cletva: string; categorieTva: string; etabTva: string; registreCom: string;
   famille: string; adresse: string; tel: string; email: string; longitude: string; latitude: string;
   gouvernorat: string; ville: string;
 };
@@ -32,6 +34,7 @@ type Form = {
 function depuisClient(c: ClientModifiable): Form {
   return {
     raisonSocial: c.raisonSocial ?? "", codeTva: c.codeTva ?? "", cletva: c.cletva ?? "", categorieTva: c.categorieTva ?? "",
+    etabTva: c.etabTva ?? "",
     registreCom: c.registreCom ?? "", famille: c.famille ?? "", adresse: c.adresse ?? "", tel: c.tel ?? "", email: c.email ?? "",
     longitude: c.longitude != null && !(c.latitude === 0 && c.longitude === 0) ? String(c.longitude) : "",
     latitude: c.latitude != null && !(c.latitude === 0 && c.longitude === 0) ? String(c.latitude) : "",
@@ -297,10 +300,27 @@ export default function ModifierClientModal({
                 {/* 3 colonnes serrées devenaient illisibles sur mobile : le
                     code TVA y prend toute la largeur, clé et catégorie se
                     partagent la ligne suivante. */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  <Champ label="Code TVA" className="col-span-2 sm:col-span-1" value={form.codeTva} onChange={maj("codeTva")} placeholder="1428436/F" />
-                  <Champ label="Clé" value={form.cletva} onChange={maj("cletva")} placeholder="A" />
-                  <Champ label="Catégorie" value={form.categorieTva} onChange={maj("categorieTva")} placeholder="M" />
+                {/* Matricule fiscal en quatre segments, comme la saisie de
+                    l'ERP d'origine et le formulaire de création. */}
+                <div>
+                  <span className={classeLabel}>Matricule fiscal</span>
+                  <div className="mt-1.5 grid grid-cols-6 gap-1.5 sm:gap-2">
+                    <input value={form.codeTva} onChange={maj("codeTva")}
+                      placeholder="1234567" aria-label="Code TVA"
+                      className={`${classeChampSegment} col-span-3`} />
+                    <input value={form.cletva} onChange={maj("cletva")}
+                      placeholder="Clé" aria-label="Clé" maxLength={1}
+                      className={`${classeChampSegment} text-center uppercase`} />
+                    <input value={form.categorieTva} onChange={maj("categorieTva")}
+                      placeholder="Cat" aria-label="Catégorie" maxLength={1}
+                      className={`${classeChampSegment} text-center uppercase`} />
+                    <input value={form.etabTva} onChange={maj("etabTva")}
+                      placeholder="000" aria-label="Établissement" maxLength={3}
+                      className={`${classeChampSegment} text-center`} />
+                  </div>
+                  <div className="mt-1 text-[10px] text-[var(--text-secondary)] opacity-75">
+                    Code · Clé · Catégorie · Établissement
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <Champ label="Registre de commerce" value={form.registreCom} onChange={maj("registreCom")} />
@@ -448,3 +468,11 @@ function Champ({
     </label>
   );
 }
+
+/** Style des quatre segments du matricule fiscal. */
+const classeChampSegment =
+  "h-11 min-w-0 px-2 text-sm rounded-xl bg-[var(--bg-primary)] " +
+  "border border-[var(--border-primary)] text-[var(--text-primary)] " +
+  "placeholder:text-[var(--text-secondary)]/45 transition " +
+  "focus:outline-none focus:bg-[var(--bg-card)] focus:border-[var(--accent-primary)]/55 " +
+  "focus:ring-2 focus:ring-[var(--accent-primary)]/12";

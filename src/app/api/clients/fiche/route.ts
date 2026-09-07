@@ -189,6 +189,8 @@ export async function GET(req: NextRequest) {
       sousFamille: client.sousFamille, matriculeF: client.matriculeF, plafond: client.plafond,
       soldeFin: client.soldeFin, debit: client.debit, credit: client.credit,
       latitude: client.latitude, longitude: client.longitude,
+      // Devanture prise sur le terrain : sert de fond à l'en-tête de la fiche.
+      photo: client.photo,
     },
     periode: { mois, annee, annees, auto: periodeAuto, derniereActivite },
     // Compte calculé depuis les transactions (voir en-tête du fichier).
